@@ -1,13 +1,21 @@
 from datetime import UTC, datetime
 from typing import Optional
+from urllib.parse import urlparse
 
 from redis.asyncio import ConnectionPool, Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.logger import logging
-from ...schemas.rate_limit import sanitize_path
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_path(path: str) -> str:
+    parsed = urlparse(path)
+    clean_path = parsed.path
+    if clean_path.endswith("/") and len(clean_path) > 1:
+        clean_path = clean_path[:-1]
+    return clean_path or "/"
 
 
 class RateLimiter:
