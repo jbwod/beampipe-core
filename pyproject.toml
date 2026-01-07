@@ -1,8 +1,8 @@
 [project]
-name = "fastapi-boilerplate"
+name = "beampipe-core"
 version = "0.1.0"
-description = "Batteries-included FastAPI starter with production-ready defaults, optional modules, and clear docs."
-authors = [{ name = "Benav Labs", email = "contact@benav.io" }]
+description = "Control plane for event-driven, scheduler-aware radio astronomy workflows."
+authors = [{ name = "Jack Blackwood", email = "23326698@student.uwa.edu.au" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.11, <4"
