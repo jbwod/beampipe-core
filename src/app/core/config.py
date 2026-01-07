@@ -6,10 +6,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppSettings(BaseSettings):
-    APP_NAME: str = "FastAPI app"
-    APP_DESCRIPTION: str | None = None
+    APP_NAME: str = "beampipe-core"
+    APP_DESCRIPTION: str | None = (
+        "Event-driven control plane for scheduler-aware radio astronomy workflows."
+    )
     APP_VERSION: str | None = None
-    LICENSE_NAME: str | None = None
+    LICENSE_NAME: str | None = "MIT"
     CONTACT_NAME: str | None = None
     CONTACT_EMAIL: str | None = None
 
