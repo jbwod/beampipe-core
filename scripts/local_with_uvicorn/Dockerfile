@@ -7,18 +7,18 @@ ENV UV_LINK_MODE=copy
 
 WORKDIR /app
 
+COPY pyproject.toml uv.lock ./
+
 # Install dependencies first (for better layer caching)
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project
+    uv sync --locked --no-install-project --all-groups
 
 # Copy the project source code
 COPY . /app
 
 # Install the project in non-editable mode
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-editable
+    uv sync --locked --no-editable --all-groups
 
 # --------- Final Stage ---------
 FROM python:3.11-slim-bookworm

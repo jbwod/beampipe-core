@@ -44,6 +44,11 @@ services:
       - postgres-data:/var/lib/postgresql/data
     expose:
       - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:alpine
@@ -62,6 +67,21 @@ services:
   #   depends_on:
   #     - web
 
+  #-------- uncomment to run migrations --------
+  migrate:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ./src/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "cd /code/src && python -m alembic upgrade head"
+    volumes:
+      - ./src:/code/src
+    working_dir: /code/src
+
   #-------- uncomment to create first superuser --------
   create_superuser:
     build: 
@@ -71,7 +91,7 @@ services:
       - ./src/.env
     depends_on:
       - db
-      - web
+      - migrate
     command: python -m src.scripts.create_first_superuser
     volumes:
       - ./src:/code/src
