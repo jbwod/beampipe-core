@@ -1,4 +1,7 @@
-# Pull Request Template for FastAPI-boilerplate
+# Pull Request for beampipe-core
+
+## Closes
+
 
 ## Description
 Please provide a clear and concise description of what your pull request is about.
@@ -17,4 +20,8 @@ Describe the tests you added or modified to cover your changes, if applicable.
 - [ ] All new and existing tests passed.
 
 ## Additional Notes
-Include any additional information that you think is important for reviewers to know.
+Include any additional information that you think is important for reviewers to know. For example:
+- Breaking changes
+- Migration requirements
+- Performance implications
+- Dependencies on external systems (CASDA, SLURM clusters, etc.)
