@@ -27,16 +27,12 @@ beampipe-core is a modular orchestration and triggering framework for data-drive
 ## Start the 
 
 1. Create environment variables: copy an env example from `scripts/*/.env.example` to `src/.env` and adjust secrets.
-2. Local dev without Docker:
-   ```bash
-   uv sync && uv run uvicorn src.app.main:app --reload
-   ```
-3. With Docker Compose:
+2. With Docker Compose:
    ```bash
    ./setup.py local  # or staging / production
    docker compose up
    ```
-4. API docs are available at `/docs` when `ENVIRONMENT=local`.
+3. API docs are available at `/docs` when `ENVIRONMENT=local`.
 
 
 
