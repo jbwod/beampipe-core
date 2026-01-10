@@ -80,6 +80,8 @@ class RunRecordUpdate(BaseModel):
 
 class RunRecordUpdateInternal(RunRecordUpdate):
     updated_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
 
 
