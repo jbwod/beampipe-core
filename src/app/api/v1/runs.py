@@ -11,7 +11,7 @@ from ...core.exceptions.http_exceptions import BadRequestException, NotFoundExce
 from ...core.ledger.service import run_ledger_service
 from ...crud.crud_run_record import crud_run_records
 from ...models.ledger import RunStatus
-from ...schemas.ledger import RunRecordRead, RunRecordCreate
+from ...schemas.ledger import RunRecordRead, RunRecordCreate, RunRecordUpdate
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -67,7 +67,17 @@ async def create_run(
     current_user: Annotated[dict, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
-    """Create a new run record."""
+    """Create a new run record.
+    
+    Args:
+        request: FastAPI request object
+        run_data: Run data
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        New run record
+    """
     run = await run_ledger_service.create_run(
         db=db,
         project_module=run_data.project_module,
@@ -77,8 +87,10 @@ async def create_run(
         dataset_metadata=run_data.dataset_metadata,
         created_by_id=current_user.get("id"),
     )
+    # Handle both dict and model object returns
+    run_uuid = run.get("uuid") if isinstance(run, dict) else run.uuid
     return await crud_run_records.get(
-        db=db, uuid=run.uuid, schema_to_select=RunRecordRead
+        db=db, uuid=run_uuid, schema_to_select=RunRecordRead
     )
 
 
@@ -108,6 +120,47 @@ async def get_run(
         raise NotFoundException(f"Run {run_id} not found")
 
     return run
+
+
+@router.patch("/{run_id}", response_model=RunRecordRead)
+async def update_run(
+    request: Request,
+    run_id: UUID,
+    run_update: RunRecordUpdate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    """Update a run record.
+
+    Updates run status, workflow manifest, scheduler information, etc.
+
+    Args:
+        request: FastAPI request object
+        run_id: Run UUID
+        run_update: Update data
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Updated run record
+    """
+    updated_run = await run_ledger_service.update_run_status(
+        db=db,
+        run_id=run_id,
+        status=run_update.status,
+        scheduler_job_id=run_update.scheduler_job_id,
+        scheduler_name=run_update.scheduler_name,
+        workflow_type=run_update.workflow_type,
+        workflow_manifest=run_update.workflow_manifest,
+        error=run_update.last_error,
+    )
+
+    # Handle both dict and model object returns
+    run_uuid = updated_run.get("uuid") if isinstance(updated_run, dict) else updated_run.uuid
+
+    return await crud_run_records.get(
+        db=db, uuid=run_uuid, schema_to_select=RunRecordRead
+    )
 # - GET /runs - list runs with filtering
 # - GET /runs/{id} - get run details
 # - POST /runs/{id}/retry - retry failed run

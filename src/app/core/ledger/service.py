@@ -4,6 +4,7 @@ Provides idempotent run tracking and duplicate prevention.
 """
 import logging
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -12,8 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_run_record import crud_run_records
 from ...models.ledger import RunRecord, RunStatus
-from ...schemas.ledger import RunRecordCreateInternal
+from ...schemas.ledger import RunRecordCreateInternal, RunRecordUpdateInternal
 from ..config import settings
+from ..exceptions.http_exceptions import BadRequestException, NotFoundException
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +85,10 @@ class RunLedgerService:
             db, project_module, source_identifier, dataset_id
         )
         if existing:
+            existing_uuid = existing.get("uuid") if isinstance(existing, dict) else existing.uuid
             logger.info(
                 f"Run already exists for {project_module}/{source_identifier}/{dataset_id}, "
-                f"returning existing run {existing.uuid}"
+                f"returning existing run {existing_uuid}"
             )
             return existing
 
@@ -101,22 +104,121 @@ class RunLedgerService:
                 status=RunStatus.PENDING,
             )
             run = await crud_run_records.create(db=db, object=run_data)
-            logger.info(f"Created new run {run.uuid} for {project_module}/{source_identifier}/{dataset_id}")
+            run_uuid = run.get("uuid") if isinstance(run, dict) else run.uuid
+            logger.info(f"Created new run {run_uuid} for {project_module}/{source_identifier}/{dataset_id}")
             return run
         except Exception as e:
             logger.exception(f"Error creating run for {project_module}/{source_identifier}/{dataset_id}: {e}")
             raise
 
-    # @staticmethod
-    # async def update_run_status(
-    #     db: AsyncSession,
-    #     run_id: UUID,
-    #     status: RunStatus,
-    #     scheduler_job_id: str | None = None,
-    #     error: str | None = None,
-    #     workflow_manifest: dict | None = None,
-    #     workflow_batch_id: UUID | None = None,
-    # ) -> RunRecord:
+    @staticmethod
+    def _validate_status_transition(current_status: RunStatus, new_status: RunStatus) -> bool:
+        allowed_transitions = {
+            RunStatus.PENDING: [RunStatus.RUNNING, RunStatus.CANCELLED],
+            RunStatus.RUNNING: [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED],
+            RunStatus.COMPLETED: [],  # no more transitions allowed
+            RunStatus.FAILED: [RunStatus.RETRYING, RunStatus.CANCELLED],
+            RunStatus.RETRYING: [RunStatus.RUNNING, RunStatus.FAILED, RunStatus.CANCELLED],
+            RunStatus.CANCELLED: [],  # no more transitions allowed
+        }
+        return new_status in allowed_transitions.get(current_status, [])
+
+    @staticmethod
+    async def update_run_status(
+        db: AsyncSession,
+        run_id: UUID,
+        status: RunStatus | None = None,
+        scheduler_job_id: str | None = None,
+        scheduler_name: str | None = None,
+        workflow_type: str | None = None,
+        workflow_manifest: dict | None = None,
+        error: str | None = None,
+    ) -> RunRecord:
+        """Update run status and related fields.
+
+        Args:
+            db: Database session
+            run_id: Run UUID
+            status: New status for the run
+            scheduler_job_id: ID from the HPC scheduler
+            scheduler_name: Name of the scheduler
+            workflow_type: Type of workflow
+            workflow_manifest: JSON manifest of the workflow
+            error: Error message if the run failed
+
+        Returns:
+            Updated run record
+
+        Raises:
+            NotFoundException: If run not found
+            BadRequestException: If status transition is invalid
+        """
+        # Get existing
+        run = await crud_run_records.get(db=db, uuid=run_id)
+        if not run:
+            raise NotFoundException(f"Run {run_id} not found")
+
+            # debug figure out which is returned?
+        if isinstance(run, dict):
+            logger.warning(f"Run {run_id} returned as dict, should be object")
+        current_status_value = run.get("status") if isinstance(run, dict) else run.status
+        started_at_value = run.get("started_at") if isinstance(run, dict) else run.started_at
+        completed_at_value = run.get("completed_at") if isinstance(run, dict) else run.completed_at
+
+        # status transition if status is being changed
+        if status and status != current_status_value:
+            current_status = RunStatus(current_status_value)
+            if not RunLedgerService._validate_status_transition(current_status, status):
+                raise BadRequestException(
+                    f"Invalid status transition from {current_status.value} to {status.value}"
+                )
+
+        # Prepare
+        update_data: dict[str, Any] = {}
+        now = datetime.now(UTC)
+
+        if status:
+            update_data["status"] = status
+            # timestamp management
+            if status == RunStatus.RUNNING and not started_at_value:
+                update_data["started_at"] = now
+            elif status in [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED]:
+                if not completed_at_value:
+                    update_data["completed_at"] = now
+
+        if scheduler_job_id is not None:
+            update_data["scheduler_job_id"] = scheduler_job_id
+        if scheduler_name is not None:
+            update_data["scheduler_name"] = scheduler_name
+        if workflow_type is not None:
+            update_data["workflow_type"] = workflow_type
+        if workflow_manifest is not None:
+            update_data["workflow_manifest"] = workflow_manifest
+        if error is not None:
+            update_data["last_error"] = error
+
+        # Always update updated_at
+        update_data["updated_at"] = now
+
+        if not update_data:
+            # No changes to make
+            return run
+
+        # Update run
+        update_schema = RunRecordUpdateInternal(**update_data)
+        await crud_run_records.update(
+            db=db, object=update_schema, uuid=run_id
+        )
+
+        # Fetch
+        updated_run = await crud_run_records.get(db=db, uuid=run_id)
+        if not updated_run:
+            raise NotFoundException(f"Run {run_id} not found after update")
+
+        logger.info(
+            f"Updated run {run_id}: status={status}, scheduler_job_id={scheduler_job_id}"
+        )
+        return updated_run
 
     # @staticmethod
     # async def mark_for_retry(
