@@ -151,6 +151,10 @@ class CORSSettings(BaseSettings):
     CORS_HEADERS: list[str] = ["*"]
 
 
+class RunLedgerSettings(BaseSettings):
+    MAX_RETRIES: int = 3
+
+
 class Settings(
     AppSettings,
     SQLiteSettings,
@@ -166,6 +170,7 @@ class Settings(
     CRUDAdminSettings,
     EnvironmentSettings,
     CORSSettings,
+    RunLedgerSettings,
 ):
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".env"),

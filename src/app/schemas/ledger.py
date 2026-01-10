@@ -63,18 +63,19 @@ class RunRecordRead(TimestampSchema, RunRecordBase, UUIDSchema):
 
 
 class RunRecordUpdate(BaseModel):
+    """Schema for updating run records via API.
+
+    Note: status, started_at, and completed_at are managed automatically
+    by the service layer based on status transitions.
+    """
     model_config = ConfigDict(extra="forbid")
 
-    dataset_metadata: dict | None = Field(default=None)
-    status: RunStatus | None = Field(default=None)
-    workflow_manifest: dict | None = Field(default=None)
-    workflow_type: str | None = Field(default=None, max_length=50)
-    scheduler_name: str | None = Field(default=None, max_length=50)
-    scheduler_job_id: str | None = Field(default=None, max_length=100)
-    retry_count: int | None = Field(default=None, ge=0)
-    last_error: str | None = Field(default=None)
-    started_at: datetime | None = Field(default=None)
-    completed_at: datetime | None = Field(default=None)
+    status: RunStatus | None = Field(default=None, description="New run status")
+    workflow_manifest: dict | None = Field(default=None, description="Workflow manifest JSON")
+    workflow_type: str | None = Field(default=None, max_length=50, description="Type of workflow")
+    scheduler_name: str | None = Field(default=None, max_length=50, description="Name of scheduler")
+    scheduler_job_id: str | None = Field(default=None, max_length=100, description="Scheduler job ID")
+    last_error: str | None = Field(default=None, description="Error message if run failed")
 
 
 class RunRecordUpdateInternal(RunRecordUpdate):
