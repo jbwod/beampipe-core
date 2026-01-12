@@ -87,11 +87,7 @@ async def create_run(
         dataset_metadata=run_data.dataset_metadata,
         created_by_id=current_user.get("id"),
     )
-    # Handle both dict and model object returns
-    run_uuid = run.get("uuid") if isinstance(run, dict) else run.uuid
-    return await crud_run_records.get(
-        db=db, uuid=run_uuid, schema_to_select=RunRecordRead
-    )
+    return run
 
 
 @router.get("/{run_id}", response_model=RunRecordRead)
@@ -155,12 +151,7 @@ async def update_run(
         error=run_update.last_error,
     )
 
-    # Handle both dict and model object returns
-    run_uuid = updated_run.get("uuid") if isinstance(updated_run, dict) else updated_run.uuid
-
-    return await crud_run_records.get(
-        db=db, uuid=run_uuid, schema_to_select=RunRecordRead
-    )
+    return updated_run
 # - GET /runs - list runs with filtering
 # - GET /runs/{id} - get run details
 # - POST /runs/{id}/retry - retry failed run

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_run_record import crud_run_records
 from ...models.ledger import RunRecord, RunStatus
-from ...schemas.ledger import RunRecordCreateInternal, RunRecordUpdateInternal
+from ...schemas.ledger import RunRecordCreateInternal, RunRecordRead, RunRecordUpdateInternal
 from ..config import settings
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
 
@@ -27,7 +27,7 @@ class RunLedgerService:
         project_module: str,
         source_identifier: str,
         dataset_id: str,
-    ) -> RunRecord | None:
+    ) -> dict[str, Any] | None:
         """Check if a run already exists for the given key.
 
         Args:
@@ -45,6 +45,7 @@ class RunLedgerService:
                 project_module=project_module,
                 source_identifier=source_identifier,
                 dataset_id=dataset_id,
+                schema_to_select=RunRecordRead,
             )
             return run
         except Exception as e:
@@ -62,7 +63,7 @@ class RunLedgerService:
         archive_name: str,
         dataset_metadata: dict | None = None,
         created_by_id: int | None = None,
-    ) -> RunRecord:
+    ) -> dict[str, Any]:
         """Create a new run record with check.
 
         If a run exist with the same key, returns the existing run.
@@ -85,7 +86,7 @@ class RunLedgerService:
             db, project_module, source_identifier, dataset_id
         )
         if existing:
-            existing_uuid = existing.get("uuid") if isinstance(existing, dict) else existing.uuid
+            existing_uuid = existing.get("uuid")
             logger.info(
                 f"Run already exists for {project_module}/{source_identifier}/{dataset_id}, "
                 f"returning existing run {existing_uuid}"
@@ -103,8 +104,10 @@ class RunLedgerService:
                 created_by_id=created_by_id,
                 status=RunStatus.PENDING,
             )
-            run = await crud_run_records.create(db=db, object=run_data)
-            run_uuid = run.get("uuid") if isinstance(run, dict) else run.uuid
+            run = await crud_run_records.create(
+                db=db, object=run_data, schema_to_select=RunRecordRead
+            )
+            run_uuid = run.get("uuid")
             logger.info(f"Created new run {run_uuid} for {project_module}/{source_identifier}/{dataset_id}")
             return run
         except Exception as e:
@@ -133,7 +136,7 @@ class RunLedgerService:
         workflow_type: str | None = None,
         workflow_manifest: dict | None = None,
         error: str | None = None,
-    ) -> RunRecord:
+    ) -> dict[str, Any]:
         """Update run status and related fields.
 
         Args:
@@ -154,16 +157,13 @@ class RunLedgerService:
             BadRequestException: If status transition is invalid
         """
         # Get existing
-        run = await crud_run_records.get(db=db, uuid=run_id)
+        run = await crud_run_records.get(db=db, uuid=run_id, schema_to_select=RunRecordRead)
         if not run:
             raise NotFoundException(f"Run {run_id} not found")
 
-            # debug figure out which is returned?
-        if isinstance(run, dict):
-            logger.warning(f"Run {run_id} returned as dict, should be object")
-        current_status_value = run.get("status") if isinstance(run, dict) else run.status
-        started_at_value = run.get("started_at") if isinstance(run, dict) else run.started_at
-        completed_at_value = run.get("completed_at") if isinstance(run, dict) else run.completed_at
+        current_status_value = run.get("status")
+        started_at_value = run.get("started_at")
+        completed_at_value = run.get("completed_at")
 
         # status transition if status is being changed
         if status and status != current_status_value:
@@ -211,7 +211,9 @@ class RunLedgerService:
         )
 
         # Fetch
-        updated_run = await crud_run_records.get(db=db, uuid=run_id)
+        updated_run = await crud_run_records.get(
+            db=db, uuid=run_id, schema_to_select=RunRecordRead
+        )
         if not updated_run:
             raise NotFoundException(f"Run {run_id} not found after update")
 
