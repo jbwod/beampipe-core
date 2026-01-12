@@ -16,6 +16,7 @@ from ...models.ledger import RunRecord, RunStatus
 from ...schemas.ledger import RunRecordCreateInternal, RunRecordRead
 from ..config import settings
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
+# from ..registry.service import source_registry_service
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,19 @@ class RunLedgerService:
 
         Returns:
             RunRecord (existing or newly created)
+
+        Raises:
+            BadRequestException: If source is not registered in the source registry
         """
+        # registered_source = await source_registry_service.check_existing_source(
+        #     db, project_module, source_identifier
+        # )
+        # if not registered_source:
+        #     raise BadRequestException(
+        #         f"Source {source_identifier} is not registered for project {project_module}. "
+        #         "register the source first before creating a run."
+        #     )
+
         # Check for existing
         existing = await RunLedgerService.check_existing_run(
             db, project_module, source_identifier, dataset_id
