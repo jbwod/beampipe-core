@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_run_record import crud_run_records
 from ...models.ledger import RunRecord, RunStatus
-from ...schemas.ledger import RunRecordCreateInternal, RunRecordRead, RunRecordUpdateInternal
+from ...schemas.ledger import RunRecordCreateInternal, RunRecordRead
 from ..config import settings
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
 
@@ -205,9 +205,8 @@ class RunLedgerService:
             return run
 
         # Update run
-        update_schema = RunRecordUpdateInternal(**update_data)
         await crud_run_records.update(
-            db=db, object=update_schema, uuid=run_id
+            db=db, object=update_data, uuid=run_id
         )
 
         # Fetch
