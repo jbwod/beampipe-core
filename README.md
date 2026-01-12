@@ -1,6 +1,8 @@
 # beampipe-core
+![beampipe-core pipeline trace diagram](/trace.svg)
 
-beampipe-core is a modular orchestration and triggering framework for data-driven radio astronomy workflows. It operates as a control plane that continuously monitors scientific archives (ie; CASDA), determines when datasets are ready, and orchestrates scheduler-aware execution of distributed workflows on heterogeneous HPC systems such as Pawsey’s Setonix.
+
+> `beampipe-core` is a modular orchestration and triggering framework for data-driven radio astronomy workflows. It operates as a control plane that continuously monitors scientific archives (ie; CASDA), determines when datasets are ready, and orchestrates scheduler-aware execution of distributed workflows on heterogeneous HPC systems.
 
 ## What it does
 
@@ -11,6 +13,7 @@ beampipe-core is a modular orchestration and triggering framework for data-drive
 - Deterministic provenance to track parameters, container digests, inputs, outputs, and signatures for reproducibility metrics.
 
 ## Features
+- To update here
 
 ### Core Infrastructure (from FastAPI boilerplate)
 * ⚡️ Fully async FastAPI + SQLAlchemy 2.0
