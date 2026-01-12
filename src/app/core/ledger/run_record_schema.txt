@@ -1,0 +1,49 @@
+Table: run_record
+
+Fields:
+- uuid (UUID, Primary Key) - Auto-generated uuid7
+- project_module (VARCHAR(50), NOT NULL, INDEXED)
+- source_identifier (VARCHAR(100), NOT NULL, INDEXED)
+- archive_name (VARCHAR(50), NOT NULL)
+- dataset_id (VARCHAR(255), NOT NULL)
+- dataset_metadata (JSONB, NULLABLE)
+- workflow_manifest (JSONB, NULLABLE)
+- workflow_type (VARCHAR(50), NULLABLE)
+- scheduler_name (VARCHAR(50), NULLABLE)
+- scheduler_job_id (VARCHAR(100), NULLABLE, INDEXED)
+- last_error (TEXT, NULLABLE)
+- created_by_id (INTEGER, NULLABLE, INDEXED, FK to user.id)
+- updated_at (TIMESTAMP WITH TIME ZONE, NULLABLE)
+- started_at (TIMESTAMP WITH TIME ZONE, NULLABLE)
+- completed_at (TIMESTAMP WITH TIME ZONE, NULLABLE)
+- status (ENUM, NOT NULL, INDEXED) - Values: pending, running, completed, failed, retrying, cancelled. Default: pending
+- retry_count (INTEGER, NOT NULL) - Default: 0
+- created_at (TIMESTAMP WITH TIME ZONE, NOT NULL) - Auto-generated UTC
+
+Constraints:
+- Unique constraint on (project_module, source_identifier, dataset_id)
+
+JSON Example:
+{
+  "uuid": "018e1234-5678-9abc-def0-123456789abc",
+  "project_module": "wallaby",
+  "source_identifier": "HIPASSJ1234+56",
+  "archive_name": "casda",
+  "dataset_id": "SB12345_visibilities.ms.tar",
+  "dataset_metadata": {
+  },
+  "status": "running",
+  "workflow_manifest": {
+  },
+  "workflow_type": "daliuge",
+  "scheduler_name": "slurm",
+  "scheduler_job_id": "12345678",
+  "retry_count": 0,
+  "last_error": null,
+  "created_by_id": 1,
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T10:05:00Z",
+  "started_at": "2024-01-15T10:01:00Z",
+  "completed_at": null
+}
+
