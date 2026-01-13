@@ -60,9 +60,28 @@ async def register_source(
     return source
 
 @router.get("/{source_id}")
-async def get_source(source_id):
-    pass
+async def get_source(
+    request: Request,
+    source_id: UUID,
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    source = await source_registry_service.get_source(
+        db=db,
+        source_id=source_id,
+    )
+    return source
 
 @router.patch("/{source_id}")
-async def update_source(source_id):
-    pass
+async def update_source(
+    request: Request,
+    source_id: UUID,
+    source_data: SourceRegistryUpdate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    source = await source_registry_service.update_source(
+        db=db,
+        source_id=source_id,
+        enabled=source_data.enabled,
+    )
+    return source
