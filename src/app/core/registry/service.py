@@ -25,7 +25,17 @@ class SourceRegistryService:
         source_identifier: str,
     ) -> SourceRegistry | None:
         """Check if a source already exists for the given key."""
-        pass
+        try:
+            source = await crud_source_registry.get(
+                db=db,
+                project_module=project_module,
+                source_identifier=source_identifier,
+                schema_to_select=SourceRegistryRead,
+            )
+            return source
+        except Exception as e:
+            logger.exception(f"Error checking existing source for {project_module}/{source_identifier}: {e}")
+            return None
 
     @staticmethod
     async def register_source(
