@@ -1,14 +1,56 @@
-from fastapi import APIRouter
+from typing import Annotated, Any
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Request
+from fastcrud import PaginatedListResponse, compute_offset, paginated_response
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...api.dependencies import get_current_user
+from ...core.db.database import async_get_db
+from ...core.exceptions.http_exceptions import BadRequestException, NotFoundException
+from ...core.registry.service import source_registry_service
+from ...models.registry import SourceRegistry
+from ...schemas.registry import SourceRegistryRead, SourceRegistryCreate, SourceRegistryUpdate
+
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
-@router.get("")
-async def list_sources():
-    pass
+@router.get("", response_model=PaginatedListResponse[SourceRegistryRead])
+async def list_sources(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+    project_module: str | None = None,
+    enabled: bool | None = None,
+    page: int = 1,
+    items_per_page: int = 10,
+) -> dict[str, Any]:
+# need to fix that in the run ledger also to use the service instead of the crud directly
+    sources_data = await source_registry_service.list_sources(
+        db=db,
+        project_module=project_module,
+        enabled=enabled,
+        offset=compute_offset(page, items_per_page),
+        limit=items_per_page,
+    )
+    response: dict[str, Any] = paginated_response(
+        crud_data=sources_data, page=page, items_per_page=items_per_page
+    )
+    return response
 
-@router.post("")
-async def register_source():
-    pass
+@router.post("", response_model=SourceRegistryRead, status_code=201)
+async def register_source(
+    request: Request,
+    source_data: SourceRegistryCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    source = await source_registry_service.register_source(
+        db=db,
+        project_module=source_data.project_module,
+        source_identifier=source_data.source_identifier,
+        enabled=source_data.enabled,
+    )
+    return source
 
 @router.get("/{source_id}")
 async def get_source(source_id):

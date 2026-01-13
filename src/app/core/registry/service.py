@@ -45,7 +45,25 @@ class SourceRegistryService:
         enabled: bool = False,
     ) -> SourceRegistry:
         """Register a new source or return existing (idempotent)."""
-        pass
+        existing = await crud_source_registry.get(
+            db=db,
+            project_module=project_module,
+            source_identifier=source_identifier,
+            schema_to_select=SourceRegistryRead,
+        )
+        if existing:
+            return existing
+        source_data = SourceRegistryCreateInternal(
+            project_module=project_module,
+            source_identifier=source_identifier,
+            enabled=enabled,
+        )
+        source = await crud_source_registry.create(
+            db=db,
+            object=source_data,
+            schema_to_select=SourceRegistryRead,
+        )
+        return source
 
     @staticmethod
     async def get_source(
@@ -53,7 +71,14 @@ class SourceRegistryService:
         source_id: UUID,
     ) -> SourceRegistry:
         """Get a single source by UUID."""
-        pass
+        source = await crud_source_registry.get(
+            db=db,
+            uuid=source_id,
+            schema_to_select=SourceRegistryRead,
+        )
+        if not source:
+            raise NotFoundException(f"Source with id {source_id} not found")
+        return source
 
     @staticmethod
     async def list_sources(
@@ -64,7 +89,24 @@ class SourceRegistryService:
         limit: int = 10,
     ) -> dict[str, Any]:
         """List sources with filtering and pagination."""
-        pass
+        filters = {}
+        if project_module is not None:
+            filters["project_module"] = project_module
+        if enabled is not None:
+            filters["enabled"] = enabled
+
+        sources = await crud_source_registry.get_multi(
+            db=db,
+            offset=offset,
+            limit=limit,
+            **filters,
+            schema_to_select=SourceRegistryRead,
+        )
+        return {
+            "items": sources,
+            "offset": offset,
+            "limit": limit,
+        }
 
     @staticmethod
     async def update_source(
