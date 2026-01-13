@@ -87,7 +87,15 @@ class SourceRegistryService:
         enabled: bool | None = None,
     ) -> SourceRegistry:
         """Update source metadata."""
-        pass
+        source = await crud_source_registry.get(
+            db=db,
+            uuid=source_id,
+            schema_to_select=SourceRegistryRead,
+        )
+        if not source:
+            raise NotFoundException(f"Source with id {source_id} not found")
+        source.enabled = enabled
+        return source
 
     @staticmethod
     async def get_enabled_sources(
