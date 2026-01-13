@@ -81,34 +81,6 @@ class SourceRegistryService:
         return source
 
     @staticmethod
-    async def list_sources(
-        db: AsyncSession,
-        project_module: str | None = None,
-        enabled: bool | None = None,
-        offset: int = 0,
-        limit: int = 10,
-    ) -> dict[str, Any]:
-        """List sources with filtering and pagination."""
-        filters = {}
-        if project_module is not None:
-            filters["project_module"] = project_module
-        if enabled is not None:
-            filters["enabled"] = enabled
-
-        sources = await crud_source_registry.get_multi(
-            db=db,
-            offset=offset,
-            limit=limit,
-            **filters,
-            schema_to_select=SourceRegistryRead,
-        )
-        return {
-            "items": sources,
-            "offset": offset,
-            "limit": limit,
-        }
-
-    @staticmethod
     async def update_source(
         db: AsyncSession,
         source_id: UUID,

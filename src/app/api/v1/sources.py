@@ -9,6 +9,7 @@ from ...api.dependencies import get_current_user
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import BadRequestException, NotFoundException
 from ...core.registry.service import source_registry_service
+from ...crud.crud_source_registry import crud_source_registry
 from ...models.registry import SourceRegistry
 from ...schemas.registry import SourceRegistryRead, SourceRegistryCreate, SourceRegistryUpdate
 
@@ -24,14 +25,20 @@ async def list_sources(
     page: int = 1,
     items_per_page: int = 10,
 ) -> dict[str, Any]:
-# need to fix that in the run ledger also to use the service instead of the crud directly
-    sources_data = await source_registry_service.list_sources(
+# nevermind, just use the crud directly
+    filters: dict[str, Any] = {}
+    if project_module:
+        filters["project_module"] = project_module
+    if enabled is not None:
+        filters["enabled"] = enabled
+
+    sources_data = await crud_source_registry.get_multi(
         db=db,
-        project_module=project_module,
-        enabled=enabled,
         offset=compute_offset(page, items_per_page),
         limit=items_per_page,
+        **filters,
     )
+
     response: dict[str, Any] = paginated_response(
         crud_data=sources_data, page=page, items_per_page=items_per_page
     )
