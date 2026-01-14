@@ -1,7 +1,8 @@
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import Response
 from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -85,3 +86,40 @@ async def update_source(
         enabled=source_data.enabled,
     )
     return source
+
+
+@router.delete("/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_source(
+    request: Request,
+    source_id: UUID,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> Response:
+    """Delete a source from the registry.
+    """
+    source = await crud_source_registry.get(
+        db=db,
+        uuid=source_id,
+        schema_to_select=SourceRegistryRead,
+    )
+    if not source:
+        raise NotFoundException(f"Source with id {source_id} not found")
+
+    # not sure how this will be handled yet, whether we delete run records, or prevent deleting a source if there are runs...    
+    # from ...crud.crud_run_record import crud_run_records
+    # runs = await crud_run_records.get_multi(
+    #     db=db,
+    #     project_module=source["project_module"],
+    #     source_identifier=source["source_identifier"],
+    # )
+    # run_count = runs.get("total", 0) if isinstance(runs, dict) else len(runs) if isinstance(runs, list) else 0
+    
+    # if run_count > 0:
+    #     raise Exception(
+    #         f"Cannot delete source {source_id} ({source['source_identifier']}): "
+    #         f"{run_count} associated run(s) exist. Please remove these runs before deleting the source."
+    #     )
+    
+    await crud_source_registry.delete(db=db, uuid=source_id)
+    
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
