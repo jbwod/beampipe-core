@@ -16,7 +16,7 @@ async def view_sources(request: Request) -> HTMLResponse:
 </head>
 <body>
     <h1>Source Registry</h1>
-    
+
     <div id="loginSection" style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
         <h3>Authentication</h3>
         <div>
@@ -27,17 +27,17 @@ async def view_sources(request: Request) -> HTMLResponse:
             <span id="authStatus" style="margin-left: 10px;"></span>
         </div>
     </div>
-    
+
     <div id="addSourceSection" style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
         <h3>Add New Source</h3>
         <div>
             <label>Project Module: <input type="text" id="newProjectModule" placeholder="e.g. wallaby"></label>
-            <label>Source Identifier: <input type="text" id="newSourceIdentifier" placeholder="e.g. HIPASSJ1303+07"></label>
+            <label>Source Identifier: <input type="text" id="newSourceIdentifier" placeholder="HIPASSJ1303+07"></label>
             <label>Enabled: <input type="checkbox" id="newEnabled"></label>
             <button onclick="addSource()">Add Source</button>
         </div>
     </div>
-    
+
     <div>
         <label>Project Module: <input type="text" id="projectModule" placeholder="project-name"></label>
         <label>Enabled Only: <input type="checkbox" id="enabledOnly"></label>
@@ -61,17 +61,17 @@ async def view_sources(request: Request) -> HTMLResponse:
         </tbody>
     </table>
     <div id="pagination" style="margin-top: 10px;"></div>
-    
+
     <script>
         async function loadSources(page = 1) {
             const projectModule = document.getElementById('projectModule').value;
             const enabledOnly = document.getElementById('enabledOnly').checked;
             const itemsPerPage = 100;
-            
+
             document.getElementById('loading').style.display = 'block';
             document.getElementById('error').style.display = 'none';
             document.getElementById('sourcesTable').style.display = 'none';
-            
+
             try {
                 let url = '/api/v1/sources?page=' + page + '&items_per_page=' + itemsPerPage;
                 if (projectModule) {
@@ -80,17 +80,17 @@ async def view_sources(request: Request) -> HTMLResponse:
                 if (enabledOnly) {
                     url += '&enabled=true';
                 }
-                
+
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error('Failed to load sources: ' + response.statusText);
                 }
-                
+
                 const data = await response.json();
-                
+
                 const tbody = document.getElementById('sourcesBody');
                 tbody.innerHTML = '';
-                
+
                 if (data.data && data.data.length > 0) {
                     data.data.forEach(source => {
                         const row = tbody.insertRow();
@@ -101,22 +101,22 @@ async def view_sources(request: Request) -> HTMLResponse:
                         enabledCell.textContent = source.enabled ? 'Yes' : 'No';
                         row.insertCell(4).textContent = source.created_at || 'N/A';
                         row.insertCell(5).textContent = source.updated_at || 'N/A';
-                        
+
                         const actionsCell = row.insertCell(6);
                         const toggleBtn = document.createElement('button');
                         toggleBtn.textContent = source.enabled ? 'Disable' : 'Enable';
                         toggleBtn.onclick = () => toggleSource(source.uuid, !source.enabled);
                         actionsCell.appendChild(toggleBtn);
-                        
+
                         const deleteBtn = document.createElement('button');
                         deleteBtn.textContent = 'Delete';
                         deleteBtn.onclick = () => deleteSource(source.uuid);
                         deleteBtn.style.marginLeft = '5px';
                         actionsCell.appendChild(deleteBtn);
                     });
-                    
+
                     document.getElementById('sourcesTable').style.display = 'table';
-   
+
                     const paginationDiv = document.getElementById('pagination');
                     paginationDiv.innerHTML = '';
                     if (data.total_pages > 1) {
@@ -126,7 +126,8 @@ async def view_sources(request: Request) -> HTMLResponse:
                             prevBtn.onclick = () => loadSources(data.page - 1);
                             paginationDiv.appendChild(prevBtn);
                         }
-                        paginationDiv.appendChild(document.createTextNode(' Page ' + data.page + ' of ' + data.total_pages + ' '));
+                        const pageText = ' Page ' + data.page + ' of ' + data.total_pages + ' ';
+                        paginationDiv.appendChild(document.createTextNode(pageText));
                         if (data.page < data.total_pages) {
                             const nextBtn = document.createElement('button');
                             nextBtn.textContent = 'Next';
@@ -149,7 +150,7 @@ async def view_sources(request: Request) -> HTMLResponse:
         function getAuthToken() {
             return localStorage.getItem('access_token');
         }
-        
+
         function setAuthToken(token) {
             if (token) {
                 localStorage.setItem('access_token', token);
@@ -161,21 +162,21 @@ async def view_sources(request: Request) -> HTMLResponse:
                 document.getElementById('authStatus').style.color = 'red';
             }
         }
-        
+
         async function login() {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            
+
             if (!username || !password) {
                 alert('Please enter username and password');
                 return;
             }
-            
+
             try {
                 const formData = new URLSearchParams();
                 formData.append('username', username);
                 formData.append('password', password);
-                
+
                 const response = await fetch('/api/v1/login', {
                     method: 'POST',
                     headers: {
@@ -183,12 +184,12 @@ async def view_sources(request: Request) -> HTMLResponse:
                     },
                     body: formData
                 });
-                
+
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.detail || 'Login failed');
                 }
-                
+
                 const data = await response.json();
                 setAuthToken(data.access_token);
                 document.getElementById('username').value = '';
@@ -197,27 +198,27 @@ async def view_sources(request: Request) -> HTMLResponse:
                 alert('Login error: ' + error.message);
             }
         }
-        
+
         function logout() {
             setAuthToken(null);
         }
-        
+
         async function addSource() {
             const token = getAuthToken();
             if (!token) {
                 alert('Please login first');
                 return;
             }
-            
+
             const projectModule = document.getElementById('newProjectModule').value;
             const sourceIdentifier = document.getElementById('newSourceIdentifier').value;
             const enabled = document.getElementById('newEnabled').checked;
-            
+
             if (!projectModule || !sourceIdentifier) {
                 alert('Please enter project module and source identifier');
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/v1/sources', {
                     method: 'POST',
@@ -231,12 +232,12 @@ async def view_sources(request: Request) -> HTMLResponse:
                         enabled: enabled
                     })
                 });
-                
+
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.detail || 'Failed to add source');
                 }
-                
+
                 document.getElementById('newProjectModule').value = '';
                 document.getElementById('newSourceIdentifier').value = '';
                 document.getElementById('newEnabled').checked = false;
@@ -245,18 +246,18 @@ async def view_sources(request: Request) -> HTMLResponse:
                 alert('Error adding source: ' + error.message);
             }
         }
-        
+
         async function toggleSource(sourceId, newEnabled) {
             const token = getAuthToken();
             if (!token) {
                 alert('Please login first');
                 return;
             }
-            
+
             if (!confirm('Are you sure you want to ' + (newEnabled ? 'enable' : 'disable') + ' this source?')) {
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/v1/sources/' + sourceId, {
                     method: 'PATCH',
@@ -268,29 +269,29 @@ async def view_sources(request: Request) -> HTMLResponse:
                         enabled: newEnabled
                     })
                 });
-                
+
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.detail || 'Failed to update source');
                 }
-                
+
                 loadSources();
             } catch (error) {
                 alert('Error updating source: ' + error.message);
             }
         }
-        
+
         async function deleteSource(sourceId) {
             const token = getAuthToken();
             if (!token) {
                 alert('Please login first');
                 return;
             }
-            
+
             if (!confirm('Are you sure you want to delete this source? This action cannot be undone.')) {
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/v1/sources/' + sourceId, {
                     method: 'DELETE',
@@ -298,18 +299,18 @@ async def view_sources(request: Request) -> HTMLResponse:
                         'Authorization': 'Bearer ' + token
                     }
                 });
-                
+
                 if (!response.ok) {
                     const error = await response.text();
                     throw new Error(error || 'Failed to delete source');
                 }
-                
+
                 loadSources();
             } catch (error) {
                 alert('Error deleting source: ' + error.message);
             }
         }
-        
+
         window.onload = function() {
             const token = getAuthToken();
             if (token) {
@@ -324,4 +325,3 @@ async def view_sources(request: Request) -> HTMLResponse:
 </html>
     """
     return HTMLResponse(content=html_content)
-

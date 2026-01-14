@@ -144,17 +144,17 @@ class SourceRegistryService:
         )
         if not source:
             raise NotFoundException(f"Source with id {source_id} not found")
-        
+
         update_data: dict[str, Any] = {"updated_at": datetime.now(UTC)}
         if enabled is not None:
             update_data["enabled"] = enabled
-        
+
         await crud_source_registry.update(
             db=db,
             object=update_data,
             uuid=source_id,
         )
-        
+
         updated_source = await crud_source_registry.get(
             db=db,
             uuid=source_id,
@@ -181,7 +181,7 @@ class SourceRegistryService:
         filters: dict[str, Any] = {"enabled": True}
         if project_module:
             filters["project_module"] = project_module
-        
+
         sources_data = await crud_source_registry.get_multi(
             db=db,
             schema_to_select=SourceRegistryRead,

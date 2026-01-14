@@ -8,12 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_user
 from ...core.db.database import async_get_db
-from ...core.exceptions.http_exceptions import BadRequestException, NotFoundException
+from ...core.exceptions.http_exceptions import NotFoundException
 from ...core.registry.service import source_registry_service
 from ...crud.crud_source_registry import crud_source_registry
-from ...models.registry import SourceRegistry
-from ...schemas.registry import SourceRegistryRead, SourceRegistryCreate, SourceRegistryUpdate
-
+from ...schemas.registry import SourceRegistryCreate, SourceRegistryRead, SourceRegistryUpdate
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -35,7 +33,7 @@ async def list_sources(
         enabled: Filter by enabled status (True/False)
         page: Page number (1-indexed)
         items_per_page: Number of items per page
-    
+
     Returns:
         Paginated list of sources
     """
@@ -178,7 +176,8 @@ async def delete_source(
     if not source:
         raise NotFoundException(f"Source with id {source_id} not found")
 
-    # not sure how this will be handled yet, whether we delete run records, or prevent deleting a source if there are runs...
+    # not sure how this will be handled yet, whether we delete run records,
+    # or prevent deleting a source if there are runs...
     # from ...crud.crud_run_record import crud_run_records
     # runs = await crud_run_records.get_multi(
     #     db=db,
