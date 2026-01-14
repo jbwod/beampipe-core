@@ -68,7 +68,7 @@ async def create_run(
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
     """Create a new run record.
-    
+
     Args:
         request: FastAPI request object
         run_data: Run data
