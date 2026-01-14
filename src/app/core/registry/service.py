@@ -94,16 +94,46 @@ class SourceRegistryService:
         )
         if not source:
             raise NotFoundException(f"Source with id {source_id} not found")
-        source.enabled = enabled
-        return source
+        
+        update_data: dict[str, Any] = {"updated_at": datetime.now(UTC)}
+        if enabled is not None:
+            update_data["enabled"] = enabled
+        
+        await crud_source_registry.update(
+            db=db,
+            object=update_data,
+            uuid=source_id,
+        )
+        
+        updated_source = await crud_source_registry.get(
+            db=db,
+            uuid=source_id,
+            schema_to_select=SourceRegistryRead,
+        )
+        if not updated_source:
+            raise NotFoundException(f"Source with id {source_id} not found after update")
+        return updated_source
 
     @staticmethod
     async def get_enabled_sources(
         db: AsyncSession,
         project_module: str | None = None,
-    ) -> list[SourceRegistry]:
-        """Get all enabled sources, optionally filtered by project module."""
-        pass
+    ) -> list[dict[str, Any]]:
+        """Get all enabled sources, optionally filtered by project module.
+        
+        Returns:
+            List of source dictionaries (SourceRegistryRead schema)
+        """
+        filters: dict[str, Any] = {"enabled": True}
+        if project_module:
+            filters["project_module"] = project_module
+        
+        sources_data = await crud_source_registry.get_multi(
+            db=db,
+            schema_to_select=SourceRegistryRead,
+            **filters,
+        )
+        return sources_data.get("items", [])
 
 
 # instance
