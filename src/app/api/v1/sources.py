@@ -37,6 +37,8 @@ async def list_sources(
         db=db,
         offset=compute_offset(page, items_per_page),
         limit=items_per_page,
+        schema_to_select=SourceRegistryRead,
+        return_total_count=True,
         **filters,
     )
 
@@ -123,3 +125,6 @@ async def delete_source(
     await crud_source_registry.delete(db=db, uuid=source_id)
     
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+# /sources/bulk-add and /sources/bulk-delete and /sources/bulk-update
+# will be useful for lots of sources at once
