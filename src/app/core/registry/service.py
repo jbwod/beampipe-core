@@ -4,13 +4,12 @@ Provides source registration and cataloging functionality.
 """
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_source_registry import crud_source_registry
-from ...models.registry import SourceRegistry
 from ...schemas.registry import SourceRegistryCreateInternal, SourceRegistryRead
 from ..exceptions.http_exceptions import NotFoundException
 
@@ -23,7 +22,7 @@ class SourceRegistryService:
         db: AsyncSession,
         project_module: str,
         source_identifier: str,
-    ) -> SourceRegistry | None:
+    ) -> dict[str, Any] | None:
         """Check if a source already exists for the given key.
 
         Args:
@@ -52,7 +51,7 @@ class SourceRegistryService:
         project_module: str,
         source_identifier: str,
         enabled: bool = False,
-    ) -> SourceRegistry:
+    ) -> dict[str, Any]:
         """Register a new source or return existing (idempotent).
 
         If a source with the same project_module and source_identifier
@@ -93,7 +92,7 @@ class SourceRegistryService:
     async def get_source(
         db: AsyncSession,
         source_id: UUID,
-    ) -> SourceRegistry:
+    ) -> dict[str, Any]:
         """Get a single source by UUID.
 
         Args:
@@ -120,7 +119,7 @@ class SourceRegistryService:
         db: AsyncSession,
         source_id: UUID,
         enabled: bool | None = None,
-    ) -> SourceRegistry:
+    ) -> dict[str, Any]:
         """Update source metadata.
 
         Currently supports updating the enabled status. Updates the
@@ -187,7 +186,7 @@ class SourceRegistryService:
             schema_to_select=SourceRegistryRead,
             **filters,
         )
-        return sources_data.get("items", [])
+        return cast(list[dict[str, Any]], sources_data.get("items", []))
 
 
 # instance
