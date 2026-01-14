@@ -61,7 +61,7 @@ class SourceRegistryService:
         Args:
             db: Database session
             project_module: Project module identifier
-            source_identifier: Source identifier (e.g., "HIPASSJ1303+07")
+            source_identifier: Source identifier (e.g., "HIPASSJ1318-21")
             enabled: Whether the source is enabled for monitoring (default: False)
 
         Returns:

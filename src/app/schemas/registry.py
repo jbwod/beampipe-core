@@ -15,7 +15,7 @@ class SourceRegistryBase(BaseModel):
         Field(
             min_length=1,
             max_length=100,
-            examples=["HIPASSJ1303+07"],
+            examples=["HIPASSJ1318-21"],
             description="Source identifier",
         ),
     ]

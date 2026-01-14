@@ -32,7 +32,7 @@ async def view_sources(request: Request) -> HTMLResponse:
         <h3>Add New Source</h3>
         <div>
             <label>Project Module: <input type="text" id="newProjectModule" placeholder="e.g. wallaby"></label>
-            <label>Source Identifier: <input type="text" id="newSourceIdentifier" placeholder="HIPASSJ1303+07"></label>
+            <label>Source Identifier: <input type="text" id="newSourceIdentifier" placeholder="HIPASSJ1318-21"></label>
             <label>Enabled: <input type="checkbox" id="newEnabled"></label>
             <button onclick="addSource()">Add Source</button>
         </div>
