@@ -31,6 +31,7 @@ dependencies = [
     "fastcrud>=0.19.2",
     "crudadmin>=0.4.2",
     "gunicorn>=23.0.0",
+    "astropy>=6.0.0",
     "ruff>=0.11.13",
     "mypy>=1.16.0",
 ]
