@@ -26,7 +26,19 @@ async def list_sources(
     page: int = 1,
     items_per_page: int = 10,
 ) -> dict[str, Any]:
-# nevermind, just use the crud directly
+    """List sources from the registry.
+
+    Args:
+        request: FastAPI request object
+        db: Database session
+        project_module: Filter by project module (e.g., "wallaby")
+        enabled: Filter by enabled status (True/False)
+        page: Page number (1-indexed)
+        items_per_page: Number of items per page
+    
+    Returns:
+        Paginated list of sources
+    """
     filters: dict[str, Any] = {}
     if project_module:
         filters["project_module"] = project_module
@@ -54,6 +66,20 @@ async def register_source(
     current_user: Annotated[dict, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
+    """Register a new source in the registry.
+
+    Registration is idempotent - if a source with the same project_module
+    and source_identifier already exists, returns the existing source.
+
+    Args:
+        request: FastAPI request object
+        source_data: Source registration data (project_module, source_identifier, enabled)
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Source registry entry (existing or newly created)
+    """
     source = await source_registry_service.register_source(
         db=db,
         project_module=source_data.project_module,
@@ -68,6 +94,19 @@ async def get_source(
     source_id: UUID,
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
+    """Get a single source by UUID.
+
+    Args:
+        request: FastAPI request object
+        source_id: Source UUID
+        db: Database session
+
+    Returns:
+        Source registry entry details
+
+    Raises:
+        NotFoundException: If source not found
+    """
     source = await source_registry_service.get_source(
         db=db,
         source_id=source_id,
@@ -82,6 +121,23 @@ async def update_source(
     current_user: Annotated[dict, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
+    """Update a source in the registry.
+
+    Currently supports updating the enabled status of a source.
+
+    Args:
+        request: FastAPI request object
+        source_id: Source UUID
+        source_data: Update data (enabled status)
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Updated source registry entry
+
+    Raises:
+        NotFoundException: If source not found
+    """
     source = await source_registry_service.update_source(
         db=db,
         source_id=source_id,
@@ -98,6 +154,21 @@ async def delete_source(
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> Response:
     """Delete a source from the registry.
+
+    Note: This will prevent new runs from being created for this source,
+    but existing runs are not affected.
+
+    Args:
+        request: FastAPI request object
+        source_id: Source UUID
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        HTTP 204 No Content on success
+
+    Raises:
+        NotFoundException: If source not found
     """
     source = await crud_source_registry.get(
         db=db,
@@ -107,7 +178,7 @@ async def delete_source(
     if not source:
         raise NotFoundException(f"Source with id {source_id} not found")
 
-    # not sure how this will be handled yet, whether we delete run records, or prevent deleting a source if there are runs...    
+    # not sure how this will be handled yet, whether we delete run records, or prevent deleting a source if there are runs...
     # from ...crud.crud_run_record import crud_run_records
     # runs = await crud_run_records.get_multi(
     #     db=db,
@@ -115,15 +186,15 @@ async def delete_source(
     #     source_identifier=source["source_identifier"],
     # )
     # run_count = runs.get("total", 0) if isinstance(runs, dict) else len(runs) if isinstance(runs, list) else 0
-    
+
     # if run_count > 0:
     #     raise Exception(
     #         f"Cannot delete source {source_id} ({source['source_identifier']}): "
     #         f"{run_count} associated run(s) exist. Please remove these runs before deleting the source."
     #     )
-    
+
     await crud_source_registry.delete(db=db, uuid=source_id)
-    
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 # /sources/bulk-add and /sources/bulk-delete and /sources/bulk-update

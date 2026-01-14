@@ -24,7 +24,16 @@ class SourceRegistryService:
         project_module: str,
         source_identifier: str,
     ) -> SourceRegistry | None:
-        """Check if a source already exists for the given key."""
+        """Check if a source already exists for the given key.
+
+        Args:
+            db: Database session
+            project_module: Project module identifier
+            source_identifier: Source identifier
+
+        Returns:
+            Source registry entry if found, None otherwise
+        """
         try:
             source = await crud_source_registry.get(
                 db=db,
@@ -44,7 +53,21 @@ class SourceRegistryService:
         source_identifier: str,
         enabled: bool = False,
     ) -> SourceRegistry:
-        """Register a new source or return existing (idempotent)."""
+        """Register a new source or return existing (idempotent).
+
+        If a source with the same project_module and source_identifier
+        already exists, returns the existing source. Otherwise, creates
+        a new source registry entry.
+
+        Args:
+            db: Database session
+            project_module: Project module identifier
+            source_identifier: Source identifier (e.g., "HIPASSJ1303+07")
+            enabled: Whether the source is enabled for monitoring (default: False)
+
+        Returns:
+            Source registry entry (existing or newly created)
+        """
         existing = await crud_source_registry.get(
             db=db,
             project_module=project_module,
@@ -63,6 +86,7 @@ class SourceRegistryService:
             object=source_data,
             schema_to_select=SourceRegistryRead,
         )
+        # fire off a source discovery job
         return source
 
     @staticmethod
@@ -70,7 +94,18 @@ class SourceRegistryService:
         db: AsyncSession,
         source_id: UUID,
     ) -> SourceRegistry:
-        """Get a single source by UUID."""
+        """Get a single source by UUID.
+
+        Args:
+            db: Database session
+            source_id: Source UUID
+
+        Returns:
+            Source registry entry
+
+        Raises:
+            NotFoundException: If source not found
+        """
         source = await crud_source_registry.get(
             db=db,
             uuid=source_id,
@@ -86,7 +121,22 @@ class SourceRegistryService:
         source_id: UUID,
         enabled: bool | None = None,
     ) -> SourceRegistry:
-        """Update source metadata."""
+        """Update source metadata.
+
+        Currently supports updating the enabled status. Updates the
+        updated_at timestamp automatically.
+
+        Args:
+            db: Database session
+            source_id: Source UUID
+            enabled: New enabled status (None to leave unchanged)
+
+        Returns:
+            Updated source registry entry
+
+        Raises:
+            NotFoundException: If source not found
+        """
         source = await crud_source_registry.get(
             db=db,
             uuid=source_id,
@@ -120,7 +170,11 @@ class SourceRegistryService:
         project_module: str | None = None,
     ) -> list[dict[str, Any]]:
         """Get all enabled sources, optionally filtered by project module.
-        
+
+        Args:
+            db: Database session
+            project_module: Optional project module filter (e.g., "wallaby")
+
         Returns:
             List of source dictionaries (SourceRegistryRead schema)
         """
