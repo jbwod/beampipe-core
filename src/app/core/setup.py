@@ -207,6 +207,10 @@ def create_application(
 
     application = FastAPI(lifespan=lifespan, **kwargs)
     application.include_router(router)
+    
+    # test
+    from ..views import router as views_router
+    application.include_router(views_router)
 
     if isinstance(settings, ClientSideCacheSettings):
         application.add_middleware(ClientCacheMiddleware, max_age=settings.CLIENT_CACHE_MAX_AGE)

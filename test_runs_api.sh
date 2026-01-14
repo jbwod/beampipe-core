@@ -31,6 +31,26 @@ echo "Login success"
 echo "Token: ${TOKEN:0:50}..."
 echo ""
 
+# Step 1.5: Add a source via API
+echo "POST /sources (register source for wallaby/HIPASSJ1303+07)"
+ADD_SOURCE_RESPONSE=$(curl -s -X POST "${BASE_URL}/sources" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_module": "wallaby",
+    "source_identifier": "HIPASSJ1303+07",
+    "enabled": true
+  }')
+SOURCE_ID=$(echo "$ADD_SOURCE_RESPONSE" | jq -r '.uuid // empty')
+if [ -z "$SOURCE_ID" ] || [ "$SOURCE_ID" = "null" ]; then
+  echo "Add source failed!"
+  echo "Response: $ADD_SOURCE_RESPONSE"
+  exit 1
+fi
+echo "Source created: $SOURCE_ID"
+echo "$ADD_SOURCE_RESPONSE" | jq '.'
+echo ""
+
 # Step 2: Create a run
 echo "POST /runs."
 CREATE_RESPONSE=$(curl -s -X POST "${BASE_URL}/runs" \
@@ -204,12 +224,22 @@ echo "runs retrieved"
 echo "$COMPLETED_RESPONSE" | jq '.data | length as $count | "Completed runs: \($count)"'
 echo ""
 
+# Step 12: List all sources
+echo "Step 12: Listing all sources..."
+SOURCES_RESPONSE=$(curl -s -X GET "${BASE_URL}/sources?page=1&items_per_page=10" \
+  -H "Authorization: Bearer ${TOKEN}")
+echo "All sources:"
+echo "$SOURCES_RESPONSE" | jq '.data | length as $count | "Total sources: \($count)"'
+echo "$SOURCES_RESPONSE" | jq '.data[] | {uuid, project_module, source_identifier, enabled}'
+echo ""
+
 echo "=========================================="
 echo "tests completed!"
 echo "=========================================="
 echo ""
 echo "Summary:"
 echo "  - Created runs: $RUN_ID, $RUN_ID2"
-echo "  - Tested: Create, Read, Update, List, Filter, Idempotency, Status Validation"
+echo "  - Created source: $SOURCE_ID"
+echo "  - Tested: Create, Read, Update, List, Filter, Idempotency, Status Validation, Source registration and listing"
 echo ""
 
