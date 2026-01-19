@@ -1,0 +1,34 @@
+This XML file does not appear to have any style information associated with it. The document tree is shown below.
+<uws:job xmlns:uws="http://www.ivoa.net/xml/UWS/v1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<uws:jobId>
+<![CDATA[ 483c8b3f-8be0-46cc-a558-94567f93a495 ]]>
+</uws:jobId>
+<uws:runId xsi:nil="true"/>
+<uws:ownerId xsi:nil="true"/>
+<uws:phase>COMPLETED</uws:phase>
+<uws:quote xsi:nil="true"/>
+<uws:startTime>2026-01-19T10:18:34.898+0800</uws:startTime>
+<uws:endTime>2026-01-19T10:21:35.729+0800</uws:endTime>
+<uws:executionDuration>0</uws:executionDuration>
+<uws:destruction>2026-01-26T10:18:35.342+0800</uws:destruction>
+<uws:parameters>
+<uws:parameter id="id">
+<![CDATA[ {0p_UUtF2T00fpN2qo34tQM8eabMGuq1irvBXQpT5bGp30cJTyE9jkxoxWp0F8QbP,0p_UUtF2T00fpN2qo34tQMew78VDfBPLaNpdNLRtdPundt1-ekacglXxegqj2mPM,0p_UUtF2T00fpN2qo34tQPNdV-ZDz-hd_UDIijNGvIOzuSRx1_n9O3sMm_0adXR0,Pyhrlz0Mej3rdtBgQxZ-ZvNdV-ZDz-hd_UDIijNGvIM15kh9MKeTM_3qAn7PrP5w,Pyhrlz0Mej3rdtBgQxZ-ZsTn9HS9dqjlKjHf1_6zrnrNMkDh8Y4o2hkSMy7TkVRL,Pyhrlz0Mej3rdtBgQxZ-ZvTopvcjPoHXuKj0JsghvZh4NDUhwbdsnYf7M4vSeX05} ]]>
+</uws:parameter>
+</uws:parameters>
+<uws:results>
+<uws:result id="visibility-105365.checksum" xlink:type="simple" xlink:href="https%3A%2F%2Fcasda.csiro.au%2Fdownload%2Fweb%2F483c8b3f-8be0-46cc-a558-94567f93a495%2FHIPASSJ1318-21_A_beam26_10arc_split.ms.tar.checksum"/>
+<uws:result id="visibility-105364.checksum" xlink:type="simple" xlink:href="https%3A%2F%2Fcasda.csiro.au%2Fdownload%2Fweb%2F483c8b3f-8be0-46cc-a558-94567f93a495%2FHIPASSJ1318-21_A_beam10_10arc_split.ms.tar.checksum"/>
+<uws:result id="visibility-105366" xlink:type="simple" xlink:href="https%3A%2F%2Fingest.pawsey.org.au%2Fcasda-prd-as102-01%2Fsb34275%2Fvisibilities%2FHIPASSJ1318-21_A_beam27_10arc_split.ms.tar%3Fresponse-content-disposition%3Dattachment%253B%2520filename%2520%253D%2522HIPASSJ1318-21_A_beam27_10arc_split.ms.tar%2522%26X-Amz-Algorithm%3DAWS4-HMAC-SHA256%26X-Amz-Date%3D20260119T022201Z%26X-Amz-SignedHeaders%3Dhost%26X-Amz-Expires%3D604593%26X-Amz-Credential%3Db70b5ef79c494272afd8810ed1b6f2bb%252F20260119%252Fpawsey%252Fs3%252Faws4_request%26X-Amz-Signature%3D0f840d8bc1f7800a399577de28032623e4b4bba4783a5712ffdae378dcf59633"/>
+<uws:result id="visibility-105173.checksum" xlink:type="simple" xlink:href="https%3A%2F%2Fcasda.csiro.au%2Fdownload%2Fweb%2F483c8b3f-8be0-46cc-a558-94567f93a495%2FHIPASSJ1318-21_A_beam26_10arc_split.ms.tar.checksum"/>
+<uws:result id="visibility-105364" xlink:type="simple" xlink:href="https%3A%2F%2Fingest.pawsey.org.au%2Fcasda-prd-as102-01%2Fsb34275%2Fvisibilities%2FHIPASSJ1318-21_A_beam10_10arc_split.ms.tar%3Fresponse-content-disposition%3Dattachment%253B%2520filename%2520%253D%2522HIPASSJ1318-21_A_beam10_10arc_split.ms.tar%2522%26X-Amz-Algorithm%3DAWS4-HMAC-SHA256%26X-Amz-Date%3D20260119T022201Z%26X-Amz-SignedHeaders%3Dhost%26X-Amz-Expires%3D604593%26X-Amz-Credential%3Db70b5ef79c494272afd8810ed1b6f2bb%252F20260119%252Fpawsey%252Fs3%252Faws4_request%26X-Amz-Signature%3Dafaa22a8a05f60f1fdb4b709a2cb8e027db7018992898fba8549cfdad7091123"/>
+<uws:result id="visibility-105365" xlink:type="simple" xlink:href="https%3A%2F%2Fingest.pawsey.org.au%2Fcasda-prd-as102-01%2Fsb34275%2Fvisibilities%2FHIPASSJ1318-21_A_beam26_10arc_split.ms.tar%3Fresponse-content-disposition%3Dattachment%253B%2520filename%2520%253D%2522HIPASSJ1318-21_A_beam26_10arc_split.ms.tar%2522%26X-Amz-Algorithm%3DAWS4-HMAC-SHA256%26X-Amz-Date%3D20260119T022201Z%26X-Amz-SignedHeaders%3Dhost%26X-Amz-Expires%3D604593%26X-Amz-Credential%3Db70b5ef79c494272afd8810ed1b6f2bb%252F20260119%252Fpawsey%252Fs3%252Faws4_request%26X-Amz-Signature%3Ddc9a19ec0eaaab34faf0af96bc54a7127b9982756632c55d01b8421f3728f92e"/>
+<uws:result id="visibility-105366.checksum" xlink:type="simple" xlink:href="https%3A%2F%2Fcasda.csiro.au%2Fdownload%2Fweb%2F483c8b3f-8be0-46cc-a558-94567f93a495%2FHIPASSJ1318-21_A_beam27_10arc_split.ms.tar.checksum"/>
+<uws:result id="visibility-105172" xlink:type="simple" xlink:href="https%3A%2F%2Fingest.pawsey.org.au%2Fcasda-prd-as102-01%2Fsb34166%2Fvisibilities%2FHIPASSJ1318-21_A_beam25_10arc_split.ms.tar%3Fresponse-content-disposition%3Dattachment%253B%2520filename%2520%253D%2522HIPASSJ1318-21_A_beam25_10arc_split.ms.tar%2522%26X-Amz-Algorithm%3DAWS4-HMAC-SHA256%26X-Amz-Date%3D20260119T022201Z%26X-Amz-SignedHeaders%3Dhost%26X-Amz-Expires%3D604593%26X-Amz-Credential%3Db70b5ef79c494272afd8810ed1b6f2bb%252F20260119%252Fpawsey%252Fs3%252Faws4_request%26X-Amz-Signature%3D0f78d04eb36051ed63a1d40b0049819509a4675885ee097915a9dd7522c18498"/>
+<uws:result id="visibility-105172.checksum" xlink:type="simple" xlink:href="https%3A%2F%2Fcasda.csiro.au%2Fdownload%2Fweb%2F483c8b3f-8be0-46cc-a558-94567f93a495%2FHIPASSJ1318-21_A_beam25_10arc_split.ms.tar.checksum"/>
+<uws:result id="visibility-105173" xlink:type="simple" xlink:href="https%3A%2F%2Fingest.pawsey.org.au%2Fcasda-prd-as102-01%2Fsb34166%2Fvisibilities%2FHIPASSJ1318-21_A_beam26_10arc_split.ms.tar%3Fresponse-content-disposition%3Dattachment%253B%2520filename%2520%253D%2522HIPASSJ1318-21_A_beam26_10arc_split.ms.tar%2522%26X-Amz-Algorithm%3DAWS4-HMAC-SHA256%26X-Amz-Date%3D20260119T022201Z%26X-Amz-SignedHeaders%3Dhost%26X-Amz-Expires%3D604593%26X-Amz-Credential%3Db70b5ef79c494272afd8810ed1b6f2bb%252F20260119%252Fpawsey%252Fs3%252Faws4_request%26X-Amz-Signature%3Dde9fbd6bbeed0c2ce64b8c4ef38a0a8d26fb8f8028b3f2e7b6c0ecf57b1b722d"/>
+<uws:result id="visibility-105174.checksum" xlink:type="simple" xlink:href="https%3A%2F%2Fcasda.csiro.au%2Fdownload%2Fweb%2F483c8b3f-8be0-46cc-a558-94567f93a495%2FHIPASSJ1318-21_A_beam27_10arc_split.ms.tar.checksum"/>
+<uws:result id="visibility-105174" xlink:type="simple" xlink:href="https%3A%2F%2Fingest.pawsey.org.au%2Fcasda-prd-as102-01%2Fsb34166%2Fvisibilities%2FHIPASSJ1318-21_A_beam27_10arc_split.ms.tar%3Fresponse-content-disposition%3Dattachment%253B%2520filename%2520%253D%2522HIPASSJ1318-21_A_beam27_10arc_split.ms.tar%2522%26X-Amz-Algorithm%3DAWS4-HMAC-SHA256%26X-Amz-Date%3D20260119T022201Z%26X-Amz-SignedHeaders%3Dhost%26X-Amz-Expires%3D604593%26X-Amz-Credential%3Db70b5ef79c494272afd8810ed1b6f2bb%252F20260119%252Fpawsey%252Fs3%252Faws4_request%26X-Amz-Signature%3D5e9e7c8fa071bc522c67a86a6cb9e7517c64cb979bd473b56c0d4ccff72e132a"/>
+</uws:results>
+<uws:errorSummary xsi:nil="true"/>
+</uws:job>
