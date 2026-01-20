@@ -143,6 +143,8 @@ src/.env
 /Dockerfile
 /docker-compose.yml
 
+.beampipe-wallaby/
+
 # Don't ignore files inside of script folder:
 !scripts/*
 
