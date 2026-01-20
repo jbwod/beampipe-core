@@ -19,18 +19,24 @@ import json
 import logging
 import os
 import re
+import xml.etree.ElementTree as ET
 from typing import Any, Optional
 from urllib.parse import parse_qs, unquote, urlparse
 
+import requests
+
 from astropy.table import Table
 from astroquery.casda import Casda
-
-
-from casda import _extract_scan_id, query as casda_query, stage_data as casda_stage_data, CASDA_TAP_URL
-from vizier import VIZIER_TAP_URL, query as vizier_query
+from astroquery.utils.tap.core import TapPlus
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# CASDA TAP endpoint
+CASDA_TAP_URL = "https://casda.csiro.au/casda_vo_tools/tap"
+
+# Vizier TAP endpoint
+VIZIER_TAP_URL = "http://tapvizier.cds.unistra.fr/TAPVizieR/tap"
 
 # Query template for vis files
 VISIBILITY_QUERY_TEMPLATE = "SELECT * FROM ivoa.obscore WHERE filename LIKE '{source_identifier}%'"
@@ -39,21 +45,38 @@ VISIBILITY_QUERY_TEMPLATE = "SELECT * FROM ivoa.obscore WHERE filename LIKE '{so
 SBID_EVALUATION_QUERY_TEMPLATE = "SELECT * FROM casda.observation_evaluation_file WHERE sbid = '{sbid}'"
 
 # Query template for RA, DEC, VSys from Vizier HIPASS catalog
-RA_DEC_VSYS_QUERY_TEMPLATE = (
-    'SELECT RAJ2000, DEJ2000, VSys FROM "J/AJ/128/16/table2" WHERE HIPASS LIKE \'{source_name}\''
-)
-
+RA_DEC_VSYS_QUERY_TEMPLATE = 'SELECT RAJ2000, DEJ2000, VSys FROM "J/AJ/128/16/table2" WHERE HIPASS LIKE \'{source_name}\''
 
 def query_casda_visibility_files(source_identifier: str) -> Table:
-    # Query CASDA visibility files by source identifier
+     # Query CASDA visibility files by source identifier
     # https://astroquery.readthedocs.io/en/stable/api/astroquery.utils.tap.Tap.html
     query = VISIBILITY_QUERY_TEMPLATE.format(source_identifier=source_identifier)
-    return casda_query(query, tap_url=CASDA_TAP_URL)
+    logger.info(f"Executing TAP query: {query}")
+
+    try:
+        casdatap = TapPlus(url=CASDA_TAP_URL, verbose=False)
+        job = casdatap.launch_job_async(query)
+        results = job.get_results()
+        logger.info(f"Query returned {len(results)} results")
+        return results
+    except Exception as e:
+        logger.error(f"Error executing TAP query: {e}")
+        raise
 
 
 def query_sbid_evaluation(sbid: int) -> Table:
     query = SBID_EVALUATION_QUERY_TEMPLATE.format(sbid=str(sbid))
-    return casda_query(query, tap_url=CASDA_TAP_URL)
+    logger.info(f"Executing SBID evaluation query: {query}")
+
+    try:
+        casdatap = TapPlus(url=CASDA_TAP_URL, verbose=False)
+        job = casdatap.launch_job_async(query)
+        results = job.get_results()
+        logger.info(f"SBID {sbid} evaluation query returned {len(results)} results")
+        return results
+    except Exception as e:
+        logger.error(f"Error executing SBID evaluation query: {e}")
+        raise
 
 
 def degrees_to_hms(degrees: float) -> tuple[int, int, float]:
@@ -89,8 +112,12 @@ def query_ra_dec_vsys(source_identifier: str) -> Optional[dict[str, Any]]:
         extracted_name = source_identifier.strip()
 
     query = RA_DEC_VSYS_QUERY_TEMPLATE.format(source_name=extracted_name)
+    logger.info(f"Executing RA/DEC/VSys query: {query}")
+
     try:
-        results = vizier_query(query, tap_url=VIZIER_TAP_URL)
+        viziertap = TapPlus(url=VIZIER_TAP_URL, verbose=False)
+        job = viziertap.launch_job_async(query)
+        results = job.get_results()
         logger.info(f"RA/DEC/VSys query returned {len(results)} results")
 
         if len(results) == 0:
@@ -128,6 +155,51 @@ def query_ra_dec_vsys(source_identifier: str) -> Optional[dict[str, Any]]:
         return None
 
 
+def stage_data(
+    casda: Casda, query_results: Table, verbose: bool = True
+) -> tuple[dict[str, str], dict[str, str]]:
+    if len(query_results) == 0:
+        logger.warning("No results to stage")
+        return {}, {}
+
+    logger.info(f"Staging {len(query_results)} files...")
+    logger.info("Note: Staging may take time and will poll for completion")
+    try:
+        data_url_by_scan_id: dict[str, str] = {}
+        checksum_url_by_scan_id: dict[str, str] = {}
+        # casda.stage_data
+        # Try to get a scan-id keyed mapping from CASDA job results (if available).
+        # https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=scan-105366-255133
+        # https://astroquery.readthedocs.io/en/latest/_modules/astroquery/casda/core.html#CasdaClass.stage_data
+        # TLDR; casda.stage_data returns a list of URLs, which is fine if we're using all of them, but we need to get the scan-id keyed mapping from the CASDA job results.
+        # otherwise we don't know which url corresponds to which scan-id (like with ingest we can infer from the path, but not for the checksums)
+        # ie; what happens when duplicate filename, but different obs_publisher_did?
+        if hasattr(casda, "_create_job") and hasattr(casda, "_complete_job"):
+            try:
+                job_url = casda._create_job(query_results, "async_service", verbose)  # pawsey_async_service? toggle possible
+                casda._complete_job(job_url, verbose)  # type: ignore[attr-defined]
+                results_url = f"{job_url}/results"
+                session = getattr(casda, "_session", None)
+                response = session.get(results_url) if session else requests.get(results_url)
+                response.raise_for_status()
+                data_url_by_scan_id, checksum_url_by_scan_id = _parse_job_results(response.text)
+            except Exception as e:
+                logger.error(f"Error during CASDA custom job staging: {e}")
+                raise
+        else:
+            logger.error("CASDA object does not support _create_job/_complete_job")
+            raise RuntimeError("CASDA does not have required job methods for staging.")
+
+        logger.info(
+            f"Found {len(data_url_by_scan_id)} data URLs and {len(checksum_url_by_scan_id)} checksum URLs"
+        )
+
+        return data_url_by_scan_id, checksum_url_by_scan_id
+    except Exception as e:
+        logger.error(f"Error staging data: {e}")
+        raise
+
+
 def _extract_filename_from_url(url: str) -> Optional[str]:
     decoded_url = unquote(url)
     parsed = urlparse(decoded_url)
@@ -139,6 +211,66 @@ def _extract_filename_from_url(url: str) -> Optional[str]:
             return match.group(1)
     filename = os.path.basename(parsed.path)
     return filename or None
+
+
+def _extract_sbid_from_url(url: str) -> Optional[int]:
+    decoded_url = unquote(url)
+    match = re.search(r"/sb(\d+)/", decoded_url)
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _extract_scan_id(obs_publisher_did: str) -> Optional[str]:
+    match = re.search(r"scan-(\d+)-", obs_publisher_did)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _parse_job_results(xml_text: str) -> tuple[dict[str, str], dict[str, str]]:
+    data_url_by_scan_id: dict[str, str] = {}
+    checksum_url_by_scan_id: dict[str, str] = {}
+
+    uws_ns = "http://www.ivoa.net/xml/UWS/v1.0"
+    xlink_ns = "http://www.w3.org/1999/xlink"
+
+    root = ET.fromstring(xml_text)
+    for result in root.findall(f".//{{{uws_ns}}}result"):
+        result_id = result.attrib.get("id", "")
+        href = result.attrib.get(f"{{{xlink_ns}}}href", "")
+        if not result_id or not href:
+            continue
+        url = unquote(href)
+        match = re.search(r"visibility-(\d+)", result_id)
+        if not match:
+            continue
+        scan_id = match.group(1)
+        if ".checksum" in result_id:
+            checksum_url_by_scan_id[scan_id] = url
+        else:
+            data_url_by_scan_id[scan_id] = url
+
+    return data_url_by_scan_id, checksum_url_by_scan_id
+
+
+def _choose_url_for_dataset(
+    filename: str,
+    sbid: Optional[int],
+    url_map: dict[str, list[tuple[str, Optional[int]]]],
+) -> Optional[str]:
+    candidates = url_map.get(filename, [])
+    if not candidates:
+        return None
+    if sbid is not None:
+        for url, url_sbid in candidates:
+            if url_sbid == sbid:
+                return url
+    # Fallback to first match if no sbid match is found
+    return candidates[0][0]
 
 
 def get_evaluation_file_for_sbid(sbid: int) -> Optional[str]:
@@ -296,6 +428,7 @@ def prepare_metadata(
     return metadata_list
 
 
+
 def main():
     """Test function to demonstrate CASDA TAP queries and staging."""
     import sys
@@ -415,7 +548,7 @@ Example:
         checksum_url_by_scan_id: dict[str, str] = {}
         if args.stage and casda:
             logger.info("Staging files (this will poll for completion)...")
-            data_url_by_scan_id, checksum_url_by_scan_id = casda_stage_data(
+            data_url_by_scan_id, checksum_url_by_scan_id = stage_data(
                 casda, new_query_results, verbose=True
             )
         else:
