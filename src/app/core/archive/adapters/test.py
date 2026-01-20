@@ -28,6 +28,7 @@ from astroquery.casda import Casda
 
 from casda import _extract_scan_id, query as casda_query, stage_data as casda_stage_data, CASDA_TAP_URL
 from vizier import VIZIER_TAP_URL, query as vizier_query
+from app.core.utils.astro import degrees_to_dms, degrees_to_hms
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,25 +55,6 @@ def query_casda_visibility_files(source_identifier: str) -> Table:
 def query_sbid_evaluation(sbid: int) -> Table:
     query = SBID_EVALUATION_QUERY_TEMPLATE.format(sbid=str(sbid))
     return casda_query(query, tap_url=CASDA_TAP_URL)
-
-
-def degrees_to_hms(degrees: float) -> tuple[int, int, float]:
-    """Convert RA given in degrees to hours-minutes-seconds.
-    """
-    hours = degrees / 15.0  # Convert degrees to hours
-    h = int(hours)  # Integer part of hours
-    m = int((hours - h) * 60)  # Integer part of minutes
-    s = (hours - h - m / 60.0) * 3600  # Seconds
-    return h, m, s
-
-
-def degrees_to_dms(degrees: float) -> tuple[int, int, float]:
-    """Convert DEC given in degrees to degrees-minutes-seconds.
-    """
-    d = int(degrees)  # Integer part of degrees
-    m = int(abs(degrees - d) * 60)  # Integer part of minutes
-    s = (abs(degrees) - abs(d) - m / 60.0) * 3600  # Seconds
-    return d, m, s
 
 
 def query_ra_dec_vsys(source_identifier: str) -> Optional[dict[str, Any]]:
