@@ -1,8 +1,6 @@
 """
 CASDA adapter services.
 """
-from __future__ import annotations
-
 import logging
 import re
 import xml.etree.ElementTree as ET
