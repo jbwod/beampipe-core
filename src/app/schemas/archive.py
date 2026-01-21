@@ -37,8 +37,28 @@ class ArchiveMetadataCreate(ArchiveMetadataBase):
     metadata_json: dict | None = Field(default=None, description="Survey-specific metadata payload")
 
 
+class ArchiveMetadataCreateInternal(ArchiveMetadataCreate):
+    pass
+
+
 class ArchiveMetadataRead(TimestampSchema, ArchiveMetadataBase, UUIDSchema):
     model_config = ConfigDict(from_attributes=True)
 
     metadata_json: dict | None = None
     updated_at: datetime | None = None
+
+
+class ArchiveMetadataUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metadata_json: dict | None = Field(default=None, description="Survey-specific metadata payload")
+
+
+class ArchiveMetadataUpdateInternal(ArchiveMetadataUpdate):
+    updated_at: datetime
+
+
+class ArchiveMetadataDelete(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    is_deleted: bool = Field(default=True, description="Soft delete flag for archive metadata")
+    deleted_at: datetime | None = Field(default=None, description="Timestamp when the record was deleted")
