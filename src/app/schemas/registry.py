@@ -54,3 +54,23 @@ class SourceRegistryDelete(BaseModel):
     is_deleted: bool = Field(default=True, description="Soft delete flag for the source registry entry")
     deleted_at: datetime | None = Field(default=None, description="Timestamp when the record was deleted")
 
+
+class SourceRegistryBulkCreate(BaseModel):
+    """Schema for bulk source registration."""
+
+    model_config = ConfigDict(extra="forbid")
+    items: Annotated[
+        list[SourceRegistryCreate],
+        Field(min_length=1, description="List of sources to register"),
+    ]
+
+
+class SourceRegistryBulkCreateResponse(BaseModel):
+    """Response for bulk source registration."""
+
+    model_config = ConfigDict(extra="forbid")
+    created: list[SourceRegistryRead]
+    existing: list[SourceRegistryRead]
+    total_created: int
+    total_existing: int
+

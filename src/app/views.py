@@ -38,6 +38,21 @@ async def view_sources(request: Request) -> HTMLResponse:
         </div>
     </div>
 
+    <div id="bulkSourceSection" style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
+        <h3>Bulk Add Sources</h3>
+        <div style="margin-bottom: 10px;">
+            <label>Format: one per line as "project_module,source_identifier,enabled"</label>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <textarea id="bulkSourcesInput" rows="6" cols="80"
+                placeholder="wallaby,HIPASSJ1318-21,true&#10;wallaby,HIPASSJ1303+07,false"></textarea>
+        </div>
+        <div>
+            <button onclick="bulkAddSources()">Bulk Add</button>
+            <span id="bulkResult" style="margin-left: 10px;"></span>
+        </div>
+    </div>
+
     <div>
         <label>Project Module: <input type="text" id="projectModule" placeholder="project-name"></label>
         <label>Enabled Only: <input type="checkbox" id="enabledOnly"></label>
@@ -244,6 +259,73 @@ async def view_sources(request: Request) -> HTMLResponse:
                 loadSources();
             } catch (error) {
                 alert('Error adding source: ' + error.message);
+            }
+        }
+
+        function parseBool(value) {
+            if (!value) {
+                return false;
+            }
+            return ['true', '1', 'yes', 'y'].includes(value.toLowerCase());
+        }
+
+        async function bulkAddSources() {
+            const token = getAuthToken();
+            if (!token) {
+                alert('Please login first');
+                return;
+            }
+
+            const input = document.getElementById('bulkSourcesInput').value.trim();
+            if (!input) {
+                alert('Please enter at least one source line');
+                return;
+            }
+
+            const lines = input.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+            const items = [];
+            for (const line of lines) {
+                const parts = line.split(',').map(part => part.trim());
+                if (parts.length < 2) {
+                    alert('Invalid line format: ' + line);
+                    return;
+                }
+                const projectModule = parts[0];
+                const sourceIdentifier = parts[1];
+                const enabled = parts.length >= 3 ? parseBool(parts[2]) : false;
+                if (!projectModule || !sourceIdentifier) {
+                    alert('Missing project_module or source_identifier: ' + line);
+                    return;
+                }
+                items.push({
+                    project_module: projectModule,
+                    source_identifier: sourceIdentifier,
+                    enabled: enabled
+                });
+            }
+
+            try {
+                const response = await fetch('/api/v1/sources/bulk', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ items: items })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to bulk add sources');
+                }
+
+                const data = await response.json();
+                const result = 'Created: ' + data.total_created + ', Existing: ' + data.total_existing;
+                document.getElementById('bulkResult').textContent = result;
+                document.getElementById('bulkSourcesInput').value = '';
+                loadSources();
+            } catch (error) {
+                alert('Error bulk adding sources: ' + error.message);
             }
         }
 

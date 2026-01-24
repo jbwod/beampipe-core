@@ -11,7 +11,13 @@ from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import NotFoundException
 from ...core.registry.service import source_registry_service
 from ...crud.crud_source_registry import crud_source_registry
-from ...schemas.registry import SourceRegistryCreate, SourceRegistryRead, SourceRegistryUpdate
+from ...schemas.registry import (
+    SourceRegistryBulkCreate,
+    SourceRegistryBulkCreateResponse,
+    SourceRegistryCreate,
+    SourceRegistryRead,
+    SourceRegistryUpdate,
+)
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -85,6 +91,42 @@ async def register_source(
         enabled=source_data.enabled,
     )
     return source
+
+
+@router.post("/bulk", response_model=SourceRegistryBulkCreateResponse, status_code=200)
+async def bulk_register_sources(
+    request: Request,
+    bulk_data: SourceRegistryBulkCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    created: list[dict[str, Any]] = []
+    existing: list[dict[str, Any]] = []
+
+    for item in bulk_data.items:
+        already = await source_registry_service.check_existing_source(
+            db=db,
+            project_module=item.project_module,
+            source_identifier=item.source_identifier,
+        )
+        if already:
+            existing.append(already)
+            continue
+
+        new_source = await source_registry_service.register_source(
+            db=db,
+            project_module=item.project_module,
+            source_identifier=item.source_identifier,
+            enabled=item.enabled,
+        )
+        created.append(new_source)
+
+    return {
+        "created": created,
+        "existing": existing,
+        "total_created": len(created),
+        "total_existing": len(existing),
+    }
 
 @router.get("/{source_id}")
 async def get_source(
