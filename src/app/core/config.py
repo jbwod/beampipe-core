@@ -155,6 +155,13 @@ class RunLedgerSettings(BaseSettings):
     MAX_RETRIES: int = 3
 
 
+class DiscoverySettings(BaseSettings):
+    DISCOVERY_BATCH_SIZE: int = 100
+    DISCOVERY_STALE_HOURS: int = 24
+    DISCOVERY_TAP_LOOKBACK_DAYS: int = 30
+    DISCOVERY_SCHEDULE_MINUTES: int = 1
+
+
 class Settings(
     AppSettings,
     SQLiteSettings,
@@ -171,6 +178,7 @@ class Settings(
     EnvironmentSettings,
     CORSSettings,
     RunLedgerSettings,
+    DiscoverySettings,
 ):
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".env"),

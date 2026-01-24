@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from ..core.schemas import TimestampSchema, UUIDSchema
 
@@ -35,6 +35,13 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
     model_config = ConfigDict(from_attributes=True)
 
     enabled: bool
+    last_checked_at: datetime | None = Field(default=None, description="Last discovery check timestamp")
+
+    @field_serializer("last_checked_at")
+    def serialize_last_checked_at(self, last_checked_at: datetime | None, _info):  # type: ignore[override]
+        if last_checked_at is not None:
+            return last_checked_at.isoformat()
+        return None
 
 
 class SourceRegistryUpdate(BaseModel):

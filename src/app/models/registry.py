@@ -24,6 +24,9 @@ class SourceRegistry(Base):
 
     # Optional
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    last_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, index=True
+    )
 
     uuid: Mapped[uuid_pkg.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default_factory=uuid7, unique=True, init=False
