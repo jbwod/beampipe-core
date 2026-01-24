@@ -32,6 +32,8 @@ dependencies = [
     "crudadmin>=0.4.2",
     "gunicorn>=23.0.0",
     "astropy>=6.0.0",
+    "astroquery>=0.4.9",
+    "requests>=2.32.0",
     "ruff>=0.11.13",
     "mypy>=1.16.0",
 ]
