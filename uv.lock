@@ -229,6 +229,7 @@ dependencies = [
     { name = "astroquery" },
     { name = "asyncpg" },
     { name = "bcrypt" },
+    { name = "beampipe-wallaby" },
     { name = "crudadmin" },
     { name = "fastapi" },
     { name = "fastcrud" },
@@ -278,6 +279,7 @@ requires-dist = [
     { name = "astroquery", specifier = ">=0.4.9" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "bcrypt", specifier = ">=4.1.1" },
+    { name = "beampipe-wallaby", directory = "beampipe-wallaby" },
     { name = "crudadmin", specifier = ">=0.4.2" },
     { name = "faker", marker = "extra == 'dev'", specifier = ">=26.0.0" },
     { name = "fastapi", specifier = ">=0.109.1" },
@@ -314,6 +316,21 @@ provides-extras = ["dev"]
 dev = [
     { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "pytest-asyncio", specifier = ">=1.0.0" },
+]
+
+[[package]]
+name = "beampipe-wallaby"
+version = "0.0.1"
+source = { directory = "beampipe-wallaby" }
+dependencies = [
+    { name = "astropy" },
+    { name = "astroquery" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "astropy", specifier = ">=5.0" },
+    { name = "astroquery", specifier = ">=0.4" },
 ]
 
 [[package]]
