@@ -148,3 +148,4 @@ src/.env
 # Don't ignore files inside of script folder:
 !scripts/*
 
+src/app/core/archive/adapters/test.py
