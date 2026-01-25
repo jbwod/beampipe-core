@@ -3,13 +3,15 @@
 Provides source registration and cataloging functionality.
 """
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
 
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_source_registry import crud_source_registry
+from ...models.registry import SourceRegistry
 from ...schemas.registry import SourceRegistryCreateInternal, SourceRegistryRead
 from ..exceptions.http_exceptions import NotFoundException
 
@@ -187,6 +189,48 @@ class SourceRegistryService:
             **filters,
         )
         return cast(list[dict[str, Any]], sources_data.get("items", []))
+
+    @staticmethod
+    async def get_sources_for_discovery(
+        db: AsyncSession,
+        project_module: str | None = None,
+        stale_after_hours: int | None = None,
+        limit: int | None = None,
+    ) -> list[SourceRegistry]:
+        # Build basic query for enabled sources
+        query = select(SourceRegistry).where(SourceRegistry.enabled.is_(True))
+
+        # if project_module:
+        #     query = query.where(SourceRegistry.project_module == project_module)
+
+        # Only select sources not yet checked, or stale
+        conditions = [SourceRegistry.last_checked_at.is_(None)]
+
+        if stale_after_hours is not None:
+            cutoff = datetime.now(UTC) - timedelta(hours=stale_after_hours)
+            conditions.append(SourceRegistry.last_checked_at < cutoff)
+
+        query = query.where(or_(*conditions)).order_by(SourceRegistry.created_at.asc())
+
+        if limit:
+            query = query.limit(limit)
+
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def mark_sources_checked(
+        db: AsyncSession, source_ids: list[UUID], checked_at: datetime | None = None
+    ) -> None:
+        """Update last_checked_at for a batch of sources."""
+        if not source_ids:
+            return
+        await db.execute(
+            update(SourceRegistry)
+            .where(SourceRegistry.uuid.in_(source_ids))
+            .values(last_checked_at=checked_at or datetime.now(UTC))
+        )
+        await db.commit()
 
 
 # instance
