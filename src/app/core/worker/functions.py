@@ -33,6 +33,11 @@ async def discover_batch(
     }
 
 
+async def timer_task(ctx: Worker) -> dict[str, Any]:
+    print("execute something timer")
+    return {"status": "ok"}
+
+
 # -------- base functions --------
 async def startup(ctx: Worker) -> None:
     logging.info("Worker Started")

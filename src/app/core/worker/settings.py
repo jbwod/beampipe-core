@@ -1,15 +1,24 @@
+from arq import cron
 from arq.connections import RedisSettings
 
 from ...core.config import settings
-from .functions import discover_batch, discover_schedule_task, sample_background_task, shutdown, startup
+from .functions import (
+    discover_batch,
+    discover_schedule_task,
+    sample_background_task,
+    shutdown,
+    startup,
+    timer_task,
+)
 
 REDIS_QUEUE_HOST = settings.REDIS_QUEUE_HOST
 REDIS_QUEUE_PORT = settings.REDIS_QUEUE_PORT
 
 
 class WorkerSettings:
-    functions = [sample_background_task, discover_schedule_task, discover_batch]
+    functions = [sample_background_task, discover_schedule_task, discover_batch, timer_task]
     redis_settings = RedisSettings(host=REDIS_QUEUE_HOST, port=REDIS_QUEUE_PORT)
     on_startup = startup
     on_shutdown = shutdown
     handle_signals = False
+    cron_jobs = [cron(timer_task, second=0)]
