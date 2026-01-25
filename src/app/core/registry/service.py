@@ -7,10 +7,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import and_, exists, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_source_registry import crud_source_registry
+from ...models.archive import ArchiveMetadata
 from ...models.registry import SourceRegistry
 from ...schemas.registry import SourceRegistryCreateInternal, SourceRegistryRead
 from ..exceptions.http_exceptions import NotFoundException
@@ -197,21 +198,24 @@ class SourceRegistryService:
         stale_after_hours: int | None = None,
         limit: int | None = None,
     ) -> list[SourceRegistry]:
-        # Build basic query for enabled sources
+        metadata_exists = exists(
+            select(1).where(
+                and_(
+                    ArchiveMetadata.project_module == SourceRegistry.project_module,
+                    ArchiveMetadata.source_identifier == SourceRegistry.source_identifier,
+                )
+            )
+        )
         query = select(SourceRegistry).where(SourceRegistry.enabled.is_(True))
+        if project_module:
+            query = query.where(SourceRegistry.project_module == project_module)
 
-        # if project_module:
-        #     query = query.where(SourceRegistry.project_module == project_module)
-
-        # Only select sources not yet checked, or stale
-        conditions = [SourceRegistry.last_checked_at.is_(None)]
-
+        conditions = [SourceRegistry.last_checked_at.is_(None), ~metadata_exists]
         if stale_after_hours is not None:
             cutoff = datetime.now(UTC) - timedelta(hours=stale_after_hours)
             conditions.append(SourceRegistry.last_checked_at < cutoff)
 
         query = query.where(or_(*conditions)).order_by(SourceRegistry.created_at.asc())
-
         if limit:
             query = query.limit(limit)
 

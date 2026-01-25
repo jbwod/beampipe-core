@@ -8,5 +8,11 @@ router = APIRouter()
 async def view_sources(request: Request) -> HTMLResponse:
     """testing adding a non API endpoint to the application."""
     html_content = """
+    <html>
+    <body>
+    <h1>Sources</h1>
+    <p>empty</p>
+    </body>
+    </html>
     """
     return HTMLResponse(content=html_content)
