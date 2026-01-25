@@ -16,9 +16,21 @@ REDIS_QUEUE_PORT = settings.REDIS_QUEUE_PORT
 
 
 class WorkerSettings:
-    functions = [sample_background_task, discover_schedule_task, discover_batch, timer_task]
+    functions = [sample_background_task, discover_batch]
     redis_settings = RedisSettings(host=REDIS_QUEUE_HOST, port=REDIS_QUEUE_PORT)
     on_startup = startup
     on_shutdown = shutdown
     handle_signals = False
-    cron_jobs = [cron(timer_task, second=0)]
+
+
+class SchedulerSettings:
+    functions = [sample_background_task, discover_schedule_task, timer_task]
+    redis_settings = RedisSettings(host=REDIS_QUEUE_HOST, port=REDIS_QUEUE_PORT)
+    on_startup = startup
+    on_shutdown = shutdown
+    handle_signals = False
+
+    cron_jobs = [
+        cron(discover_schedule_task, minute=settings.DISCOVERY_SCHEDULE_MINUTES),
+        cron(timer_task, second=0),
+    ]
