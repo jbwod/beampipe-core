@@ -35,5 +35,5 @@ class SchedulerSettings:
 
     cron_jobs = [
         cron(discover_schedule_task, minute=settings.DISCOVERY_SCHEDULE_MINUTES),
-        cron(enqueue_timer_task, second=0),
+        cron(enqueue_timer_task, second={0}),
     ]
