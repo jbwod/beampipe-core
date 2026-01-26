@@ -60,7 +60,12 @@ async def discover_schedule(
                 f"discover_schedule: enqueue discover_batch for module={module_name} "
                 f"sources={len(batch)}"
             )
-            job = await redis.enqueue_job("discover_batch", module_name, batch)
+            job = await redis.enqueue_job(
+                "discover_batch",
+                module_name,
+                batch,
+                _queue_name=settings.WORKER_QUEUE_NAME,
+            )
             if job:
                 job_ids.append(job.job_id)
             total_sources += len(batch)

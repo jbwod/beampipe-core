@@ -97,6 +97,8 @@ class ClientSideCacheSettings(BaseSettings):
 class RedisQueueSettings(BaseSettings):
     REDIS_QUEUE_HOST: str = "localhost"
     REDIS_QUEUE_PORT: int = 6379
+    WORKER_QUEUE_NAME: str = "arq:queue"
+    SCHEDULER_QUEUE_NAME: str = "arq:scheduler"
 
 
 class RedisRateLimiterSettings(BaseSettings):

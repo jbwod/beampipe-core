@@ -9,6 +9,7 @@ from arq.worker import Worker
 from ..archive.adapters import test as discovery_test
 from ..archive.discovery import discover_schedule
 from ..archive.service import archive_metadata_service
+from ..config import settings
 from ..db.database import local_session
 from ..projects import list_project_modules, load_project_module
 from ..registry.service import source_registry_service
@@ -27,6 +28,17 @@ async def sample_background_task(ctx: Worker, name: str) -> str:
 async def discover_schedule_task(ctx: Worker, project_module: str | None = None) -> dict[str, Any]:
     async with local_session() as db:
         return await discover_schedule(db=db, redis=ctx["redis"], project_module=project_module)
+
+async def enqueue_timer_task(ctx: Worker) -> dict[str, Any]:
+    redis = ctx.get("redis")
+    if redis is None:
+        raise RuntimeError("Redis queue is not available for timer enqueue")
+
+    job = await redis.enqueue_job(
+        "timer_task",
+        _queue_name=settings.WORKER_QUEUE_NAME,
+    )
+    return {"status": "ok", "job_id": job.job_id if job else None}
 
 
 async def discover_batch(
