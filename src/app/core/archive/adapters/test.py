@@ -26,8 +26,13 @@ from astropy.table import Table
 from astroquery.casda import Casda
 
 
-from casda import _extract_scan_id, query as casda_query, stage_data as casda_stage_data, CASDA_TAP_URL
-from vizier import VIZIER_TAP_URL, query as vizier_query
+from app.core.archive.adapters.casda import (
+    CASDA_TAP_URL,
+    _extract_scan_id,
+    query as casda_query,
+    stage_data as casda_stage_data,
+)
+from app.core.archive.adapters.vizier import VIZIER_TAP_URL, query as vizier_query
 from app.core.utils.astro import degrees_to_dms, degrees_to_hms
 
 logging.basicConfig(level=logging.INFO)
