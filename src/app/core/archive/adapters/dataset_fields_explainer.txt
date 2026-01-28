@@ -1,0 +1,53 @@
+source_identifier: Source name used for the query (e.g., HIPASSJ1318-21).
+dataset_id: CASDA filename used as dataset identifier (typically the visibility tar filename).
+visibility_filename: Visibility file name (same as dataset_id for visibilities).
+sbid: Scheduling Block ID (numeric identifier in ASKAP/CASDA).
+obs_id: Observation identifier (e.g., ASKAP-<sbid> from obscore).
+staged_url: Pawsey ingest URL for the staged visibility file (time-limited).
+checksum_url: CASDA checksum URL for the staged file (for integrity verification).
+evaluation_file: CASDA observation evaluation file name for the SBID (largest by filesize).
+ra_degrees: Right Ascension in degrees (from Vizier HIPASS catalog).
+dec_degrees: Declination in degrees (from Vizier HIPASS catalog).
+vsys: Systemic velocity (km/s) from Vizier HIPASS catalog.
+ra_string: Right Ascension formatted as H:M:S string.
+dec_string: Declination formatted as D:M:S string.
+dataproduct_type: IVOA ObsCore data product type (e.g., visibility).
+calib_level: ObsCore calibration level (e.g., 1 for calibrated/partially calibrated).
+obs_collection: Survey/collection name in ObsCore.
+obs_publisher_did: Publisher dataset identifier in ObsCore.
+access_url: ObsCore access URL (often a datalink endpoint).
+access_format: MIME type / access format for the access_url.
+access_estsize: Estimated size of the dataset (usually in kilobytes).
+target_name: Target name from ObsCore (e.g., field/pointing target).
+s_ra: Central RA of the dataset footprint (deg, ObsCore).
+s_dec: Central Dec of the dataset footprint (deg, ObsCore).
+s_fov: Field of view diameter (deg, ObsCore).
+s_region: Spatial region description (STC-S string, ObsCore).
+s_resolution: Spatial resolution (arcsec or deg, ObsCore; may be "--" if unknown).
+s_xel1: Spatial axis length (pixels or bins, ObsCore; may be "--").
+s_xel2: Spatial axis length (pixels or bins, ObsCore; may be "--").
+t_min: Observation start time (MJD, ObsCore).
+t_max: Observation end time (MJD, ObsCore).
+t_exptime: Exposure time (seconds, ObsCore).
+t_resolution: Temporal resolution (seconds, ObsCore; may be "--").
+t_xel: Temporal axis length (samples, ObsCore; may be "--").
+em_min: Minimum spectral value (meters, ObsCore).
+em_max: Maximum spectral value (meters, ObsCore).
+em_res_power: Spectral resolving power (ObsCore; may be "--").
+em_xel: Spectral axis length (channels, ObsCore; may be "--").
+o_ucd: Observable UCD (e.g., phys.polarisation).
+pol_states: Polarization states present (e.g., /XX/XY/YX/YY/).
+pol_xel: Polarization axis length (number of pol states).
+facility_name: Facility name (e.g., ASKAP).
+instrument_name: Instrument name (ObsCore; may be empty).
+dataproduct_subtype: Subtype of the data product (ObsCore; may be empty).
+em_ucd: Spectral axis UCD (e.g., em.wl).
+em_unit: Spectral axis unit (e.g., m).
+em_resolution: Spectral resolution (ObsCore; may be "--").
+s_resolution_min: Minimum spatial resolution (ObsCore; may be "--").
+s_resolution_max: Maximum spatial resolution (ObsCore; may be "--").
+s_ucd: Spatial axis UCD (e.g., pos.eq).
+s_unit: Spatial axis unit (e.g., deg).
+obs_release_date: Release date/time for the observation (ISO 8601).
+quality_level: Data quality flag (ObsCore; e.g., UNCERTAIN).
+thumbnail_id: Thumbnail identifier (ObsCore; may be "--" or empty).

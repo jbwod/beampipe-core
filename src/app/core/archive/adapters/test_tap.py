@@ -6,7 +6,7 @@ from astroquery.utils.tap.core import TapPlus
 CASDA_TAP_URL = "https://casda.csiro.au/casda_vo_tools/tap"
 VIZIER_TAP_URL = "http://tapvizier.cds.unistra.fr/TAPVizieR/tap"
 
-source = "HIPASSJ1318-21"
+source = "HIPASSJ1308-16"
 
 casdatap = TapPlus(url=CASDA_TAP_URL, verbose=False)
 query = f"SELECT * FROM ivoa.obscore WHERE filename LIKE '{source}%'"
