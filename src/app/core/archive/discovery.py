@@ -5,6 +5,7 @@ Handles polling and event-driven discovery of newly deposited datasets.
 # - Polling-based discovery for CASDA
 # using the ARQ queue system in /workers and /tasks
 # using the source_registry_service to get sources for discovery and module grouping
+import logging
 from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any
@@ -14,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..registry.service import source_registry_service
+
+logger = logging.getLogger(__name__)
 
 
 def _chunk_list(items: list[Any], chunk_size: int) -> list[list[Any]]:
@@ -41,7 +44,7 @@ async def discover_schedule(
         stale_after_hours=stale_after_hours,
     )
 
-    print(f"discover_schedule: {len(sources)} sources marked for discovery")
+    logger.info(f"discover_schedule: {len(sources)} sources marked for discovery")
 
     # Group sources by project_module
     grouped = defaultdict(list)
@@ -56,7 +59,7 @@ async def discover_schedule(
         identifiers = [source.source_identifier for source in module_sources]
         # Batch the identifiers and enqueue each batch
         for batch in _chunk_list(identifiers, batch_size):
-            print(
+            logger.info(
                 f"discover_schedule: enqueue discover_batch for module={module_name} "
                 f"sources={len(batch)}"
             )
@@ -66,6 +69,7 @@ async def discover_schedule(
                 batch,
                 _queue_name=settings.WORKER_QUEUE_NAME,
             )
+        
             if job:
                 job_ids.append(job.job_id)
             total_sources += len(batch)

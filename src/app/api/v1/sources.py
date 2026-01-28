@@ -7,6 +7,7 @@ from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_user
+from ...core.archive.service import archive_metadata_service
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import NotFoundException
 from ...core.registry.service import source_registry_service
@@ -152,6 +153,45 @@ async def get_source(
         source_id=source_id,
     )
     return source
+
+
+@router.get("/{source_id}/metadata")
+async def get_source_metadata(
+    request: Request,
+    source_id: UUID,
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    """Get archive metadata for a source.
+
+    Returns all metadata entries (grouped by SBID) for the specified source.
+
+    Args:
+        request: FastAPI request object
+        source_id: Source UUID
+        db: Database session
+
+    Returns:
+        Dictionary containing source information and list of metadata entries
+
+    Raises:
+        NotFoundException: If source not found
+    """
+    source = await source_registry_service.get_source(
+        db=db,
+        source_id=source_id,
+    )
+    
+    metadata_list = await archive_metadata_service.list_metadata_for_source(
+        db=db,
+        project_module=source["project_module"],
+        source_identifier=source["source_identifier"],
+    )
+    
+    return {
+        "source": source,
+        "metadata": metadata_list,
+        "metadata_count": len(metadata_list),
+    }
 
 @router.patch("/{source_id}")
 async def update_source(
