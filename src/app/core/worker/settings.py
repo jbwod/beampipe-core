@@ -34,6 +34,6 @@ class SchedulerSettings:
     handle_signals = False
 
     cron_jobs = [
-        cron(discover_schedule_task, minute=settings.DISCOVERY_SCHEDULE_MINUTES),
-        cron(enqueue_timer_task, second={0}),
+        cron(discover_schedule_task, second={0}),  # Run at the start of every minute
+        # cron(enqueue_timer_task, second={0}),
     ]

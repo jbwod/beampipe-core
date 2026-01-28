@@ -103,7 +103,8 @@ class ArchiveMetadataService:
             source_identifier=source_identifier,
             schema_to_select=ArchiveMetadataRead,
         )
-        return cast(list[dict[str, Any]], records.get("items", []))
+        # FastCRUD returns {"data": [...], "total_count": N}
+        return cast(list[dict[str, Any]], records.get("data", []))
 
 
 archive_metadata_service = ArchiveMetadataService()
