@@ -6,9 +6,11 @@ Handles polling and event-driven discovery of newly deposited datasets.
 # using the ARQ queue system in /workers and /tasks
 # using the source_registry_service to get sources for discovery and module grouping
 import logging
+import re
 from collections import defaultdict
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Optional
+from urllib.parse import parse_qs, unquote, urlparse
 
 from arq.connections import ArqRedis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +19,20 @@ from ..config import settings
 from ..registry.service import source_registry_service
 
 logger = logging.getLogger(__name__)
+
+
+def extract_filename_from_url(url: str) -> Optional[str]:
+    """Extract filename from a URL (handles query parameters)."""
+    decoded_url = unquote(url)
+    parsed = urlparse(decoded_url)
+    query_params = parse_qs(parsed.query)
+    response_disposition = query_params.get("response-content-disposition", [])
+    for value in response_disposition:
+        match = re.search(r'filename="?([^";]+)"?', value)
+        if match:
+            return match.group(1)
+    filename = parsed.path.split("/")[-1]
+    return filename or None
 
 
 def _chunk_list(items: list[Any], chunk_size: int) -> list[list[Any]]:

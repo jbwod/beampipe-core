@@ -1,4 +1,22 @@
 """Astronomy helpers."""
+from typing import Any
+
+import numpy as np
+
+
+def to_python_value(value: Any) -> Any:
+    """Convert NumPy/astropy table values to native Python types for JSON."""
+    if hasattr(value, "item"):  # NumPy scalar (int32, float64, etc.)
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, (np.integer, np.floating)):
+        return float(value) if isinstance(value, np.floating) else int(value)
+    if isinstance(value, (np.str_, np.bytes_)):
+        return str(value)
+    return value
+
+
 def degrees_to_hms(degrees: float) -> tuple[int, int, float]:
     """Convert RA given in degrees to hours-minutes-seconds."""
     hours = degrees / 15.0  # Convert degrees to hours
