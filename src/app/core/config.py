@@ -162,6 +162,7 @@ class DiscoverySettings(BaseSettings):
     DISCOVERY_STALE_HOURS: int = 24
     DISCOVERY_TAP_LOOKBACK_DAYS: int = 30
     DISCOVERY_SCHEDULE_MINUTES: int = 1
+    DISCOVERY_TAP_TIMEOUT_SECONDS: int = 120
 
 
 class Settings(

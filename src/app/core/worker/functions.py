@@ -63,19 +63,30 @@ async def discover_batch(
     total_datasets = 0
     total_sbids = 0
 
+    tap_timeout = getattr(settings, "DISCOVERY_TAP_TIMEOUT_SECONDS", 120)
+
     async with local_session() as db:
         logger.info(
             f"discover_batch: project_module={project_module} sources={len(source_identifiers)}"
         )
         for source_identifier in source_identifiers:
             try:
-                # module.discover() to get query results
+                # Run blocking TAP discover in thread with timeout so worker cannot hang
                 discover_fn = getattr(module, "discover", None)
                 if discover_fn:
-                    query_results = discover_fn(source_identifier)
+                    query_results = await asyncio.wait_for(
+                        asyncio.to_thread(discover_fn, source_identifier),
+                        timeout=tap_timeout,
+                    )
                 else:
                     logger.warning(f"Module {project_module} has no discover() function, using fallback")
-                    query_results = discovery_test.query_casda_visibility_files(source_identifier)
+                    query_results = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            discovery_test.query_casda_visibility_files,
+                            source_identifier,
+                        ),
+                        timeout=tap_timeout,
+                    )
 
                 if len(query_results) == 0:
                     logger.info(f"No datasets found for {source_identifier}")
@@ -86,26 +97,33 @@ async def discover_batch(
                         processed_source_ids.append(source["uuid"])
                     continue
 
-                # later
                 data_url_by_scan_id: dict[str, str] | None = None
                 checksum_url_by_scan_id: dict[str, str] | None = None
 
-                #  module.prepare_metadata()
+                # Run blocking prepare_metadata (Vizier/CASDA TAP) in thread with timeout
                 prepare_fn = getattr(module, "prepare_metadata", None)
                 if prepare_fn:
-                    metadata_list = prepare_fn(
-                        source_identifier=source_identifier,
-                        query_results=query_results,
-                        data_url_by_scan_id=data_url_by_scan_id,
-                        checksum_url_by_scan_id=checksum_url_by_scan_id,
+                    metadata_list = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            prepare_fn,
+                            source_identifier=source_identifier,
+                            query_results=query_results,
+                            data_url_by_scan_id=data_url_by_scan_id,
+                            checksum_url_by_scan_id=checksum_url_by_scan_id,
+                        ),
+                        timeout=tap_timeout,
                     )
                 else:
                     logger.warning(f"Module {project_module} has no prepare_metadata() function, using fallback")
-                    metadata_list = discovery_test.prepare_metadata(
-                        source_identifier=source_identifier,
-                        query_results=query_results,
-                        data_url_by_scan_id=data_url_by_scan_id,
-                        checksum_url_by_scan_id=checksum_url_by_scan_id,
+                    metadata_list = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            discovery_test.prepare_metadata,
+                            source_identifier=source_identifier,
+                            query_results=query_results,
+                            data_url_by_scan_id=data_url_by_scan_id,
+                            checksum_url_by_scan_id=checksum_url_by_scan_id,
+                        ),
+                        timeout=tap_timeout,
                     )
 
                 grouped = _group_metadata_by_sbid(metadata_list)
@@ -144,6 +162,12 @@ async def discover_batch(
                 if source and source.get("uuid"):
                     processed_source_ids.append(source["uuid"])
 
+            except asyncio.TimeoutError:
+                logger.error(
+                    f"TAP timeout ({tap_timeout}s) for source {source_identifier} in module {project_module}; "
+                    "skipping (source will be retried next run)"
+                )
+                continue
             except Exception as e:
                 logger.error(
                     f"Error processing source {source_identifier} in module {project_module}: {e}",
