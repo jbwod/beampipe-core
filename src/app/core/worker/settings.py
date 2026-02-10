@@ -16,6 +16,13 @@ REDIS_QUEUE_HOST = settings.REDIS_QUEUE_HOST
 REDIS_QUEUE_PORT = settings.REDIS_QUEUE_PORT
 
 
+def _discovery_schedule_minutes() -> set[int]:
+    interval = max(1, settings.DISCOVERY_SCHEDULE_MINUTES)
+    if interval >= 60:
+        return {0}
+    return set(range(0, 60, interval))
+
+
 class WorkerSettings:
     functions = [sample_background_task, discover_batch, timer_task]
     redis_settings = RedisSettings(host=REDIS_QUEUE_HOST, port=REDIS_QUEUE_PORT)
@@ -23,6 +30,8 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     handle_signals = False
+    job_try = 3
+    job_result_ttl = 3600
 
 
 class SchedulerSettings:
@@ -32,8 +41,14 @@ class SchedulerSettings:
     on_startup = startup
     on_shutdown = shutdown
     handle_signals = False
+    job_try = 3
+    job_result_ttl = 3600
 
     cron_jobs = [
-        cron(discover_schedule_task, second={0}),  # Run at the start of every minute
+        cron(
+            discover_schedule_task,
+            minute=_discovery_schedule_minutes(),
+            second={0},
+        ),
         # cron(enqueue_timer_task, second={0}),
     ]

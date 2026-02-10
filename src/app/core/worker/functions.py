@@ -1,10 +1,12 @@
 import asyncio
 import logging
+import time
 from datetime import UTC, datetime
 from typing import Any
 
 import uvloop
 from arq.worker import Worker
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from ..archive.adapters import test as discovery_test
 from ..archive.discovery import discover_schedule
@@ -26,8 +28,86 @@ async def sample_background_task(ctx: Worker, name: str) -> str:
     return f"Task {name} is complete!"
 
 async def discover_schedule_task(ctx: Worker, project_module: str | None = None) -> dict[str, Any]:
-    async with local_session() as db:
-        return await discover_schedule(db=db, redis=ctx["redis"], project_module=project_module)
+    try:
+        async with local_session() as db:
+            result = await discover_schedule(db=db, redis=ctx["redis"], project_module=project_module)
+            if "ok" not in result:
+                result["ok"] = True
+            logger.info(
+                "event=discover_schedule_task_result "
+                "project_module=%s scheduled_at=%s ok=%s total_sources=%s "
+                "total_jobs=%s enqueue_failures=%s skipped_due_to_queue_full=%s",
+                project_module or "all",
+                result.get("scheduled_at"),
+                result.get("ok"),
+                result.get("total_sources"),
+                result.get("total_jobs"),
+                result.get("enqueue_failures"),
+                result.get("skipped_due_to_queue_full"),
+            )
+            return result
+    except Exception as exc:
+        logger.exception(
+            "event=discover_schedule_task_error project_module=%s error=%s",
+            project_module,
+            exc,
+        )
+        return {
+            "ok": False,
+            "error": str(exc),
+            "project_module": project_module,
+            "scheduled_at": datetime.now(UTC).isoformat(),
+        }
+
+
+async def _run_discover_once(
+    discover_callable: Any,
+    source_identifier: str,
+    tap_timeout: int,
+) -> Any:
+    return await asyncio.wait_for(
+        asyncio.to_thread(discover_callable, source_identifier),
+        timeout=tap_timeout,
+    )
+
+
+@retry(
+    retry=retry_if_exception_type(Exception),
+    wait=wait_exponential(multiplier=1, min=2, max=60),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
+async def _run_discover_with_retry(
+    discover_callable: Any,
+    source_identifier: str,
+    tap_timeout: int,
+) -> Any:
+    return await _run_discover_once(
+        discover_callable=discover_callable,
+        source_identifier=source_identifier,
+        tap_timeout=tap_timeout,
+    )
+
+
+async def _run_prepare_once(
+    prepare_callable: Any,
+    source_identifier: str,
+    query_results: Any,
+    data_url_by_scan_id: dict[str, str] | None,
+    checksum_url_by_scan_id: dict[str, str] | None,
+    tap_timeout: int,
+) -> Any:
+    return await asyncio.wait_for(
+        asyncio.to_thread(
+            prepare_callable,
+            source_identifier=source_identifier,
+            query_results=query_results,
+            data_url_by_scan_id=data_url_by_scan_id,
+            checksum_url_by_scan_id=checksum_url_by_scan_id,
+        ),
+        timeout=tap_timeout,
+    )
+
 
 async def enqueue_timer_task(ctx: Worker) -> dict[str, Any]:
     redis = ctx.get("redis")
@@ -46,7 +126,10 @@ def _group_metadata_by_sbid(metadata_list: list[dict[str, Any]]) -> dict[str, li
     for item in metadata_list:
         sbid = item.get("sbid")
         if sbid is None:
-            logger.warning(f"Dataset missing SBID: {item.get('dataset_id', 'unknown')}")
+            logger.warning(
+                "event=discover_batch_missing_sbid dataset_id=%s",
+                item.get("dataset_id", "unknown"),
+            )
             continue
         key = str(sbid)
         grouped.setdefault(key, []).append(item)
@@ -66,36 +149,50 @@ async def discover_batch(
     now = datetime.now(UTC)
 
     processed_source_ids: list[Any] = []
+    failed_source_identifiers: list[str] = []
     total_datasets = 0
     total_sbids = 0
 
     tap_timeout = getattr(settings, "DISCOVERY_TAP_TIMEOUT_SECONDS", 120)
+    job_started_at = time.perf_counter()
 
     async with local_session() as db:
         logger.info(
-            f"discover_batch: project_module={project_module} sources={len(source_identifiers)}"
+            "event=discover_batch_started project_module=%s total_sources=%s",
+            project_module,
+            len(source_identifiers),
         )
         for source_identifier in source_identifiers:
+            source_started_at = time.perf_counter()
             try:
                 # Run blocking TAP discover in thread with timeout so worker cannot hang
                 discover_fn = getattr(module, "discover", None)
                 if discover_fn:
-                    query_results = await asyncio.wait_for(
-                        asyncio.to_thread(discover_fn, source_identifier),
-                        timeout=tap_timeout,
+                    query_results = await _run_discover_with_retry(
+                        discover_callable=discover_fn,
+                        source_identifier=source_identifier,
+                        tap_timeout=tap_timeout,
                     )
                 else:
-                    logger.warning(f"Module {project_module} has no discover() function, using fallback")
-                    query_results = await asyncio.wait_for(
-                        asyncio.to_thread(
-                            discovery_test.query_casda_visibility_files,
-                            source_identifier,
-                        ),
-                        timeout=tap_timeout,
+                    logger.warning(
+                        "event=discover_batch_no_discover_fallback project_module=%s",
+                        project_module,
+                    )
+                    query_results = await _run_discover_with_retry(
+                        discover_callable=discovery_test.query_casda_visibility_files,
+                        source_identifier=source_identifier,
+                        tap_timeout=tap_timeout,
                     )
 
                 if len(query_results) == 0:
-                    logger.info(f"discover_batch: outcome=no_datasets source={source_identifier}")
+                    logger.info(
+                        "event=discover_batch_source_outcome "
+                        "project_module=%s source_identifier=%s "
+                        "outcome=no_datasets duration_ms=%s",
+                        project_module,
+                        source_identifier,
+                        int((time.perf_counter() - source_started_at) * 1000),
+                    )
                     await archive_metadata_service.upsert_metadata(
                         db=db,
                         project_module=project_module,
@@ -114,30 +211,29 @@ async def discover_batch(
                 data_url_by_scan_id: dict[str, str] | None = None
                 checksum_url_by_scan_id: dict[str, str] | None = None
 
-                # Run blocking prepare_metadata (Vizier/CASDA TAP) in thread with timeout
+                # Run blocking prepare_metadata (Vizier/CASDA TAP) in thread with timeout (no retry)
                 prepare_fn = getattr(module, "prepare_metadata", None)
                 if prepare_fn:
-                    result = await asyncio.wait_for(
-                        asyncio.to_thread(
-                            prepare_fn,
-                            source_identifier=source_identifier,
-                            query_results=query_results,
-                            data_url_by_scan_id=data_url_by_scan_id,
-                            checksum_url_by_scan_id=checksum_url_by_scan_id,
-                        ),
-                        timeout=tap_timeout,
+                    result = await _run_prepare_once(
+                        prepare_callable=prepare_fn,
+                        source_identifier=source_identifier,
+                        query_results=query_results,
+                        data_url_by_scan_id=data_url_by_scan_id,
+                        checksum_url_by_scan_id=checksum_url_by_scan_id,
+                        tap_timeout=tap_timeout,
                     )
                 else:
-                    logger.warning(f"Module {project_module} has no prepare_metadata() function, using fallback")
-                    result = await asyncio.wait_for(
-                        asyncio.to_thread(
-                            discovery_test.prepare_metadata,
-                            source_identifier=source_identifier,
-                            query_results=query_results,
-                            data_url_by_scan_id=data_url_by_scan_id,
-                            checksum_url_by_scan_id=checksum_url_by_scan_id,
-                        ),
-                        timeout=tap_timeout,
+                    logger.warning(
+                        "event=discover_batch_no_prepare_fallback project_module=%s",
+                        project_module,
+                    )
+                    result = await _run_prepare_once(
+                        prepare_callable=discovery_test.prepare_metadata,
+                        source_identifier=source_identifier,
+                        query_results=query_results,
+                        data_url_by_scan_id=data_url_by_scan_id,
+                        checksum_url_by_scan_id=checksum_url_by_scan_id,
+                        tap_timeout=tap_timeout,
                     )
 
                 if isinstance(result, tuple):
@@ -151,8 +247,11 @@ async def discover_batch(
 
                 grouped = _group_metadata_by_sbid(metadata_list)
                 logger.info(
-                    f"discover_batch: {project_module}/{source_identifier} "
-                    f"sbids={len(grouped)} datasets={len(metadata_list)}"
+                    "event=discover_batch_source_grouped project_module=%s source_identifier=%s sbids=%s datasets=%s",
+                    project_module,
+                    source_identifier,
+                    len(grouped),
+                    len(metadata_list),
                 )
 
                 # Upsert
@@ -170,16 +269,27 @@ async def discover_batch(
                         )
                     except Exception as e:
                         logger.error(
-                            f"Error upserting metadata for {source_identifier} SBID {sbid}: {e}",
+                            "event=discover_batch_upsert_error "
+                            "project_module=%s source_identifier=%s sbid=%s error=%s",
+                            project_module,
+                            source_identifier,
+                            str(sbid),
+                            e,
                             exc_info=True,
                         )
                         await db.rollback()
                         raise
-                
+
                 await db.commit()
                 logger.info(
-                    f"discover_batch: outcome=has_metadata source={source_identifier} "
-                    f"sbids={len(grouped)} datasets={len(metadata_list)}"
+                    "event=discover_batch_source_outcome "
+                    "project_module=%s source_identifier=%s outcome=has_metadata "
+                    "sbids=%s datasets=%s duration_ms=%s",
+                    project_module,
+                    source_identifier,
+                    len(grouped),
+                    len(metadata_list),
+                    int((time.perf_counter() - source_started_at) * 1000),
                 )
                 total_sbids += len(grouped)
                 total_datasets += len(metadata_list)
@@ -189,54 +299,91 @@ async def discover_batch(
                 )
                 if source and source.get("uuid"):
                     processed_source_ids.append(source["uuid"])
-# going to look into https://github.com/jd/tenacity for retry
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error(
-                    f"discover_batch: outcome=timeout source={source_identifier} "
-                    f"TAP timeout ({tap_timeout}s); will retry next run"
+                    "event=discover_batch_source_outcome "
+                    "project_module=%s source_identifier=%s outcome=timeout "
+                    "tap_timeout_seconds=%s duration_ms=%s",
+                    project_module,
+                    source_identifier,
+                    tap_timeout,
+                    int((time.perf_counter() - source_started_at) * 1000),
                 )
+                failed_source_identifiers.append(source_identifier)
                 continue
             except Exception as e:
                 logger.error(
-                    f"discover_batch: outcome=error source={source_identifier} error={e}",
+                    "event=discover_batch_source_outcome "
+                    "project_module=%s source_identifier=%s outcome=error "
+                    "error=%s duration_ms=%s",
+                    project_module,
+                    source_identifier,
+                    e,
+                    int((time.perf_counter() - source_started_at) * 1000),
                     exc_info=True,
                 )
                 try:
                     await db.rollback()
                 except Exception as rollback_error:
-                    logger.warning(f"Error during rollback: {rollback_error}")
+                    logger.warning(
+                        "event=discover_batch_rollback_error error=%s",
+                        rollback_error,
+                    )
+                failed_source_identifiers.append(source_identifier)
                 continue
 
         await source_registry_service.mark_sources_checked(
             db, processed_source_ids, checked_at=now
         )
         logger.info(
-            f"discover_batch: marked last_checked_at for {len(processed_source_ids)} sources"
+            "event=discover_batch_marked_checked project_module=%s processed_count=%s",
+            project_module,
+            len(processed_source_ids),
         )
+
+    total_duration_ms = int((time.perf_counter() - job_started_at) * 1000)
+    logger.info(
+        "event=discover_batch_completed "
+        "project_module=%s total_sources=%s total_sbids=%s total_datasets=%s "
+        "processed_count=%s failed_count=%s duration_ms=%s",
+        project_module,
+        len(source_identifiers),
+        total_sbids,
+        total_datasets,
+        len(processed_source_ids),
+        len(failed_source_identifiers),
+        total_duration_ms,
+    )
 
     return {
         "project_module": project_module,
         "total_sources": len(source_identifiers),
         "total_sbids": total_sbids,
         "total_datasets": total_datasets,
+        "failed_sources": failed_source_identifiers,
+        "failed_count": len(failed_source_identifiers),
     }
 
 
 async def timer_task(ctx: Worker) -> dict[str, Any]:
     modules = list_project_modules()
     if not modules:
-        logger.info("timer_task: no project modules registered")
+        logger.info("event=timer_task_no_modules")
         return {"status": "ok", "modules": []}
 
     for name in modules:
         try:
             module = load_project_module(name)
         except Exception as exc:
-            logger.warning(f"timer_task: failed to load project module {name}: {exc}")
+            logger.warning(
+                "event=timer_task_module_load_failed module=%s error=%s",
+                name,
+                exc,
+            )
             continue
         ping_fn = getattr(module, "ping", None)
         if callable(ping_fn):
-            logger.info(f"timer_task: ping {name}")
+            logger.info("event=timer_task_ping module=%s", name)
             ping_fn()
 
     return {"status": "ok", "modules": modules}
@@ -244,8 +391,8 @@ async def timer_task(ctx: Worker) -> dict[str, Any]:
 
 # -------- base functions --------
 async def startup(ctx: Worker) -> None:
-    logging.info("Worker Started")
+    logger.info("event=worker_lifecycle action=started")
 
 
 async def shutdown(ctx: Worker) -> None:
-    logging.info("Worker end")
+    logger.info("event=worker_lifecycle action=shutdown")

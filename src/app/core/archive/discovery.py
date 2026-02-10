@@ -50,32 +50,77 @@ async def discover_schedule(
 ) -> dict[str, Any]:
     """Enqueue discovery batch jobs for sources needing discovery."""
     scheduled_at = datetime.now(UTC).isoformat()
+    target_module = project_module or "all"
+    max_sources_per_run = settings.DISCOVERY_MAX_SOURCES_PER_RUN
+    max_queue_depth = settings.DISCOVERY_MAX_QUEUE_DEPTH
 
     def _error_result(error: str) -> dict[str, Any]:
         return {
             "ok": False,
             "error": error,
             "scheduled_at": scheduled_at,
+            "project_module": target_module,
             "total_sources": 0,
             "total_jobs": 0,
             "job_ids": [],
             "enqueue_failures": 0,
             "failed_batches": [],
+            "max_sources_per_run": max_sources_per_run,
+            "queue_depth": None,
+            "skipped_due_to_queue_full": False,
         }
 
     if not redis:
         error = "Redis queue is not available for discovery scheduling"
-        logger.error(f"discover_schedule: {error}")
+        logger.error("event=discover_schedule_error project_module=%s error=%s", target_module, error)
         return _error_result(error)
 
     batch_size = batch_size or settings.DISCOVERY_BATCH_SIZE
     stale_after_hours = stale_after_hours or settings.DISCOVERY_STALE_HOURS
+    queue_depth: int | None = None
+
+    if max_queue_depth is not None:
+        try:
+            queue_depth = await redis.zcard(settings.WORKER_QUEUE_NAME)
+        except Exception as exc:
+            logger.warning(
+                "event=discover_schedule_queue_depth_unavailable project_module=%s queue=%s error=%s",
+                target_module,
+                settings.WORKER_QUEUE_NAME,
+                exc,
+                exc_info=True,
+            )
+        else:
+            if queue_depth >= max_queue_depth:
+                logger.warning(
+                    "event=discover_schedule_queue_full "
+                    "project_module=%s queue=%s queue_depth=%s "
+                    "max_queue_depth=%s action=skip",
+                    target_module,
+                    settings.WORKER_QUEUE_NAME,
+                    queue_depth,
+                    max_queue_depth,
+                )
+                return {
+                    "ok": True,
+                    "scheduled_at": scheduled_at,
+                    "project_module": target_module,
+                    "total_sources": 0,
+                    "total_jobs": 0,
+                    "job_ids": [],
+                    "enqueue_failures": 0,
+                    "failed_batches": [],
+                    "max_sources_per_run": max_sources_per_run,
+                    "queue_depth": queue_depth,
+                    "skipped_due_to_queue_full": True,
+                }
 
     try:
         sources = await source_registry_service.get_sources_for_discovery(
             db=db,
             project_module=project_module,
             stale_after_hours=stale_after_hours,
+            limit=max_sources_per_run,
         )
     except Exception as exc:
         logger.error(
@@ -161,14 +206,29 @@ async def discover_schedule(
                     }
                 )
 
+    logger.info(
+        "event=discover_schedule_completed "
+        "project_module=%s scheduled_at=%s total_sources=%s total_jobs=%s "
+        "enqueue_failures=%s queue_depth=%s skipped_due_to_queue_full=%s",
+        target_module,
+        scheduled_at,
+        total_sources,
+        len(job_ids),
+        enqueue_failures,
+        queue_depth,
+        False,
+    )
+
     return {
         "ok": True,
         "scheduled_at": scheduled_at,
+        "project_module": target_module,
         "total_sources": total_sources,
         "total_jobs": len(job_ids),
         "job_ids": job_ids,
         "enqueue_failures": enqueue_failures,
         "failed_batches": failed_batches,
+        "max_sources_per_run": max_sources_per_run,
+        "queue_depth": queue_depth,
+        "skipped_due_to_queue_full": False,
     }
-
-# going to use this for discovery and polling tasks
