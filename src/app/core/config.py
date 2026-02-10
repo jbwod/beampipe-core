@@ -158,11 +158,13 @@ class RunLedgerSettings(BaseSettings):
 
 
 class DiscoverySettings(BaseSettings):
-    DISCOVERY_BATCH_SIZE: int = 100
+    DISCOVERY_BATCH_SIZE: int = 25
     DISCOVERY_STALE_HOURS: int = 24
     DISCOVERY_TAP_LOOKBACK_DAYS: int = 30
     DISCOVERY_SCHEDULE_MINUTES: int = 1
     DISCOVERY_TAP_TIMEOUT_SECONDS: int = 120
+    DISCOVERY_MAX_SOURCES_PER_RUN: int = 500
+    DISCOVERY_MAX_QUEUE_DEPTH: int | None = None
 
 
 class Settings(
