@@ -53,11 +53,14 @@ async def get_optional_user(request: Request, db: AsyncSession = Depends(async_g
 
     except HTTPException as http_exc:
         if http_exc.status_code != 401:
-            logger.error(f"Unexpected HTTPException in get_optional_user: {http_exc.detail}")
+            logger.error(
+                "event=dependencies_optional_user_http_error detail=%s",
+                http_exc.detail,
+            )
         return None
 
     except Exception as exc:
-        logger.error(f"Unexpected error in get_optional_user: {exc}")
+        logger.error("event=dependencies_optional_user_error error=%s", exc)
         return None
 
 

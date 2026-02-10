@@ -79,13 +79,23 @@ async def discover_schedule(
         )
     except Exception as exc:
         logger.error(
-            "discover_schedule: failed to fetch sources for discovery: %s",
+            "event=discover_schedule_error project_module=%s stage=get_sources error=%s",
+            target_module,
             exc,
             exc_info=True,
         )
         return _error_result(str(exc))
 
-    logger.info(f"discover_schedule: {len(sources)} sources marked for discovery")
+    logger.info(
+        "event=discover_schedule_sources_loaded "
+        "project_module=%s discovered_sources=%s batch_size=%s "
+        "stale_after_hours=%s max_sources_per_run=%s",
+        target_module,
+        len(sources),
+        batch_size,
+        stale_after_hours,
+        max_sources_per_run,
+    )
 
     # Group sources by project_module
     grouped = defaultdict(list)
@@ -103,8 +113,9 @@ async def discover_schedule(
         # Batch the identifiers and enqueue each batch
         for batch in _chunk_list(identifiers, batch_size):
             logger.info(
-                f"discover_schedule: enqueue discover_batch for module={module_name} "
-                f"sources={len(batch)}"
+                "event=discover_schedule_enqueue_attempt project_module=%s batch_size=%s",
+                module_name,
+                len(batch),
             )
 
             job = None
@@ -120,14 +131,14 @@ async def discover_schedule(
                         break
 
                     logger.error(
-                        "discover_schedule: enqueue returned None for module=%s batch_size=%s attempt=%s",
+                        "event=discover_schedule_enqueue_none project_module=%s batch_size=%s attempt=%s",
                         module_name,
                         len(batch),
                         attempt + 1,
                     )
                 except Exception as exc:
                     logger.error(
-                        "discover_schedule: enqueue failed for module=%s batch_size=%s attempt=%s error=%s",
+                        "event=discover_schedule_enqueue_error project_module=%s batch_size=%s attempt=%s error=%s",
                         module_name,
                         len(batch),
                         attempt + 1,

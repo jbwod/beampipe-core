@@ -39,7 +39,7 @@ class RateLimiter:
     def get_client(cls) -> Redis:
         instance = cls()
         if instance.client is None:
-            logger.error("Redis client is not initialized.")
+            logger.error("event=rate_limit_redis_not_initialized")
             raise Exception("Redis client is not initialized.")
         return instance.client
 
@@ -60,7 +60,12 @@ class RateLimiter:
                 return True
 
         except Exception as e:
-            logger.exception(f"Error checking rate limit for user {user_id} on path {path}: {e}")
+            logger.exception(
+                "event=rate_limit_check_error user_id=%s path=%s error=%s",
+                user_id,
+                path,
+                e,
+            )
             raise e
 
         return False
