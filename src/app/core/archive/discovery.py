@@ -5,6 +5,7 @@ Handles polling and event-driven discovery of newly deposited datasets.
 # - Polling-based discovery for CASDA
 # using the ARQ queue system in /workers and /tasks
 # using the source_registry_service to get sources for discovery and module grouping
+import asyncio
 import logging
 import re
 from collections import defaultdict
@@ -48,17 +49,41 @@ async def discover_schedule(
     stale_after_hours: int | None = None,
 ) -> dict[str, Any]:
     """Enqueue discovery batch jobs for sources needing discovery."""
+    scheduled_at = datetime.now(UTC).isoformat()
+
+    def _error_result(error: str) -> dict[str, Any]:
+        return {
+            "ok": False,
+            "error": error,
+            "scheduled_at": scheduled_at,
+            "total_sources": 0,
+            "total_jobs": 0,
+            "job_ids": [],
+            "enqueue_failures": 0,
+            "failed_batches": [],
+        }
+
     if not redis:
-        raise RuntimeError("Redis queue is not available for discovery scheduling")
+        error = "Redis queue is not available for discovery scheduling"
+        logger.error(f"discover_schedule: {error}")
+        return _error_result(error)
 
     batch_size = batch_size or settings.DISCOVERY_BATCH_SIZE
     stale_after_hours = stale_after_hours or settings.DISCOVERY_STALE_HOURS
 
-    sources = await source_registry_service.get_sources_for_discovery(
-        db=db,
-        project_module=project_module,
-        stale_after_hours=stale_after_hours,
-    )
+    try:
+        sources = await source_registry_service.get_sources_for_discovery(
+            db=db,
+            project_module=project_module,
+            stale_after_hours=stale_after_hours,
+        )
+    except Exception as exc:
+        logger.error(
+            "discover_schedule: failed to fetch sources for discovery: %s",
+            exc,
+            exc_info=True,
+        )
+        return _error_result(str(exc))
 
     logger.info(f"discover_schedule: {len(sources)} sources marked for discovery")
 
@@ -69,6 +94,8 @@ async def discover_schedule(
 
     job_ids = []
     total_sources = 0
+    enqueue_failures = 0
+    failed_batches: list[dict[str, Any]] = []
 
     for module_name, module_sources in grouped.items():
         # Extract identifiers just once for all sources in this module
@@ -79,22 +106,58 @@ async def discover_schedule(
                 f"discover_schedule: enqueue discover_batch for module={module_name} "
                 f"sources={len(batch)}"
             )
-            job = await redis.enqueue_job(
-                "discover_batch",
-                module_name,
-                batch,
-                _queue_name=settings.WORKER_QUEUE_NAME,
-            )
-        
+
+            job = None
+            for attempt in range(2):
+                try:
+                    job = await redis.enqueue_job(
+                        "discover_batch",
+                        module_name,
+                        batch,
+                        _queue_name=settings.WORKER_QUEUE_NAME,
+                    )
+                    if job is not None:
+                        break
+
+                    logger.error(
+                        "discover_schedule: enqueue returned None for module=%s batch_size=%s attempt=%s",
+                        module_name,
+                        len(batch),
+                        attempt + 1,
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "discover_schedule: enqueue failed for module=%s batch_size=%s attempt=%s error=%s",
+                        module_name,
+                        len(batch),
+                        attempt + 1,
+                        exc,
+                        exc_info=True,
+                    )
+                if attempt == 0:
+                    await asyncio.sleep(1)
+
             if job:
                 job_ids.append(job.job_id)
-            total_sources += len(batch)
+                total_sources += len(batch)
+            else:
+                enqueue_failures += 1
+                failed_batches.append(
+                    {
+                        "project_module": module_name,
+                        "batch_size": len(batch),
+                        "source_identifiers": batch,
+                    }
+                )
 
     return {
-        "scheduled_at": datetime.now(UTC).isoformat(),
+        "ok": True,
+        "scheduled_at": scheduled_at,
         "total_sources": total_sources,
         "total_jobs": len(job_ids),
         "job_ids": job_ids,
+        "enqueue_failures": enqueue_failures,
+        "failed_batches": failed_batches,
     }
 
 # going to use this for discovery and polling tasks
