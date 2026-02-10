@@ -56,6 +56,12 @@ def _group_metadata_by_sbid(metadata_list: list[dict[str, Any]]) -> dict[str, li
 async def discover_batch(
     ctx: Worker, project_module: str, source_identifiers: list[str]
 ) -> dict[str, Any]:
+    available_modules = list_project_modules()
+    if project_module not in available_modules:
+        raise ValueError(
+            f"Project module '{project_module}' not found. Available: {available_modules}"
+        )
+
     module = load_project_module(project_module)
     now = datetime.now(UTC)
 
