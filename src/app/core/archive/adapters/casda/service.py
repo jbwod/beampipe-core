@@ -21,15 +21,15 @@ CASDA_TAP_URL = "https://casda.csiro.au/casda_vo_tools/tap"
 def query(query: str, tap_url: Optional[str] = None) -> Table:
     """Run a TAP query against CASDA (or an overridden TAP URL)."""
     tap_endpoint = tap_url or CASDA_TAP_URL
-    logger.info(f"Executing TAP query: {query}")
+    logger.info("event=casda_tap_query query=%s", query)
     try:
         casdatap = TapPlus(url=tap_endpoint, verbose=False)
         job = casdatap.launch_job_async(query)
         results = job.get_results()
-        logger.info(f"Query returned {len(results)} results")
+        logger.info("event=casda_tap_query_result result_count=%s", len(results))
         return results
     except Exception as e:
-        logger.error(f"Error executing TAP query: {e}")
+        logger.error("event=casda_tap_query_error error=%s", e)
         raise
 
 
@@ -40,11 +40,11 @@ def stage_data(
     service_name: str = "async_service",
 ) -> tuple[dict[str, str], dict[str, str]]:
     if len(query_results) == 0:
-        logger.warning("No results to stage")
+        logger.warning("event=casda_staging_no_results")
         return {}, {}
 
-    logger.info(f"Staging {len(query_results)} files...")
-    logger.info("Note: Staging may take time and will poll for completion")
+    logger.info("event=casda_staging_start result_count=%s", len(query_results))
+    logger.info("event=casda_staging_note message=Staging may take time and will poll for completion")
     try:
         data_url_by_scan_id: dict[str, str] = {}
         checksum_url_by_scan_id: dict[str, str] = {}
@@ -65,19 +65,24 @@ def stage_data(
                 response.raise_for_status()
                 data_url_by_scan_id, checksum_url_by_scan_id = _parse_job_results(response.text)
             except Exception as e:
-                logger.error(f"Error during CASDA custom job staging: {e}")
+                logger.error("event=casda_staging_job_error error=%s", e)
                 raise
         else:
-            logger.error("CASDA object does not support _create_job/_complete_job")
+            logger.error(
+                "event=casda_staging_unsupported "
+                "message=CASDA object does not support _create_job/_complete_job"
+            )
             raise RuntimeError("CASDA does not have required job methods for staging.")
 
         logger.info(
-            f"Found {len(data_url_by_scan_id)} data URLs and {len(checksum_url_by_scan_id)} checksum URLs"
+            "event=casda_staging_complete data_url_count=%s checksum_url_count=%s",
+            len(data_url_by_scan_id),
+            len(checksum_url_by_scan_id),
         )
 
         return data_url_by_scan_id, checksum_url_by_scan_id
     except Exception as e:
-        logger.error(f"Error staging data: {e}")
+        logger.error("event=casda_staging_error error=%s", e)
         raise
 
 

@@ -45,7 +45,13 @@ class SourceRegistryService:
             )
             return source
         except Exception as e:
-            logger.exception(f"Error checking existing source for {project_module}/{source_identifier}: {e}")
+            logger.exception(
+                "event=registry_check_source_error "
+                "project_module=%s source_identifier=%s error=%s",
+                project_module,
+                source_identifier,
+                e,
+            )
             return None
 
     @staticmethod
