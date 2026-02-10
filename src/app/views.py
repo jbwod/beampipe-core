@@ -233,7 +233,17 @@ async def view_sources(request: Request) -> HTMLResponse:
               }
               entries.forEach(function (entry) {
                 const sbid = entry.sbid || '';
-                const datasets = (entry.metadata_json && entry.metadata_json.datasets) || [];
+                const metadataJson = entry.metadata_json || {};
+                const datasets = metadataJson.datasets || [];
+                const discoveryFlags = metadataJson.discovery_flags || {};
+                if (discoveryFlags.ra_dec_vsys_complete === false) {
+                  const tr = document.createElement('tr');
+                  const td = document.createElement('td');
+                  td.colSpan = 8;
+                  td.textContent = 'Incomplete: RA/DEC/VSys not available from Vizier.';
+                  tr.appendChild(td);
+                  tbody.appendChild(tr);
+                }
                 datasets.forEach(function (d) {
                   const tr = document.createElement('tr');
                   function cell(text) {

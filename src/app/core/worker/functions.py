@@ -89,7 +89,15 @@ async def discover_batch(
                     )
 
                 if len(query_results) == 0:
-                    logger.info(f"No datasets found for {source_identifier}")
+                    logger.info(f"discover_batch: outcome=no_datasets source={source_identifier}")
+                    await archive_metadata_service.upsert_metadata(
+                        db=db,
+                        project_module=project_module,
+                        source_identifier=source_identifier,
+                        sbid="0",
+                        metadata_json={"datasets": [], "discovery_status": "no_datasets"},
+                    )
+                    await db.commit()
                     source = await source_registry_service.check_existing_source(
                         db, project_module, source_identifier
                     )
@@ -103,7 +111,7 @@ async def discover_batch(
                 # Run blocking prepare_metadata (Vizier/CASDA TAP) in thread with timeout
                 prepare_fn = getattr(module, "prepare_metadata", None)
                 if prepare_fn:
-                    metadata_list = await asyncio.wait_for(
+                    result = await asyncio.wait_for(
                         asyncio.to_thread(
                             prepare_fn,
                             source_identifier=source_identifier,
@@ -115,7 +123,7 @@ async def discover_batch(
                     )
                 else:
                     logger.warning(f"Module {project_module} has no prepare_metadata() function, using fallback")
-                    metadata_list = await asyncio.wait_for(
+                    result = await asyncio.wait_for(
                         asyncio.to_thread(
                             discovery_test.prepare_metadata,
                             source_identifier=source_identifier,
@@ -126,6 +134,15 @@ async def discover_batch(
                         timeout=tap_timeout,
                     )
 
+                if isinstance(result, tuple):
+                    metadata_list = result[0]
+                    discovery_flags = result[1] if len(result) > 1 else {}
+                else:
+                    metadata_list = result
+                    discovery_flags = {}
+                if not discovery_flags and metadata_list and isinstance(metadata_list[0], dict):
+                    discovery_flags = {"ra_dec_vsys_complete": "ra_degrees" in metadata_list[0]}
+
                 grouped = _group_metadata_by_sbid(metadata_list)
                 logger.info(
                     f"discover_batch: {project_module}/{source_identifier} "
@@ -134,13 +151,16 @@ async def discover_batch(
 
                 # Upsert
                 for sbid, datasets in grouped.items():
+                    metadata_json: dict[str, Any] = {"datasets": datasets}
+                    if discovery_flags:
+                        metadata_json["discovery_flags"] = discovery_flags
                     try:
                         await archive_metadata_service.upsert_metadata(
                             db=db,
                             project_module=project_module,
                             source_identifier=source_identifier,
                             sbid=str(sbid),
-                            metadata_json={"datasets": datasets},
+                            metadata_json=metadata_json,
                         )
                     except Exception as e:
                         logger.error(
@@ -151,8 +171,10 @@ async def discover_batch(
                         raise
                 
                 await db.commit()
-                logger.info(f"Committed metadata for {source_identifier}: {len(grouped)} SBIDs, {len(metadata_list)} datasets")
-                
+                logger.info(
+                    f"discover_batch: outcome=has_metadata source={source_identifier} "
+                    f"sbids={len(grouped)} datasets={len(metadata_list)}"
+                )
                 total_sbids += len(grouped)
                 total_datasets += len(metadata_list)
 
@@ -161,16 +183,16 @@ async def discover_batch(
                 )
                 if source and source.get("uuid"):
                     processed_source_ids.append(source["uuid"])
-
+# going to look into https://github.com/jd/tenacity for retry
             except asyncio.TimeoutError:
                 logger.error(
-                    f"TAP timeout ({tap_timeout}s) for source {source_identifier} in module {project_module}; "
-                    "skipping (source will be retried next run)"
+                    f"discover_batch: outcome=timeout source={source_identifier} "
+                    f"TAP timeout ({tap_timeout}s); will retry next run"
                 )
                 continue
             except Exception as e:
                 logger.error(
-                    f"Error processing source {source_identifier} in module {project_module}: {e}",
+                    f"discover_batch: outcome=error source={source_identifier} error={e}",
                     exc_info=True,
                 )
                 try:
