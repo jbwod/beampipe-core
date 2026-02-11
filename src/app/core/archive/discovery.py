@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..registry.service import source_registry_service
+from .tap_health import all_taps_reachable, get_tap_health, unreachable_taps
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,43 @@ async def discover_schedule(
                     "queue_depth": queue_depth,
                     "skipped_due_to_queue_full": True,
                 }
+
+    # skip scheduling when a TAP endpoint is unreachable to avoid endless retries
+    if settings.DISCOVERY_TAP_HEALTH_CHECK_ENABLED:
+        try:
+            tap_health = await get_tap_health(
+                timeout_seconds=settings.DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS
+            )
+            if not all_taps_reachable(tap_health):
+                unreachable = unreachable_taps(tap_health)
+                logger.warning(
+                    "event=discover_schedule_tap_unreachable "
+                    "project_module=%s tap_unreachable=%s action=skip",
+                    target_module,
+                    unreachable,
+                )
+                return {
+                    "ok": True,
+                    "scheduled_at": scheduled_at,
+                    "project_module": target_module,
+                    "total_sources": 0,
+                    "total_jobs": 0,
+                    "job_ids": [],
+                    "enqueue_failures": 0,
+                    "failed_batches": [],
+                    "max_sources_per_run": max_sources_per_run,
+                    "queue_depth": queue_depth,
+                    "skipped_due_to_queue_full": False,
+                    "skipped_due_to_tap_unreachable": True,
+                    "tap_unreachable": unreachable,
+                }
+        except Exception as exc:
+            logger.warning(
+                "event=discover_schedule_tap_health_error project_module=%s error=%s action=continue",
+                target_module,
+                exc,
+            )
+            # On health-check failure, continue with scheduling (fail open)
 
     try:
         sources = await source_registry_service.get_sources_for_discovery(
