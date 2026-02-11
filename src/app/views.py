@@ -12,8 +12,9 @@ async def view_sources(request: Request) -> HTMLResponse:
       <head>
         <title>Sources</title>
       </head>
-      <body>
+      <body background-color="#f0f0f0">
         <h1>Source Registry</h1>
+        <p id="status-line">Ready (app, DB, Redis): <span id="ready-status-dot" title="Checking...">●</span> <span id="ready-status-label">checking...</span> &nbsp; TAP services: <span id="tap-status-dot" title="Checking...">●</span> <span id="tap-status-label">checking...</span></p>
 
         <h2>Login</h2>
         <p>Enter API credentials to enable adding sources.</p>
@@ -268,9 +269,55 @@ async def view_sources(request: Request) -> HTMLResponse:
             }
           }
 
+          async function loadReadyStatus() {
+            const dotEl = document.getElementById('ready-status-dot');
+            const labelEl = document.getElementById('ready-status-label');
+            try {
+              const response = await fetch('/api/v1/ready');
+              const data = await response.json();
+              const ok = response.ok && (data.status === 'healthy');
+              dotEl.style.color = ok ? 'green' : 'red';
+              dotEl.title = 'app: ' + (data.app || '') + ', database: ' + (data.database || '') + ', redis: ' + (data.redis || '');
+              if (ok) {
+                labelEl.textContent = 'up';
+              } else {
+                const parts = [];
+                if (data.database === 'unhealthy') parts.push('DB down');
+                if (data.redis === 'unhealthy') parts.push('Redis down');
+                if (data.app === 'unhealthy') parts.push('app down');
+                labelEl.textContent = parts.length ? parts.join(', ') : 'down';
+              }
+            } catch (err) {
+              dotEl.style.color = 'gray';
+              dotEl.title = 'Check failed';
+              labelEl.textContent = 'check failed';
+            }
+          }
+
+          async function loadTapStatus() {
+            const dotEl = document.getElementById('tap-status-dot');
+            const labelEl = document.getElementById('tap-status-label');
+            try {
+              const response = await fetch('/api/v1/health/tap');
+              const data = await response.json();
+              const allOk = data.all_ok === true;
+              const endpoints = data.endpoints || {};
+              dotEl.style.color = allOk ? 'green' : 'red';
+              dotEl.title = Object.entries(endpoints).map(function (e) { return e[0] + ': ' + (e[1] ? 'up' : 'down'); }).join(', ');
+              labelEl.textContent = allOk ? 'all up' : Object.entries(endpoints).filter(function (e) { return !e[1]; }).map(function (e) { return e[0] + ' down'; }).join(', ');
+            } catch (err) {
+              dotEl.style.color = 'gray';
+              dotEl.title = 'Check failed';
+              labelEl.textContent = 'check failed';
+            }
+          }
+
           document.getElementById('login-form').addEventListener('submit', login);
           document.getElementById('add-source-form').addEventListener('submit', addSource);
-          // Initial load
+          loadReadyStatus();
+          loadTapStatus();
+          setInterval(loadReadyStatus, 60000);
+          setInterval(loadTapStatus, 60000);
           loadSources();
         </script>
       </body>

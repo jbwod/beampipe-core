@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...core.config import settings
 from ...core.db.database import async_get_db
 from ...core.health import check_database_health, check_redis_health
-from ...core.schemas import HealthCheck, ReadyCheck
+from ...core.schemas import HealthCheck, ReadyCheck, TapHealthCheck
 from ...core.utils.cache import async_get_redis
+from ...core.archive.tap_health import get_tap_health
 
 router = APIRouter(tags=["health"])
 
@@ -55,3 +56,18 @@ async def ready(redis: Annotated[Redis, Depends(async_get_redis)], db: Annotated
     }
 
     return JSONResponse(status_code=http_status, content=response)
+
+
+@router.get("/health/tap", response_model=TapHealthCheck)
+async def tap_health():
+    timeout = getattr(settings, "DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS", 10.0)
+    health = await get_tap_health(timeout_seconds=float(timeout))
+    all_ok = all(health.values())
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "all_ok": all_ok,
+            "endpoints": health,
+            "timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
+        },
+    )

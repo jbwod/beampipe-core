@@ -165,6 +165,8 @@ class DiscoverySettings(BaseSettings):
     DISCOVERY_TAP_TIMEOUT_SECONDS: int = 120
     DISCOVERY_MAX_SOURCES_PER_RUN: int = 500
     DISCOVERY_MAX_QUEUE_DEPTH: int | None = None
+    DISCOVERY_TAP_HEALTH_CHECK_ENABLED: bool = True
+    DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS: float = 10.0
 
 
 class Settings(
