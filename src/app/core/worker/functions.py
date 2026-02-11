@@ -155,7 +155,6 @@ async def discover_batch(
 
     tap_timeout = getattr(settings, "DISCOVERY_TAP_TIMEOUT_SECONDS", 120)
     job_started_at = time.perf_counter()
-
     async with local_session() as db:
         logger.info(
             "event=discover_batch_started project_module=%s total_sources=%s",
@@ -320,7 +319,6 @@ async def discover_batch(
                     source_identifier,
                     e,
                     int((time.perf_counter() - source_started_at) * 1000),
-                    exc_info=True,
                 )
                 try:
                     await db.rollback()
