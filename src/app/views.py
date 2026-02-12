@@ -12,7 +12,7 @@ async def view_sources(request: Request) -> HTMLResponse:
       <head>
         <title>Sources</title>
       </head>
-      <body background-color="#f0f0f0">
+      <body style="background-color: #f0f890;">
         <h1>Source Registry</h1>
         <p id="status-line">Ready (app, DB, Redis): <span id="ready-status-dot" title="Checking...">●</span> <span id="ready-status-label">checking...</span> &nbsp; TAP services: <span id="tap-status-dot" title="Checking...">●</span> <span id="tap-status-label">checking...</span></p>
 
