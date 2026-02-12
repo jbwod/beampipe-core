@@ -149,3 +149,7 @@ src/.env
 !scripts/*
 
 src/app/core/archive/adapters/test.py
+
+dlg/*
+
+wallaby-hires-beampipe/*
