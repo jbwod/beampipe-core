@@ -159,6 +159,7 @@ class RunLedgerSettings(BaseSettings):
 
 class DiscoverySettings(BaseSettings):
     DISCOVERY_BATCH_SIZE: int = 25
+    DISCOVERY_BATCH_CONCURRENCY: int = 5
     DISCOVERY_STALE_HOURS: int = 24
     DISCOVERY_TAP_LOOKBACK_DAYS: int = 30
     DISCOVERY_SCHEDULE_MINUTES: int = 1
@@ -168,6 +169,9 @@ class DiscoverySettings(BaseSettings):
     DISCOVERY_TAP_HEALTH_CHECK_ENABLED: bool = True
     DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS: float = 10.0
 
+
+class ArchiveSettings(BaseSettings):
+    ARCHIVE_METADATA_VALIDATE_JSON: bool = False
 
 class Settings(
     AppSettings,
@@ -186,6 +190,7 @@ class Settings(
     CORSSettings,
     RunLedgerSettings,
     DiscoverySettings,
+    ArchiveSettings,
 ):
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".env"),

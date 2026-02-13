@@ -8,9 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_archive_metadata import crud_archive_metadata
 from ...schemas.archive import ArchiveMetadataCreateInternal, ArchiveMetadataRead
+from ..config import settings
 from ..exceptions.http_exceptions import NotFoundException
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_metadata_json(metadata_json: dict | None) -> None:
+    if not settings.ARCHIVE_METADATA_VALIDATE_JSON or metadata_json is None:
+        return
+    datasets = metadata_json.get("datasets")
+    if datasets is not None and not isinstance(datasets, list):
+        raise ValueError("archive metadata_json.datasets must be a list when validation is enabled")
 
 
 class ArchiveMetadataService:
@@ -54,6 +63,7 @@ class ArchiveMetadataService:
         metadata_json: dict | None = None,
     ) -> dict[str, Any]:
         """Create or update archive metadata for an SBID."""
+        _validate_metadata_json(metadata_json)
         existing = await crud_archive_metadata.get(
             db=db,
             project_module=project_module,
