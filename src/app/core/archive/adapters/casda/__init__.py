@@ -1,5 +1,6 @@
 """CASDA adapter exports."""
 from .service import (
+    CASDA_TAP_HEALTH_URL,
     CASDA_TAP_URL,
     _extract_scan_id,
     query,
@@ -8,6 +9,7 @@ from .service import (
 )
 
 __all__ = [
+    "CASDA_TAP_HEALTH_URL",
     "CASDA_TAP_URL",
     "_extract_scan_id",
     "query",

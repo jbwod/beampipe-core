@@ -14,8 +14,9 @@ from astroquery.utils.tap.core import TapPlus
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# CASDA TAP endpoint
+# CASDA TAP endpoint and health-check URL (TAP base is used for health)
 CASDA_TAP_URL = "https://casda.csiro.au/casda_vo_tools/tap"
+CASDA_TAP_HEALTH_URL = CASDA_TAP_URL
 
 
 def query(query: str, tap_url: Optional[str] = None) -> Table:

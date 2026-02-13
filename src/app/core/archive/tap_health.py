@@ -6,19 +6,9 @@ import logging
 
 import httpx
 
-from .adapters.casda import CASDA_TAP_URL
-from .adapters.vizier import VIZIER_TAP_URL
+from .adapters import get_health_endpoints
 
 logger = logging.getLogger(__name__)
-
-# Vizier async endpoint for health check (UWS jobs list; returns 200 + XML when up)
-VIZIER_TAP_HEALTH_URL = "https://tapvizier.cds.unistra.fr/TAPVizieR/tap/async"
-
-DISCOVERY_TAP_ENDPOINTS: list[tuple[str, str]] = [
-    ("casda", CASDA_TAP_URL),
-    ("vizier", VIZIER_TAP_HEALTH_URL),
-]
-
 
 async def is_tap_reachable(url: str, timeout_seconds: float = 10.0) -> bool:
     try:
@@ -52,8 +42,9 @@ async def is_tap_reachable(url: str, timeout_seconds: float = 10.0) -> bool:
 
 
 async def get_tap_health(timeout_seconds: float = 10.0) -> dict[str, bool]:
+    endpoints = get_health_endpoints()
     result: dict[str, bool] = {}
-    for label, url in DISCOVERY_TAP_ENDPOINTS:
+    for label, url in endpoints:
         result[label] = await is_tap_reachable(url, timeout_seconds=timeout_seconds)
     return result
 
