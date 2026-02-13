@@ -40,6 +40,10 @@ dependencies = [
     "mypy>=1.16.0",
 ]
 
+[project.entry-points."beampipe.adapters"]
+casda = "app.core.archive.adapters.casda"
+vizier = "app.core.archive.adapters.vizier"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.2",
@@ -112,6 +116,9 @@ convention = "numpy"
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore::PendingDeprecationWarning:starlette.formparsers",
+]
+markers = [
+    "integration: live TAP/network tests (run with -m integration).",
 ]
 
 [dependency-groups]
