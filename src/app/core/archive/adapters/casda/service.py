@@ -19,6 +19,25 @@ CASDA_TAP_URL = "https://casda.csiro.au/casda_vo_tools/tap"
 CASDA_TAP_HEALTH_URL = CASDA_TAP_URL
 
 
+class CasdaDiscoverAdapter:
+    """CASDA adapter."""
+
+    def __init__(self, tap_url: str = CASDA_TAP_URL, health_url: str = CASDA_TAP_HEALTH_URL) -> None:
+        self._tap_url = tap_url
+        self._health_url = health_url
+
+    @property
+    def health_url(self) -> str:
+        return self._health_url
+
+    @property
+    def tap_url(self) -> str:
+        return self._tap_url
+
+    def query(self, query_str: str, tap_url: Optional[str] = None) -> Table:
+        return query(query_str, tap_url=tap_url or self._tap_url)
+
+
 def query(query: str, tap_url: Optional[str] = None) -> Table:
     """Run a TAP query against CASDA (or an overridden TAP URL)."""
     tap_endpoint = tap_url or CASDA_TAP_URL
