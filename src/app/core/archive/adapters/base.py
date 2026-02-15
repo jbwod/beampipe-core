@@ -14,6 +14,11 @@ class DiscoverAdapter(Protocol):
         """Health-check URL for this adapter."""
         ...
 
+    @property
+    def tap_url(self) -> str:
+        """Default TAP base URL for queries."""
+        ...
+
     def query(self, query: str, tap_url: str | None = None) -> Table:
         """Execute a discovery query."""
         ...
