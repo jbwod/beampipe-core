@@ -169,6 +169,25 @@ async def discover_schedule(
         )
         return _error_result(str(exc))
 
+    if not sources:
+        logger.info(
+            "event=discover_schedule_skipped project_module=%s reason=no_stale_sources",
+            target_module,
+        )
+        return {
+            "ok": True,
+            "scheduled_at": scheduled_at,
+            "project_module": target_module,
+            "total_sources": 0,
+            "total_jobs": 0,
+            "job_ids": [],
+            "enqueue_failures": 0,
+            "failed_batches": [],
+            "max_sources_per_run": max_sources_per_run,
+            "queue_depth": queue_depth,
+            "skipped_due_to_queue_full": False,
+        }
+
     logger.info(
         "event=discover_schedule_sources_loaded "
         "project_module=%s discovered_sources=%s batch_size=%s "
