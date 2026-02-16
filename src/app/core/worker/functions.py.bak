@@ -1,0 +1,121 @@
+import asyncio
+import logging
+from datetime import UTC, datetime
+from typing import Any
+
+import uvloop
+from arq.worker import Worker
+
+from ..archive.adapters import test as discovery_test
+from ..archive.discovery import discover_schedule
+from ..archive.service import archive_metadata_service
+from ..db.database import local_session
+from ..projects import load_project_module
+from ..registry.service import source_registry_service
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+
+# -------- background tasks --------
+async def sample_background_task(ctx: Worker, name: str) -> str:
+    await asyncio.sleep(5)
+    return f"Task {name} is complete!"
+
+async def discover_schedule_task(ctx: Worker, project_module: str | None = None) -> dict[str, Any]:
+    async with local_session() as db:
+        return await discover_schedule(db=db, redis=ctx["redis"], project_module=project_module)
+
+
+async def discover_batch(
+    ctx: Worker, project_module: str, source_identifiers: list[str]
+) -> dict[str, Any]:
+    module = load_project_module(project_module)
+    now = datetime.now(UTC)
+
+    processed_source_ids: list[Any] = []
+    total_datasets = 0
+    total_sbids = 0
+
+    async with local_session() as db:
+        print(
+            f"discover_batch: project_module={project_module} sources={len(source_identifiers)}"
+        )
+        for source_identifier in source_identifiers:
+            discover_fn = getattr(module, "discover", None)
+            if discover_fn:
+                query_results = discover_fn(source_identifier)
+            else:
+                query_results = None # todo maybe do a fallback to a generic query
+
+            data_url_by_scan_id: dict[str, str] | None = None
+            checksum_url_by_scan_id: dict[str, str] | None = None
+
+            prepare_fn = getattr(module, "prepare_metadata", None)
+            if prepare_fn:
+                metadata_list = prepare_fn(
+                    source_identifier=source_identifier,
+                    query_results=query_results,
+                    data_url_by_scan_id=data_url_by_scan_id,
+                    checksum_url_by_scan_id=checksum_url_by_scan_id,
+                )
+            else:
+                metadata_list = discovery_test.prepare_metadata(
+                    source_identifier=source_identifier,
+                    query_results=query_results,
+                    data_url_by_scan_id=data_url_by_scan_id,
+                    checksum_url_by_scan_id=checksum_url_by_scan_id,
+                )
+
+            grouped = metadata_list # group the sbid together into one json later
+            print(
+                f"discover_batch: {project_module}/{source_identifier} "
+                f"sbids={len(grouped)} datasets={len(metadata_list)}"
+            )
+            for sbid, datasets in grouped.items():
+                await archive_metadata_service.upsert_metadata(
+                    db=db,
+                    project_module=project_module,
+                    source_identifier=source_identifier,
+                    sbid=str(sbid),
+                    metadata_json={"datasets": datasets},
+                )
+            total_sbids += len(grouped)
+            total_datasets += len(metadata_list)
+
+            source = await source_registry_service.check_existing_source(
+                db, project_module, source_identifier
+            )
+            if source and source.get("uuid"):
+                processed_source_ids.append(source["uuid"])
+
+        await source_registry_service.mark_sources_checked(
+            db, processed_source_ids, checked_at=now
+        )
+        print(
+            f"discover_batch: marked last_checked_at for {len(processed_source_ids)} sources"
+        )
+
+    return {
+        "project_module": project_module,
+        "total_sources": len(source_identifiers),
+        "total_sbids": total_sbids,
+        "total_datasets": total_datasets,
+    }
+
+
+async def timer_task(ctx: Worker) -> dict[str, Any]:
+    print("execute something timer")
+    
+    return {"status": "ok"}
+
+
+# -------- base functions --------
+async def startup(ctx: Worker) -> None:
+    logging.info("Worker Started")
+
+
+async def shutdown(ctx: Worker) -> None:
+    logging.info("Worker end")
