@@ -3,17 +3,18 @@
 Provides source registration and cataloging functionality.
 """
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import and_, exists, or_, select, update
+from sqlalchemy import and_, exists, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_source_registry import crud_source_registry
 from ...models.archive import ArchiveMetadata
 from ...models.registry import SourceRegistry
 from ...schemas.registry import SourceRegistryCreateInternal, SourceRegistryRead
+from ..config import settings
 from ..exceptions.http_exceptions import NotFoundException
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,9 @@ class SourceRegistryService:
         db: AsyncSession,
         source_id: UUID,
         enabled: bool | None = None,
+        stale_after_hours: int | None = None,
+        *,
+        update_stale_after_hours: bool = False,
     ) -> dict[str, Any]:
         """Update source metadata.
 
@@ -156,6 +160,8 @@ class SourceRegistryService:
         update_data: dict[str, Any] = {"updated_at": datetime.now(UTC)}
         if enabled is not None:
             update_data["enabled"] = enabled
+        if update_stale_after_hours:
+            update_data["stale_after_hours"] = stale_after_hours
 
         await crud_source_registry.update(
             db=db,
@@ -212,15 +218,19 @@ class SourceRegistryService:
                 )
             )
         )
+        default_stale = stale_after_hours if stale_after_hours is not None else settings.DISCOVERY_STALE_HOURS
+        #  something like last_checked_at < (now - COALESCE(stale_after_hours, default) hours)
+        stale_by_time = and_(
+            SourceRegistry.last_checked_at.isnot(None),
+            text(
+                "source_registry.last_checked_at < (now() AT TIME ZONE 'UTC') "
+                "- ((CASE WHEN source_registry.stale_after_hours IS NOT NULL THEN source_registry.stale_after_hours ELSE :default_stale END) * interval '1 hour')"
+            ).bindparams(default_stale=default_stale),
+        )
+        conditions = [SourceRegistry.last_checked_at.is_(None), ~metadata_exists, stale_by_time]
         query = select(SourceRegistry).where(SourceRegistry.enabled.is_(True))
         if project_module:
             query = query.where(SourceRegistry.project_module == project_module)
-
-        conditions = [SourceRegistry.last_checked_at.is_(None), ~metadata_exists]
-        if stale_after_hours is not None:
-            cutoff = datetime.now(UTC) - timedelta(hours=stale_after_hours)
-            conditions.append(SourceRegistry.last_checked_at < cutoff)
-
         query = query.where(or_(*conditions)).order_by(SourceRegistry.created_at.asc())
         if limit:
             query = query.limit(limit)

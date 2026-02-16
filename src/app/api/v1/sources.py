@@ -222,6 +222,8 @@ async def update_source(
         db=db,
         source_id=source_id,
         enabled=source_data.enabled,
+        stale_after_hours=source_data.stale_after_hours,
+        update_stale_after_hours="stale_after_hours" in source_data.model_fields_set,
     )
     return source
 
