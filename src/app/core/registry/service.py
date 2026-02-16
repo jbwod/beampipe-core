@@ -231,6 +231,16 @@ class SourceRegistryService:
         query = select(SourceRegistry).where(SourceRegistry.enabled.is_(True))
         if project_module:
             query = query.where(SourceRegistry.project_module == project_module)
+        retry_cooldown_minutes = max(0, settings.DISCOVERY_RETRY_COOLDOWN_MINUTES)
+        if retry_cooldown_minutes > 0:
+            cooldown_ok = or_(
+                SourceRegistry.last_attempted_at.is_(None),
+                text(
+                    "source_registry.last_attempted_at < (now() AT TIME ZONE 'UTC') "
+                    "- (:cooldown_minutes * interval '1 minute')"
+                ).bindparams(cooldown_minutes=retry_cooldown_minutes),
+            )
+            query = query.where(cooldown_ok)
         query = query.where(or_(*conditions)).order_by(SourceRegistry.created_at.asc())
         if limit:
             query = query.limit(limit)
@@ -251,6 +261,51 @@ class SourceRegistryService:
             .values(last_checked_at=checked_at or datetime.now(UTC))
         )
         await db.commit()
+
+    @staticmethod
+    async def mark_sources_attempted(
+        db: AsyncSession,
+        project_module: str,
+        source_identifiers: list[str],
+        attempted_at: datetime | None = None,
+    ) -> None:
+        """Update last_attempted_at for failed source attempts."""
+        if not source_identifiers:
+            return
+        await db.execute(
+            update(SourceRegistry)
+            .where(
+                SourceRegistry.project_module == project_module,
+                SourceRegistry.source_identifier.in_(source_identifiers),
+            )
+            .values(last_attempted_at=attempted_at or datetime.now(UTC))
+        )
+        await db.commit()
+
+    @staticmethod
+    async def update_source_discovery_state(
+        db: AsyncSession,
+        source_id: UUID,
+        *,
+        checked_at: datetime | None = None,
+        attempted_at: datetime | None = None,
+        discovery_signature: str | None = None,
+    ) -> None:
+        """Update discovery-specific source state without committing."""
+        update_data: dict[str, Any] = {}
+        if checked_at is not None:
+            update_data["last_checked_at"] = checked_at
+        if attempted_at is not None:
+            update_data["last_attempted_at"] = attempted_at
+        if discovery_signature is not None:
+            update_data["discovery_signature"] = discovery_signature
+        if not update_data:
+            return
+        await db.execute(
+            update(SourceRegistry)
+            .where(SourceRegistry.uuid == source_id)
+            .values(**update_data)
+        )
 
 
 # instance

@@ -27,6 +27,10 @@ class SourceRegistry(Base):
     last_checked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None, index=True
     )
+    # Timestamp of the most recent failed attempt (timeout/error). Used for retry cooldown.
+    last_attempted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, index=True
+    )
     stale_after_hours: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     discovery_signature: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
 

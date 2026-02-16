@@ -36,6 +36,10 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
 
     enabled: bool
     last_checked_at: datetime | None = Field(default=None, description="Last discovery check timestamp")
+    last_attempted_at: datetime | None = Field(
+        default=None,
+        description="Last failed discovery attempt timestamp (retry cooldown anchor).",
+    )
     stale_after_hours: int | None = Field(
         default=None,
         description="Recheck after this many hours; null = use default (DISCOVERY_STALE_HOURS)",
@@ -49,6 +53,12 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
     def serialize_last_checked_at(self, last_checked_at: datetime | None, _info):  # type: ignore[override]
         if last_checked_at is not None:
             return last_checked_at.isoformat()
+        return None
+
+    @field_serializer("last_attempted_at")
+    def serialize_last_attempted_at(self, last_attempted_at: datetime | None, _info):  # type: ignore[override]
+        if last_attempted_at is not None:
+            return last_attempted_at.isoformat()
         return None
 
 
