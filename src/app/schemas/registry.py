@@ -36,6 +36,14 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
 
     enabled: bool
     last_checked_at: datetime | None = Field(default=None, description="Last discovery check timestamp")
+    stale_after_hours: int | None = Field(
+        default=None,
+        description="Recheck after this many hours; null = use default (DISCOVERY_STALE_HOURS)",
+    )
+    discovery_signature: str | None = Field(
+        default=None,
+        description="Hash of last discovery state; used to skip writes when unchanged.",
+    )
 
     @field_serializer("last_checked_at")
     def serialize_last_checked_at(self, last_checked_at: datetime | None, _info):  # type: ignore[override]
@@ -50,6 +58,10 @@ class SourceRegistryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool | None = Field(default=None, description="monitoring is enabled for this source?")
+    stale_after_hours: int | None = Field(
+        default=None,
+        description="Recheck after this many hours; null = use default. Omit to leave unchanged.",
+    )
 
 
 class SourceRegistryUpdateInternal(SourceRegistryUpdate):
