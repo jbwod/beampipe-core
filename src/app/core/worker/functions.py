@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 import uvloop
+from ...core.logger import LOGGING_LEVEL, LOGGING_FORMAT
 
 from .tasks import (
     discover_batch,
@@ -14,8 +15,6 @@ from .tasks import (
 )
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 __all__ = [
     "discover_batch",
