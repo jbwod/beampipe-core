@@ -11,7 +11,6 @@ import requests
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # CASDA TAP endpoint and health-check URL (TAP base is used for health)
@@ -41,12 +40,12 @@ class CasdaDiscoverAdapter:
 def query(query: str, tap_url: Optional[str] = None) -> Table:
     """Run a TAP query against CASDA (or an overridden TAP URL)."""
     tap_endpoint = tap_url or CASDA_TAP_URL
-    logger.info("event=casda_tap_query query=%s", query)
+    logger.debug("event=casda_tap_query query=%s", query)
     try:
         casdatap = TapPlus(url=tap_endpoint, verbose=False)
         job = casdatap.launch_job_async(query)
         results = job.get_results()
-        logger.info("event=casda_tap_query_result result_count=%s", len(results))
+        logger.debug("event=casda_tap_query_result result_count=%s", len(results))
         return results
     except Exception as e:
         logger.error("event=casda_tap_query_error error=%s", e)
@@ -63,8 +62,8 @@ def stage_data(
         logger.warning("event=casda_staging_no_results")
         return {}, {}
 
-    logger.info("event=casda_staging_start result_count=%s", len(query_results))
-    logger.info("event=casda_staging_note message=Staging may take time and will poll for completion")
+    logger.debug("event=casda_staging_start result_count=%s", len(query_results))
+    logger.debug("event=casda_staging_note message=Staging may take time and will poll for completion")
     try:
         data_url_by_scan_id: dict[str, str] = {}
         checksum_url_by_scan_id: dict[str, str] = {}
@@ -94,7 +93,7 @@ def stage_data(
             )
             raise RuntimeError("CASDA does not have required job methods for staging.")
 
-        logger.info(
+        logger.debug(
             "event=casda_staging_complete data_url_count=%s checksum_url_count=%s",
             len(data_url_by_scan_id),
             len(checksum_url_by_scan_id),

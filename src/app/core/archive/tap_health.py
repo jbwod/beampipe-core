@@ -18,6 +18,7 @@ async def is_tap_reachable(url: str, timeout_seconds: float = 10.0) -> bool:
         ) as client:
             response = await client.get(url)
             if response.status_code < 400 or response.status_code == 405:
+                logger.debug("event=tap_health_ok url=%s status_code=%s", url, response.status_code)
                 return True
             logger.warning(
                 "event=tap_health_bad_status url=%s status_code=%s",

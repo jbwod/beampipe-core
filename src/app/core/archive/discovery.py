@@ -92,6 +92,13 @@ async def discover_schedule(
                 exc_info=True,
             )
         else:
+            logger.debug(
+                "event=discover_schedule_queue_depth project_module=%s queue=%s queue_depth=%s max_queue_depth=%s",
+                target_module,
+                settings.WORKER_QUEUE_NAME,
+                queue_depth,
+                max_queue_depth,
+            )
             if queue_depth >= max_queue_depth:
                 logger.warning(
                     "event=discover_schedule_queue_full "
@@ -121,6 +128,11 @@ async def discover_schedule(
         try:
             tap_health = await get_tap_health(
                 timeout_seconds=settings.DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS
+            )
+            logger.debug(
+                "event=discover_schedule_tap_health project_module=%s tap_health=%s",
+                target_module,
+                tap_health,
             )
             if not all_taps_reachable(tap_health):
                 unreachable = unreachable_taps(tap_health)
@@ -204,6 +216,12 @@ async def discover_schedule(
     for source in sources:
         grouped[source.project_module].append(source)
 
+    logger.debug(
+        "event=discover_schedule_sources_by_module project_module=%s module_counts=%s",
+        target_module,
+        {k: len(v) for k, v in grouped.items()},
+    )
+
     job_ids = []
     total_sources = 0
     enqueue_failures = 0
@@ -251,6 +269,12 @@ async def discover_schedule(
                     await asyncio.sleep(1)
 
             if job:
+                logger.debug(
+                    "event=discover_schedule_enqueue_success project_module=%s batch_size=%s job_id=%s",
+                    module_name,
+                    len(batch),
+                    job.job_id,
+                )
                 job_ids.append(job.job_id)
                 total_sources += len(batch)
             else:
@@ -262,6 +286,12 @@ async def discover_schedule(
                         "source_identifiers": batch,
                     }
                 )
+
+    if queue_depth is None:
+        try:
+            queue_depth = await redis.zcard(settings.WORKER_QUEUE_NAME)
+        except Exception:
+            pass
 
     logger.info(
         "event=discover_schedule_completed "
