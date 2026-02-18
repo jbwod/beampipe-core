@@ -1,3 +1,5 @@
+from .core import logger
+
 from .api import router
 from .core.config import settings
 from .core.setup import create_application

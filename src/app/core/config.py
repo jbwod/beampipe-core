@@ -1,8 +1,13 @@
 import os
 from enum import Enum
+from typing import Literal
 
 from pydantic import SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LoggingSettings(BaseSettings):
+    LOG_VERBOSITY: Literal["full", "medium", "minimal"] = "medium"
 
 
 class AppSettings(BaseSettings):
@@ -163,6 +168,8 @@ class DiscoverySettings(BaseSettings):
     DISCOVERY_STALE_HOURS: int = 24
     DISCOVERY_SCHEDULE_MINUTES: int = 1
     DISCOVERY_TAP_TIMEOUT_SECONDS: int = 120
+    DISCOVERY_RETRY_COOLDOWN_MINUTES: int = 60
+    DISCOVERY_MAX_FAILURES_BEFORE_BACKOFF_MULTIPLIER: int = 3
     DISCOVERY_MAX_SOURCES_PER_RUN: int = 500
     DISCOVERY_MAX_QUEUE_DEPTH: int | None = None
     DISCOVERY_TAP_HEALTH_CHECK_ENABLED: bool = True
@@ -173,6 +180,7 @@ class ArchiveSettings(BaseSettings):
     ARCHIVE_METADATA_VALIDATE_JSON: bool = False
 
 class Settings(
+    LoggingSettings,
     AppSettings,
     SQLiteSettings,
     PostgresSettings,
