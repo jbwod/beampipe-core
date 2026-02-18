@@ -31,7 +31,15 @@ def discovery_signature(grouped: dict[str, list[dict[str, Any]]]) -> str:
         )
         canonical[sbid] = keys
     raw = json.dumps(canonical, sort_keys=True)
-    return hashlib.sha256(raw.encode()).hexdigest()
+    sig = hashlib.sha256(raw.encode()).hexdigest()
+    sbid_list = list(grouped.keys())
+    logger.debug(
+        "event=discovery_signature_computed sbids=%s input_len=%s hash_prefix=%s",
+        sbid_list[:10] if len(sbid_list) > 10 else sbid_list,
+        len(raw),
+        sig[:16] + "..." if len(sig) > 16 else sig,
+    )
+    return sig
 
 
 def existing_signature_from_records(records: list[dict[str, Any]]) -> str:
