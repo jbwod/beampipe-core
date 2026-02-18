@@ -250,17 +250,26 @@ class SourceRegistryService:
 
     @staticmethod
     async def mark_sources_checked(
-        db: AsyncSession, source_ids: list[UUID], checked_at: datetime | None = None
+        db: AsyncSession,
+        source_ids: list[UUID],
+        checked_at: datetime | None = None,
+        *,
+        commit: bool = True,
     ) -> None:
         """Update last_checked_at for a batch of sources."""
         if not source_ids:
             return
+        logger.debug(
+            "event=registry_mark_checked count=%s",
+            len(source_ids),
+        )
         await db.execute(
             update(SourceRegistry)
             .where(SourceRegistry.uuid.in_(source_ids))
             .values(last_checked_at=checked_at or datetime.now(UTC))
         )
-        await db.commit()
+        if commit:
+            await db.commit()
 
     @staticmethod
     async def mark_sources_attempted(
@@ -268,10 +277,17 @@ class SourceRegistryService:
         project_module: str,
         source_identifiers: list[str],
         attempted_at: datetime | None = None,
+        *,
+        commit: bool = True,
     ) -> None:
         """Update last_attempted_at for failed source attempts."""
         if not source_identifiers:
             return
+        logger.debug(
+            "event=registry_mark_attempted project_module=%s count=%s",
+            project_module,
+            len(source_identifiers),
+        )
         await db.execute(
             update(SourceRegistry)
             .where(
@@ -280,7 +296,8 @@ class SourceRegistryService:
             )
             .values(last_attempted_at=attempted_at or datetime.now(UTC))
         )
-        await db.commit()
+        if commit:
+            await db.commit()
 
     @staticmethod
     async def update_source_discovery_state(
@@ -299,6 +316,11 @@ class SourceRegistryService:
             update_data["last_attempted_at"] = attempted_at
         if discovery_signature is not None:
             update_data["discovery_signature"] = discovery_signature
+            logger.debug(
+                "event=registry_discovery_signature_update source_id=%s discovery_signature=%s",
+                source_id,
+                discovery_signature,
+            )
         if not update_data:
             return
         await db.execute(
