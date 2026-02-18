@@ -20,6 +20,10 @@ async def sample_background_task(ctx: Worker, name: str) -> str:
 
 
 async def discover_schedule_task(ctx: Worker, project_module: str | None = None) -> dict[str, Any]:
+    logger.debug(
+        "event=discover_schedule_task_started project_module=%s",
+        project_module or "all",
+    )
     try:
         async with local_session() as db:
             result = await discover_schedule(db=db, redis=ctx["redis"], project_module=project_module)
@@ -79,12 +83,15 @@ async def enqueue_timer_task(ctx: Worker) -> dict[str, Any]:
         "timer_task",
         _queue_name=settings.WORKER_QUEUE_NAME,
     )
-    return {"status": "ok", "job_id": job.job_id if job else None}
+    job_id = job.job_id if job else None
+    logger.debug("event=timer_task_enqueued job_id=%s", job_id)
+    return {"status": "ok", "job_id": job_id}
 
 
 async def timer_task(ctx: Worker) -> dict[str, Any]:
     _ = ctx
     modules = list_project_modules()
+    logger.debug("event=timer_task_modules project_modules=%s", modules)
     if not modules:
         logger.info("event=timer_task_no_modules")
         return {"status": "ok", "modules": []}
@@ -103,5 +110,6 @@ async def timer_task(ctx: Worker) -> dict[str, Any]:
         if callable(ping_fn):
             logger.info("event=timer_task_ping module=%s", name)
             ping_fn()
+            logger.debug("event=timer_task_ping_done module=%s", name)
 
     return {"status": "ok", "modules": modules}
