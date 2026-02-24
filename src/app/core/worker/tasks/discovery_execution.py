@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 # transient errors we retry on (network/timeouts only)
 DISCOVERY_EXCEPTIONS = (TimeoutError, ConnectionError)
 
+DiscoverCallable = Callable[[str, dict[str, Any] | None], Any]
+PrepareCallable = Callable[..., Any]
+
 
 # log each retry attempt before sleeping (debug level)
 def _log_discover_retry(retry_state: RetryCallState) -> None:
@@ -43,7 +46,7 @@ async def run_sync_with_timeout(
 
 # single attempt: run discover in thread, enforce tap timeout
 async def _run_discover_once(
-    discover_callable: Any,
+    discover_callable: DiscoverCallable,
     source_identifier: str,
     tap_timeout: int,
     adapters: dict[str, Any] | None = None,
@@ -71,7 +74,7 @@ async def _run_discover_once(
     before_sleep=_log_discover_retry,
 )
 async def run_discover_with_retry(
-    discover_callable: Any,
+    discover_callable: DiscoverCallable,
     source_identifier: str,
     tap_timeout: int,
     adapters: dict[str, Any] | None = None,
@@ -86,7 +89,7 @@ async def run_discover_with_retry(
 
 # one-shot prepare in thread with timeout (no retry)
 async def run_prepare_once(
-    prepare_callable: Any,
+    prepare_callable: PrepareCallable,
     source_identifier: str,
     query_results: Any,
     data_url_by_scan_id: dict[str, str] | None,
