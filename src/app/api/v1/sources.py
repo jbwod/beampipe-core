@@ -1,7 +1,7 @@
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,9 +10,12 @@ from ...api.dependencies import get_current_user
 from ...core.archive.service import archive_metadata_service
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import NotFoundException
+from ...core.projects import list_project_modules
 from ...core.registry.service import source_registry_service
 from ...crud.crud_source_registry import crud_source_registry
 from ...schemas.registry import (
+    DiscoverTriggerRequest,
+    DiscoverTriggerResponse,
     SourceRegistryBulkCreate,
     SourceRegistryBulkCreateResponse,
     SourceRegistryCreate,
@@ -128,6 +131,37 @@ async def bulk_register_sources(
         "total_created": len(created),
         "total_existing": len(existing),
     }
+
+
+@router.post("/discover", response_model=DiscoverTriggerResponse, status_code=200)
+async def trigger_discovery(
+    request: Request,
+    body: DiscoverTriggerRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    available = list_project_modules()
+    if body.project_module not in available:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown project_module '{body.project_module}'. Available: {available}",
+        )
+    if body.source_identifier is not None:
+        source_identifiers: list[str] | None = [body.source_identifier]
+    else:
+        source_identifiers = body.source_identifiers
+
+    identifiers = await source_registry_service.mark_sources_for_rediscovery(
+        db=db,
+        project_module=body.project_module,
+        source_identifiers=source_identifiers,
+    )
+    return {
+        "project_module": body.project_module,
+        "marked_count": len(identifiers),
+        "source_identifiers": identifiers,
+    }
+
 
 @router.get("/{source_id}")
 async def get_source(
