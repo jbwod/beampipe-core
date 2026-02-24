@@ -11,6 +11,7 @@ from .adapters import get_health_endpoints
 logger = logging.getLogger(__name__)
 
 async def is_tap_reachable(url: str, timeout_seconds: float = 10.0) -> bool:
+    """Check if a TAP endpoint is reachable."""
     try:
         async with httpx.AsyncClient(
             follow_redirects=True,
@@ -43,6 +44,7 @@ async def is_tap_reachable(url: str, timeout_seconds: float = 10.0) -> bool:
 
 
 async def get_tap_health(timeout_seconds: float = 10.0) -> dict[str, bool]:
+    """Get the health of all TAP endpoints."""
     endpoints = get_health_endpoints()
     result: dict[str, bool] = {}
     for label, url in endpoints:

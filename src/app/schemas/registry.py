@@ -134,3 +134,21 @@ class DiscoverTriggerResponse(BaseModel):
     marked_count: int = Field(description="Number of sources marked for recheck")
     source_identifiers: list[str] = Field(description="Source identifiers that were updated")
 
+
+class ProjectModuleContractStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_module: str = Field(description="Project module identifier")
+    valid: bool = Field(description="Whether discovery contract validation passed")
+    required_adapters: list[str] = Field(default_factory=list)
+    error: str | None = Field(default=None, description="Validation/import error when invalid")
+    exports: list[str] = Field(
+        default_factory=list,
+        description="Known module exports relevant to discovery integration",
+    )
+
+
+class ProjectModuleContractListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    count: int
+    modules: list[ProjectModuleContractStatus]
+
