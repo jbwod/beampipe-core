@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from ..core.schemas import TimestampSchema, UUIDSchema
 
@@ -102,4 +102,35 @@ class SourceRegistryBulkCreateResponse(BaseModel):
     existing: list[SourceRegistryRead]
     total_created: int
     total_existing: int
+
+
+class DiscoverTriggerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_module: Annotated[
+        str, Field(min_length=1, max_length=50, examples=["wallaby"], description="Project module identifier")
+    ]
+    source_identifier: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="Single source to mark.",
+    )
+    source_identifiers: list[str] | None = Field(
+        default=None,
+        description="List of sources to mark. Omit to all enabled sources for the project.",
+    )
+
+    @model_validator(mode="after")
+    def check_mutually_exclusive(self) -> "DiscoverTriggerRequest":
+        if self.source_identifier is not None and self.source_identifiers is not None:
+            raise ValueError("Provide only one of source_identifier or source_identifiers")
+        return self
+
+
+class DiscoverTriggerResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_module: str = Field(description="Project module that was used")
+    marked_count: int = Field(description="Number of sources marked for recheck")
+    source_identifiers: list[str] = Field(description="Source identifiers that were updated")
 

@@ -300,6 +300,34 @@ class SourceRegistryService:
             await db.commit()
 
     @staticmethod
+    async def mark_sources_for_rediscovery(
+        db: AsyncSession,
+        project_module: str,
+        source_identifiers: list[str] | None = None,
+    ) -> list[str]:
+        conditions = [
+            SourceRegistry.project_module == project_module,
+            SourceRegistry.enabled.is_(True),
+        ]
+        if source_identifiers:
+            conditions.append(SourceRegistry.source_identifier.in_(source_identifiers))
+        stmt = (
+            update(SourceRegistry)
+            .where(and_(*conditions))
+            .values(last_checked_at=None, last_attempted_at=None)
+            .returning(SourceRegistry.source_identifier)
+        )
+        result = await db.execute(stmt)
+        identifiers = [row[0] for row in result.all()]
+        await db.commit()
+        logger.debug(
+            "event=registry_mark_for_rediscovery project_module=%s count=%s",
+            project_module,
+            len(identifiers),
+        )
+        return identifiers
+
+    @staticmethod
     async def update_source_discovery_state(
         db: AsyncSession,
         source_id: UUID,
