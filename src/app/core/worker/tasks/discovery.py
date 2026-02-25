@@ -11,6 +11,7 @@ from arq.worker import Worker
 from ...archive.adapters import get_adapter
 from ...config import settings
 from ...db.database import local_session
+from ...projects.contracts import extract_discover_bundle
 from ...projects import list_project_modules, load_project_module
 from ...registry.service import source_registry_service
 from ...utils.discovery import (
@@ -148,7 +149,6 @@ def _build_discovery_result(
         "missing_registry_count": stats.missing_registry_count,
     }
 
-
 # discover (with retry) then prepare for one source; returns outcome dict
 async def _process_source(
     module: Any,
@@ -158,19 +158,8 @@ async def _process_source(
     adapters: dict[str, Any] | None,
 ) -> dict[str, Any]:
     source_started_at = time.perf_counter()
-    # require discover and prepare_metadata callables on module
-    discover_fn = getattr(module, "discover", None)
-    if not discover_fn or not callable(discover_fn):
-        raise ValueError(
-            f"Project module '{project_module}' must implement discover(source_identifier)"
-        )
-
-    prepare_fn = getattr(module, "prepare_metadata", None)
-    if not prepare_fn or not callable(prepare_fn):
-        raise ValueError(
-            "Project module "
-            f"'{project_module}' must implement prepare_metadata(source_identifier, query_results, ...)"
-        )
+    discover_fn = getattr(module, "discover")
+    prepare_fn = getattr(module, "prepare_metadata")
 
     logger.debug(
         "event=discover_batch_source_discover_start project_module=%s source_identifier=%s tap_timeout=%s",
@@ -178,12 +167,14 @@ async def _process_source(
         source_identifier,
         tap_timeout,
     )
-    query_results = await _run_discover_with_retry(
+    discover_output_raw = await _run_discover_with_retry(
         discover_callable=discover_fn,
         source_identifier=source_identifier,
         tap_timeout=tap_timeout,
         adapters=adapters,
     )
+    discover_output = extract_discover_bundle(discover_output_raw, project_module)
+    query_results = discover_output["query_results"]
 
     # empty discover result therefore no_datasets path (no prepare call)
     if len(query_results) == 0:
@@ -198,7 +189,7 @@ async def _process_source(
     result = await _run_prepare_once(
         prepare_callable=prepare_fn,
         source_identifier=source_identifier,
-        query_results=query_results,
+        query_results=discover_output,
         data_url_by_scan_id=None,
         checksum_url_by_scan_id=None,
         tap_timeout=tap_timeout,
