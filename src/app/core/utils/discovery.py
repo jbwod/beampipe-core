@@ -58,4 +58,14 @@ def existing_signature_from_records(records: list[dict[str, Any]]) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+# def validate_prepared_metadata_records(
+#     metadata_list: list[dict[str, Any]],
+#     *,
+#     project_module: str,
+#     source_identifier: str,
+# ) -> list[dict[str, Any]]:
+#
+#     return metadata_list
+
+
 NO_DATASETS_SIGNATURE = discovery_signature({"0": []})
