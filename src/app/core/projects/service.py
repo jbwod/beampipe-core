@@ -12,6 +12,10 @@ class ProjectModuleService:
         try:
             module = load_project_module(project_module)
             required_adapters = getattr(module, "REQUIRED_ADAPTERS", [])
+            enrichment_keys_raw = getattr(module, "DISCOVERY_ENRICHMENT_KEYS", None)
+            enrichment_keys: list[str] = []
+            if isinstance(enrichment_keys_raw, list):
+                enrichment_keys = [k for k in enrichment_keys_raw if isinstance(k, str)]
             return {
                 "project_module": project_module,
                 "valid": True,
@@ -22,6 +26,7 @@ class ProjectModuleService:
                     for symbol in ["discover", "prepare_metadata", "stage", "REQUIRED_ADAPTERS"]
                     if hasattr(module, symbol)
                 ],
+                "enrichment_keys": enrichment_keys,
             }
         except Exception as exc:
             return {
@@ -30,7 +35,13 @@ class ProjectModuleService:
                 "required_adapters": [],
                 "error": str(exc),
                 "exports": [],
+                "enrichment_keys": [],
             }
+
+    @staticmethod
+    def list_project_names() -> list[str]:
+        """Return registered project module names."""
+        return list_project_modules()
 
     @staticmethod
     def list_contract_statuses() -> list[dict[str, Any]]:
