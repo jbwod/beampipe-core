@@ -6,13 +6,14 @@ router = APIRouter()
 
 @router.get("/sources", response_class=HTMLResponse)
 async def view_sources(request: Request) -> HTMLResponse:
-    """Very simple HTML page for interacting with the source registry."""
+    """Very simple HTML page for interacting with the source registry in development - to be removed/replaced eventaully"""
     html_content = """
     <html>
       <head>
         <title>Sources</title>
+        <script src="https://pfau-software.de/json-viewer/dist/iife/index.js"></script>
       </head>
-      <body style="background-color: #f0f890;">
+      <body style="background-color: #2d2d2d; color: #ffffff;">
         <h1>Source Registry</h1>
         <p id="status-line">Ready (app, DB, Redis): <span id="ready-status-dot" title="Checking...">●</span> <span id="ready-status-label">checking...</span> &nbsp; TAP services: <span id="tap-status-dot" title="Checking...">●</span> <span id="tap-status-label">checking...</span></p>
 
@@ -28,6 +29,10 @@ async def view_sources(request: Request) -> HTMLResponse:
           <button type="submit">Login</button>
           <span id="login-status"></span>
         </form>
+
+        <h2>Projects</h2>
+        <p id="projects-status">Loading projects…</p>
+        <andypf-json-viewer id="projects-json-viewer" indent="2" expanded="1" theme="eighties" show-data-types="true" show-toolbar="true" show-copy="true" show-size="true" style="display:none;"></andypf-json-viewer>
 
         <h2>Add Source</h2>
         <form id="add-source-form">
@@ -45,7 +50,7 @@ async def view_sources(request: Request) -> HTMLResponse:
         </form>
 
         <h2>Sources</h2>
-        <table border="1">
+        <table border="1" style="color: #ffffff;">
           <thead>
             <tr>
               <th>UUID</th>
@@ -61,23 +66,8 @@ async def view_sources(request: Request) -> HTMLResponse:
         </table>
 
         <h2>Metadata</h2>
-        <p id="metadata-header">Select a source to view its metadata.</p>
-        <table border="1">
-          <thead>
-            <tr>
-              <th>SBID</th>
-              <th>Dataset ID</th>
-              <th>Visibility Filename</th>
-              <th>Staged URL</th>
-              <th>Evaluation File</th>
-              <th>RA</th>
-              <th>DEC</th>
-              <th>Vsys</th>
-            </tr>
-          </thead>
-          <tbody id="metadata-table-body">
-          </tbody>
-        </table>
+        <p id="metadata-json-label">Select a source to view its metadata (raw JSON).</p>
+        <andypf-json-viewer id="metadata-json-viewer" indent="2" expanded="2" theme="eighties" show-data-types="true" show-toolbar="true" show-copy="true" show-size="true" style="display:none;"></andypf-json-viewer>
 
         <script>
           let authToken = null;
@@ -116,6 +106,26 @@ async def view_sources(request: Request) -> HTMLResponse:
               console.error('Login error', err);
               statusEl.textContent = ' Login error';
               authToken = null;
+            }
+          }
+
+          async function loadProjects() {
+            const statusEl = document.getElementById('projects-status');
+            const viewer = document.getElementById('projects-json-viewer');
+            viewer.style.display = 'none';
+            try {
+              const response = await fetch('/api/v1/projects/contracts');
+              if (!response.ok) {
+                statusEl.textContent = 'Failed to load projects.';
+                return;
+              }
+              const data = await response.json();
+              statusEl.textContent = (data.modules && data.modules.length) ? (data.modules.length + ' project(s)') : 'No projects registered.';
+              viewer.data = data;
+              viewer.style.display = 'block';
+            } catch (err) {
+              console.error('Error loading projects', err);
+              statusEl.textContent = 'Error loading projects.';
             }
           }
 
@@ -216,56 +226,23 @@ async def view_sources(request: Request) -> HTMLResponse:
           }
 
           async function loadMetadata(sourceUuid, sourceIdentifier) {
-            const header = document.getElementById('metadata-header');
-            const tbody = document.getElementById('metadata-table-body');
-            header.textContent = 'Metadata for ' + sourceIdentifier;
-            tbody.innerHTML = '';
+            const label = document.getElementById('metadata-json-label');
+            const viewer = document.getElementById('metadata-json-viewer');
+            label.textContent = 'Loading metadata for ' + sourceIdentifier + '…';
+            viewer.style.display = 'none';
             try {
               const response = await fetch('/api/v1/sources/' + sourceUuid + '/metadata');
               if (!response.ok) {
-                tbody.innerHTML = '<tr><td colspan="8">Failed to load metadata</td></tr>';
+                label.textContent = 'Failed to load metadata for ' + sourceIdentifier + '.';
                 return;
               }
               const data = await response.json();
-              const entries = data.metadata || [];
-              if (!entries.length) {
-                tbody.innerHTML = '<tr><td colspan="8">No metadata found for this source.</td></tr>';
-                return;
-              }
-              entries.forEach(function (entry) {
-                const sbid = entry.sbid || '';
-                const metadataJson = entry.metadata_json || {};
-                const datasets = metadataJson.datasets || [];
-                const discoveryFlags = metadataJson.discovery_flags || {};
-                if (discoveryFlags.ra_dec_vsys_complete === false) {
-                  const tr = document.createElement('tr');
-                  const td = document.createElement('td');
-                  td.colSpan = 8;
-                  td.textContent = 'Incomplete: RA/DEC/VSys not available from Vizier.';
-                  tr.appendChild(td);
-                  tbody.appendChild(tr);
-                }
-                datasets.forEach(function (d) {
-                  const tr = document.createElement('tr');
-                  function cell(text) {
-                    const td = document.createElement('td');
-                    td.textContent = text == null ? '' : String(text);
-                    return td;
-                  }
-                  tr.appendChild(cell(sbid));
-                  tr.appendChild(cell(d.dataset_id || d.visibility_filename || ''));
-                  tr.appendChild(cell(d.visibility_filename || ''));
-                  tr.appendChild(cell(d.staged_url || ''));
-                  tr.appendChild(cell(d.evaluation_file || ''));
-                  tr.appendChild(cell(d.ra_string || ''));
-                  tr.appendChild(cell(d.dec_string || ''));
-                  tr.appendChild(cell(d.vsys || ''));
-                  tbody.appendChild(tr);
-                });
-              });
+              label.textContent = 'Metadata for ' + sourceIdentifier;
+              viewer.data = data;
+              viewer.style.display = 'block';
             } catch (err) {
               console.error('Error loading metadata', err);
-              tbody.innerHTML = '<tr><td colspan="8">Error loading metadata</td></tr>';
+              label.textContent = 'Error loading metadata for ' + sourceIdentifier + '.';
             }
           }
 
@@ -318,6 +295,7 @@ async def view_sources(request: Request) -> HTMLResponse:
           loadTapStatus();
           setInterval(loadReadyStatus, 60000);
           setInterval(loadTapStatus, 60000);
+          loadProjects();
           loadSources();
         </script>
       </body>
