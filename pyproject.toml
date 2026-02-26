@@ -46,6 +46,7 @@ vizier = "app.core.archive.adapters.vizier"
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.2",
+    "pytest-asyncio>=1.0.0",
     "pytest-mock>=3.14.0",
     "faker>=26.0.0",
     "mypy>=1.8.0",
