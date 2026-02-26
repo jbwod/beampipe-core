@@ -6,7 +6,7 @@ router = APIRouter()
 
 @router.get("/sources", response_class=HTMLResponse)
 async def view_sources(request: Request) -> HTMLResponse:
-    """Very simple HTML page for interacting with the source registry in development - to be removed/replaced eventaully"""
+    """Very simple HTML page for source registry in development - to be removed."""
     html_content = """
     <html>
       <head>
@@ -15,7 +15,10 @@ async def view_sources(request: Request) -> HTMLResponse:
       </head>
       <body style="background-color: #2d2d2d; color: #ffffff;">
         <h1>Source Registry</h1>
-        <p id="status-line">Ready (app, DB, Redis): <span id="ready-status-dot" title="Checking...">●</span> <span id="ready-status-label">checking...</span> &nbsp; TAP services: <span id="tap-status-dot" title="Checking...">●</span> <span id="tap-status-label">checking...</span></p>
+        <p id="status-line">Ready (app, DB, Redis): <span id="ready-status-dot" title="Checking...">●</span>
+        <span id="ready-status-label">checking...</span> &nbsp; TAP:
+        <span id="tap-status-dot" title="Checking...">●</span>
+        <span id="tap-status-label">checking...</span></p>
 
         <h2>Login</h2>
         <p>Enter API credentials to enable adding sources.</p>
@@ -32,7 +35,9 @@ async def view_sources(request: Request) -> HTMLResponse:
 
         <h2>Projects</h2>
         <p id="projects-status">Loading projects…</p>
-        <andypf-json-viewer id="projects-json-viewer" indent="2" expanded="1" theme="eighties" show-data-types="true" show-toolbar="true" show-copy="true" show-size="true" style="display:none;"></andypf-json-viewer>
+        <andypf-json-viewer id="projects-json-viewer" indent="2" expanded="1" theme="eighties"
+          show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
+          style="display:none;"></andypf-json-viewer>
 
         <h2>Add Source</h2>
         <form id="add-source-form">
@@ -67,7 +72,9 @@ async def view_sources(request: Request) -> HTMLResponse:
 
         <h2>Metadata</h2>
         <p id="metadata-json-label">Select a source to view its metadata (raw JSON).</p>
-        <andypf-json-viewer id="metadata-json-viewer" indent="2" expanded="2" theme="eighties" show-data-types="true" show-toolbar="true" show-copy="true" show-size="true" style="display:none;"></andypf-json-viewer>
+        <andypf-json-viewer id="metadata-json-viewer" indent="2" expanded="2" theme="eighties"
+          show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
+          style="display:none;"></andypf-json-viewer>
 
         <script>
           let authToken = null;
@@ -120,7 +127,8 @@ async def view_sources(request: Request) -> HTMLResponse:
                 return;
               }
               const data = await response.json();
-              statusEl.textContent = (data.modules && data.modules.length) ? (data.modules.length + ' project(s)') : 'No projects registered.';
+              statusEl.textContent = (data.modules && data.modules.length)
+                ? (data.modules.length + ' project(s)') : 'No projects registered.';
               viewer.data = data;
               viewer.style.display = 'block';
             } catch (err) {
@@ -254,7 +262,8 @@ async def view_sources(request: Request) -> HTMLResponse:
               const data = await response.json();
               const ok = response.ok && (data.status === 'healthy');
               dotEl.style.color = ok ? 'green' : 'red';
-              dotEl.title = 'app: ' + (data.app || '') + ', database: ' + (data.database || '') + ', redis: ' + (data.redis || '');
+              dotEl.title = 'app: ' + (data.app || '') + ', database: ' + (data.database || '')
+                + ', redis: ' + (data.redis || '');
               if (ok) {
                 labelEl.textContent = 'up';
               } else {
@@ -280,8 +289,12 @@ async def view_sources(request: Request) -> HTMLResponse:
               const allOk = data.all_ok === true;
               const endpoints = data.endpoints || {};
               dotEl.style.color = allOk ? 'green' : 'red';
-              dotEl.title = Object.entries(endpoints).map(function (e) { return e[0] + ': ' + (e[1] ? 'up' : 'down'); }).join(', ');
-              labelEl.textContent = allOk ? 'all up' : Object.entries(endpoints).filter(function (e) { return !e[1]; }).map(function (e) { return e[0] + ' down'; }).join(', ');
+              dotEl.title = Object.entries(endpoints).map(function (e) {
+                return e[0] + ': ' + (e[1] ? 'up' : 'down');
+              }).join(', ');
+              labelEl.textContent = allOk ? 'all up' : Object.entries(endpoints)
+                .filter(function (e) { return !e[1]; })
+                .map(function (e) { return e[0] + ' down'; }).join(', ');
             } catch (err) {
               dotEl.style.color = 'gray';
               dotEl.title = 'Check failed';

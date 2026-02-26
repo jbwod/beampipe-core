@@ -11,8 +11,8 @@ from arq.worker import Worker
 from ...archive.adapters import get_adapter
 from ...config import settings
 from ...db.database import local_session
-from ...projects.contracts import extract_discover_bundle
 from ...projects import list_project_modules, load_project_module
+from ...projects.contracts import extract_discover_bundle
 from ...registry.service import source_registry_service
 from ...utils.discovery import (
     discovery_signature,
@@ -208,7 +208,8 @@ async def _process_source(
     )
     duration_ms = int((time.perf_counter() - source_started_at) * 1000)
     logger.debug(
-        "event=discover_batch_source_prepare_complete project_module=%s source_identifier=%s duration_ms=%s metadata_count=%s",
+        "event=discover_batch_source_prepare_complete project_module=%s source_identifier=%s "
+        "duration_ms=%s metadata_count=%s",
         project_module,
         source_identifier,
         duration_ms,
@@ -347,7 +348,8 @@ async def discover_batch(
             discovery_flags = source_result.get("discovery_flags", {})
             grouped = group_metadata_by_sbid(metadata_list)
             logger.debug(
-                "event=discover_batch_source_grouped project_module=%s source_identifier=%s sbids=%s sbid_list=%s datasets=%s",
+                "event=discover_batch_source_grouped project_module=%s source_identifier=%s "
+                "sbids=%s sbid_list=%s datasets=%s",
                 project_module,
                 source_identifier,
                 len(grouped),
@@ -373,7 +375,8 @@ async def discover_batch(
 
             if new_sig == existing_sig:
                 logger.debug(
-                    "event=discover_batch_signature_unchanged project_module=%s source_identifier=%s existing_sig=%s new_sig=%s",
+                    "event=discover_batch_signature_unchanged project_module=%s source_identifier=%s "
+                    "existing_sig=%s new_sig=%s",
                     project_module,
                     source_identifier,
                     existing_sig,
@@ -395,7 +398,8 @@ async def discover_batch(
                 continue
 
             logger.debug(
-                "event=discover_batch_signature_changed project_module=%s source_identifier=%s existing_sig=%s new_sig=%s",
+                "event=discover_batch_signature_changed project_module=%s source_identifier=%s "
+                "existing_sig=%s new_sig=%s",
                 project_module,
                 source_identifier,
                 existing_sig,

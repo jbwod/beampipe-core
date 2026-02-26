@@ -50,8 +50,9 @@ async def discover_schedule_task(ctx: Worker, project_module: str | None = None)
             else:
                 logger.info(
                     "event=discover_schedule_task_result "
-                    "project_module=%s scheduled_at=%s ok=%s total_sources=%s "
-                    "total_jobs=%s enqueue_failures=%s skipped_due_to_queue_full=%s skipped_due_to_tap_unreachable=%s tap_unreachable=%s",
+                    "project_module=%s scheduled_at=%s ok=%s total_sources=%s total_jobs=%s "
+                    "enqueue_failures=%s skipped_due_to_queue_full=%s "
+                    "skipped_due_to_tap_unreachable=%s tap_unreachable=%s",
                     project_module or "all",
                     result.get("scheduled_at"),
                     result.get("ok"),
