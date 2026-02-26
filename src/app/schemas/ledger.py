@@ -1,11 +1,11 @@
 from datetime import datetime
 from typing import Annotated
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..core.schemas import TimestampSchema, UUIDSchema
 from ..models.ledger import RunStatus
+
 
 # /Users/jblackwo/beampipe-core/docs/user-guide/database/schemas.md
 class RunRecordBase(BaseModel):

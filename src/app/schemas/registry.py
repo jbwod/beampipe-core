@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import Annotated
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from ..core.schemas import TimestampSchema, UUIDSchema
+
 
 class SourceRegistryBase(BaseModel):
     project_module: Annotated[
