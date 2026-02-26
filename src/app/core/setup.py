@@ -218,7 +218,7 @@ def create_application(
     application.include_router(views_router)
 
     if isinstance(settings, ClientSideCacheSettings):
-        application.add_middleware(ClientCacheMiddleware, max_age=settings.CLIENT_CACHE_MAX_AGE)
+        application.add_middleware(ClientCacheMiddleware, max_age=settings.CLIENT_CACHE_MAX_AGE)  # type: ignore[arg-type]
 
     if isinstance(settings, CORSSettings):
         application.add_middleware(

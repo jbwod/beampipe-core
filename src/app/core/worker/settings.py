@@ -46,7 +46,7 @@ class SchedulerSettings:
 
     cron_jobs = [
         cron(
-            discover_schedule_task,
+            discover_schedule_task,  # type: ignore[arg-type]
             minute=_discovery_schedule_minutes(),
             second={0},
         ),

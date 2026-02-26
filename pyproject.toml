@@ -50,6 +50,7 @@ dev = [
     "faker>=26.0.0",
     "mypy>=1.8.0",
     "types-redis>=4.6.0",
+    "types-requests>=2.31.0",
     "ruff>=0.1.0",
 ]
 # build/install beampipe-wallaby from sibling dir
@@ -81,6 +82,7 @@ packages = ["src"]
 target-version = "py311"
 line-length = 120
 fix = true
+exclude = ["**/*test*.py"]
 
 [tool.ruff.lint]
 select = [
@@ -140,6 +142,7 @@ warn_unused_configs = true
 ignore_missing_imports = true
 mypy_path = "src"
 explicit_package_bases = true
+exclude = [".*test.*\\.py$"]
 
 [[tool.mypy.overrides]]
 module = "src.app.*"
