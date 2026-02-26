@@ -18,11 +18,11 @@ async def list_projects(request: Request) -> dict[str, object]:
     return {"projects": projects}
 
 
-# @router.get("/contracts", response_model=ProjectModuleContractListResponse)
-# async def list_project_contracts(request: Request) -> dict[str, object]:
-#     _ = request
-#     statuses = project_module_service.list_contract_statuses()
-#     return {"count": len(statuses), "modules": statuses}
+@router.get("/contracts", response_model=ProjectModuleContractListResponse)
+async def list_project_contracts(request: Request) -> dict[str, object]:
+    _ = request
+    statuses = project_module_service.list_contract_statuses()
+    return {"count": len(statuses), "modules": statuses}
 
 
 @router.get(

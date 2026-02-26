@@ -15,6 +15,8 @@ from .tasks import (
 )
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(_loop)
 
 __all__ = [
     "discover_batch",
