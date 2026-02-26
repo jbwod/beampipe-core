@@ -16,6 +16,7 @@ so thinking perhaps an entry point?
 
 from importlib.metadata import entry_points
 from types import ModuleType
+from typing import cast
 
 from .contracts import validate_project_module_interface
 
@@ -35,7 +36,7 @@ def load_project_module(name: str) -> ModuleType:
         if ep.name == name:
             module = ep.load()
             validate_project_module_interface(module, name)
-            return module
+            return cast(ModuleType, module)
     raise ValueError(
         f"Project module '{name}' not found. Available: {list_project_modules()}"
     )

@@ -1,4 +1,4 @@
-from typing import Any, Protocol, TypedDict
+from typing import Any, Protocol, TypedDict, cast
 from types import ModuleType
 
 class DiscoverBundle(TypedDict, total=False):
@@ -50,7 +50,7 @@ def extract_discover_bundle(discover_output: Any, module_name: str) -> DiscoverB
         raise ValueError(
             f"Project module '{module_name}' discover() key 'enrichments' must be a dict when provided"
         )
-    return discover_output
+    return cast(DiscoverBundle, discover_output)
 
 
 # """

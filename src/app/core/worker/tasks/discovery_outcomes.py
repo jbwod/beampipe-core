@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from ...archive.service import archive_metadata_service
 from ...registry.service import source_registry_service
@@ -26,7 +26,7 @@ async def resolve_existing_signature(
 ) -> str:
     existing_sig = source.get("discovery_signature")
     if existing_sig is not None:
-        return existing_sig
+        return cast(str, existing_sig)
 
     existing_records = await archive_metadata_service.list_metadata_for_source(
         db=db,
@@ -42,7 +42,7 @@ async def resolve_existing_signature(
         len(existing_records),
         existing_sig,
     )
-    return existing_sig
+    return cast(str, existing_sig)
 
 # log unchanged outcome, no db writes; return source_uuid for mark_sources_checked
 def handle_unchanged_metadata(
