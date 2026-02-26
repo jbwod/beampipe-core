@@ -178,7 +178,8 @@ async def _process_source(
     query_results = discover_output["query_results"]
     if not hasattr(query_results, "__len__"):
         raise ValueError(
-            f"module '{project_module}' discover() must return bundle['query_results']"
+            f"module '{project_module}' discover() must return bundle['query_results'] "
+            "as a length-checkable collection"
         )
 
     # empty discover result therefore no_datasets path (no prepare call)

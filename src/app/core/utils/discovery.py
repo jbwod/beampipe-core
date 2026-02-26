@@ -64,6 +64,23 @@ def validate_prepared_metadata_records(
     project_module: str,
     source_identifier: str,
 ) -> list[dict[str, Any]]:
+    for i, rec in enumerate(metadata_list):
+        if not isinstance(rec, dict):
+            raise ValueError(
+                f"module '{project_module}' prepare_metadata record[{i}] must be a dict"
+            )
+        if rec.get("sbid") is None and "sbid" not in rec:
+            raise ValueError(
+                f"module '{project_module}' prepare_metadata record[{i}] missing required 'sbid'"
+            )
+        has_identity = (
+            rec.get("dataset_id") is not None or rec.get("visibility_filename") is not None
+        )
+        if not has_identity:
+            raise ValueError(
+                f"module '{project_module}' prepare_metadata record[{i}] "
+                "requires 'dataset_id' or 'visibility_filename'"
+            )
     return metadata_list
 
 
