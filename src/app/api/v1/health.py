@@ -7,12 +7,12 @@ from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...core.archive.tap_health import get_tap_health
 from ...core.config import settings
 from ...core.db.database import async_get_db
 from ...core.health import check_database_health, check_redis_health
 from ...core.schemas import HealthCheck, ReadyCheck, TapHealthCheck
 from ...core.utils.cache import async_get_redis
-from ...core.archive.tap_health import get_tap_health
 
 router = APIRouter(tags=["health"])
 

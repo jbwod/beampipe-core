@@ -214,13 +214,13 @@ async def get_source_metadata(
         db=db,
         source_id=source_id,
     )
-    
+
     metadata_list = await archive_metadata_service.list_metadata_for_source(
         db=db,
         project_module=source["project_module"],
         source_identifier=source["source_identifier"],
     )
-    
+
     return {
         "source": source,
         "metadata": metadata_list,

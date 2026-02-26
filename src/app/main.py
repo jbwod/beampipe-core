@@ -1,4 +1,3 @@
-from .core import logger
 
 from .api import router
 from .core.config import settings
