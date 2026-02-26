@@ -71,8 +71,10 @@ def stage_data(
         # Try to get a scan-id keyed mapping from CASDA job results (if available).
         # https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=scan-105366-255133
         # https://astroquery.readthedocs.io/en/latest/_modules/astroquery/casda/core.html#CasdaClass.stage_data
-        # TLDR; casda.stage_data returns a list of URLs, which is fine if we're using all of them, but we need to get the scan-id keyed mapping from the CASDA job results.
-        # otherwise we don't know which url corresponds to which scan-id (like with ingest we can infer from the path, but not for the checksums)
+        # TLDR; casda.stage_data returns a list of URLs, which is fine if we're using all of them, 
+        # but we need to get the scan-id keyed mapping from the CASDA job results.
+        # otherwise we don't know which url corresponds to which scan-id (like with ingest
+        #  we can infer from the path, but not for the checksums)
         # ie; what happens when duplicate filename, but different obs_publisher_did?
         if hasattr(casda, "_create_job") and hasattr(casda, "_complete_job"):
             try:
