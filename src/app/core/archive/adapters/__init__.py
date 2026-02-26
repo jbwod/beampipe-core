@@ -15,7 +15,7 @@ def _discover_and_register_adapters() -> None:
         if hasattr(eps, "select"):
             adapter_eps = eps.select(group="beampipe.adapters")
         else:
-            adapter_eps = eps.get("beampipe.adapters", [])
+            adapter_eps = eps.get("beampipe.adapters", [])  # type: ignore[arg-type]
     except Exception as e:
         logger.warning("event=adapter_discovery_error error=%s", e)
         return
