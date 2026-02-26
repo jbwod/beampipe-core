@@ -58,7 +58,8 @@ def query_adapter(name: str, adql: str, tap_url: str | None = None):
 
 
 # Stage helpers from casda (no adapter protocol)
-from .casda import stage_data as casda_stage_data, stage_data_pawsey as casda_stage_data_pawsey
+from .casda import stage_data as casda_stage_data
+from .casda import stage_data_pawsey as casda_stage_data_pawsey
 
 __all__ = [
     "AdapterRegistry",

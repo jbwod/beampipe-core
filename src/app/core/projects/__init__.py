@@ -20,6 +20,7 @@ from typing import cast
 
 from .contracts import validate_project_module_interface
 
+
 def _entry_points_for(group: str):
     eps = entry_points()
     if hasattr(eps, "select"):

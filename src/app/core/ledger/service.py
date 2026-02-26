@@ -205,8 +205,8 @@ class RunLedgerService:
         completed_at_value = run.get("completed_at")
 
         # status transition if status is being changed
-        if status and status != current_status_value:
-            current_status = RunStatus(current_status_value)
+        if status and status != current_status_value and current_status_value is not None:
+            current_status = RunStatus(str(current_status_value))
             if not RunLedgerService._validate_status_transition(current_status, status):
                 raise BadRequestException(
                     f"Invalid status transition from {current_status.value} to {status.value}"

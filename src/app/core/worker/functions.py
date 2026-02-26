@@ -1,8 +1,6 @@
 import asyncio
-import logging
 
 import uvloop
-from ...core.logger import LOGGING_LEVEL, LOGGING_FORMAT
 
 from .tasks import (
     discover_batch,

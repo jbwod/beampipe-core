@@ -1,5 +1,6 @@
-from typing import Any, Protocol, TypedDict, cast
 from types import ModuleType
+from typing import Any, Protocol, TypedDict, cast
+
 
 class DiscoverBundle(TypedDict, total=False):
     query_results: Any
@@ -20,7 +21,6 @@ class ProjectDiscoveryModule(Protocol):
 def validate_project_module_interface(module: ModuleType, module_name: str) -> None:
     discover_fn = getattr(module, "discover", None)
     prepare_fn = getattr(module, "prepare_metadata", None)
-    required_adapters = getattr(module, "REQUIRED_ADAPTERS", None)
 
     if not callable(discover_fn):
         raise ValueError(

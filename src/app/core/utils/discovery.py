@@ -27,7 +27,7 @@ def discovery_signature(grouped: dict[str, list[dict[str, Any]]]) -> str:
     canonical: dict[str, list[str]] = {}
     for sbid, datasets in sorted(grouped.items()):
         keys = sorted(
-            (d.get("dataset_id") or d.get("visibility_filename") or "" for d in datasets)
+            d.get("dataset_id") or d.get("visibility_filename") or "" for d in datasets
         )
         canonical[sbid] = keys
     raw = json.dumps(canonical, sort_keys=True)
@@ -51,7 +51,7 @@ def existing_signature_from_records(records: list[dict[str, Any]]) -> str:
         sbid = str(rec.get("sbid", ""))
         datasets = (rec.get("metadata_json") or {}).get("datasets") or []
         keys = sorted(
-            (d.get("dataset_id") or d.get("visibility_filename") or "" for d in datasets)
+            d.get("dataset_id") or d.get("visibility_filename") or "" for d in datasets
         )
         canonical[sbid] = keys
     raw = json.dumps(canonical, sort_keys=True)

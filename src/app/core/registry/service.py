@@ -224,7 +224,8 @@ class SourceRegistryService:
             SourceRegistry.last_checked_at.isnot(None),
             text(
                 "source_registry.last_checked_at < (now() AT TIME ZONE 'UTC') "
-                "- ((CASE WHEN source_registry.stale_after_hours IS NOT NULL THEN source_registry.stale_after_hours ELSE :default_stale END) * interval '1 hour')"
+                "- ((CASE WHEN source_registry.stale_after_hours IS NOT NULL "
+                "THEN source_registry.stale_after_hours ELSE :default_stale END) * interval '1 hour')"
             ).bindparams(default_stale=default_stale),
         )
         conditions = [SourceRegistry.last_checked_at.is_(None), ~metadata_exists, stale_by_time]
