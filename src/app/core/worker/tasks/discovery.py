@@ -17,6 +17,7 @@ from ...registry.service import source_registry_service
 from ...utils.discovery import (
     discovery_signature,
     group_metadata_by_sbid,
+    validate_prepared_metadata_records,
 )
 from .discovery_execution import (
     extract_prepare_result as _extract_prepare_result,
@@ -175,6 +176,10 @@ async def _process_source(
     )
     discover_output = extract_discover_bundle(discover_output_raw, project_module)
     query_results = discover_output["query_results"]
+    if not hasattr(query_results, "__len__"):
+        raise ValueError(
+            f"module '{project_module}' discover() must return bundle['query_results']"
+        )
 
     # empty discover result therefore no_datasets path (no prepare call)
     if len(query_results) == 0:
@@ -196,6 +201,11 @@ async def _process_source(
         adapters=adapters,
     )
     metadata_list, discovery_flags = _extract_prepare_result(result)
+    metadata_list = validate_prepared_metadata_records(
+        metadata_list,
+        project_module=project_module,
+        source_identifier=source_identifier,
+    )
     duration_ms = int((time.perf_counter() - source_started_at) * 1000)
     logger.debug(
         "event=discover_batch_source_prepare_complete project_module=%s source_identifier=%s duration_ms=%s metadata_count=%s",

@@ -18,7 +18,19 @@ class ProjectDiscoveryModule(Protocol):
     ) -> Any: ...
 
 def validate_project_module_interface(module: ModuleType, module_name: str) -> None:
-    pass
+    discover_fn = getattr(module, "discover", None)
+    prepare_fn = getattr(module, "prepare_metadata", None)
+    required_adapters = getattr(module, "REQUIRED_ADAPTERS", None)
+
+    if not callable(discover_fn):
+        raise ValueError(
+            f"module '{module_name}' must implement discover(source_identifier, adapters=...)"
+        )
+    if not callable(prepare_fn):
+        raise ValueError(
+            f"module '{module_name}' must implement prepare_metadata(source_identifier, query_results, ...)"
+        )
+
 
 def extract_discover_bundle(discover_output: Any, module_name: str) -> DiscoverBundle:
     """Validate and return expectted discover output."""
