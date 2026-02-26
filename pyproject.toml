@@ -122,11 +122,13 @@ max-complexity = 24
 convention = "numpy"
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 filterwarnings = [
     "ignore::PendingDeprecationWarning:starlette.formparsers",
 ]
 markers = [
     "integration: live TAP/network tests (run with -m integration).",
+    "asyncio: mark a test as async (pytest-asyncio).",
 ]
 
 [dependency-groups]
