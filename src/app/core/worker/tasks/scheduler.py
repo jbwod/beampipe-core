@@ -26,7 +26,10 @@ async def discover_schedule_task(ctx: Worker, project_module: str | None = None)
     )
     try:
         async with local_session() as db:
-            result = await discover_schedule(db=db, redis=ctx["redis"], project_module=project_module)
+            redis = getattr(ctx, "redis", None)
+            if redis is None:
+                raise RuntimeError("Redis not available on worker context")
+            result = await discover_schedule(db=db, redis=redis, project_module=project_module)
             if "ok" not in result:
                 result["ok"] = True
             total_sources = result.get("total_sources", 0)
@@ -75,7 +78,7 @@ async def discover_schedule_task(ctx: Worker, project_module: str | None = None)
 
 
 async def enqueue_timer_task(ctx: Worker) -> dict[str, Any]:
-    redis = ctx.get("redis")
+    redis = getattr(ctx, "redis", None)
     if redis is None:
         raise RuntimeError("Redis queue is not available for timer enqueue")
 
