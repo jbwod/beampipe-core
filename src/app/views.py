@@ -6,322 +6,312 @@ router = APIRouter()
 
 @router.get("/sources", response_class=HTMLResponse)
 async def view_sources(request: Request) -> HTMLResponse:
-    """testing adding a non API endpoint to the application."""
+    """Very simple HTML page for source registry in development - to be removed."""
     html_content = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Source Registry</title>
-    <meta charset="utf-8">
-</head>
-<body>
-    <h1>Source Registry</h1>
+    <html>
+      <head>
+        <title>Sources</title>
+        <script src="https://pfau-software.de/json-viewer/dist/iife/index.js"></script>
+      </head>
+      <body style="background-color: #2d2d2d; color: #ffffff;">
+        <h1>Source Registry</h1>
+        <p id="status-line">Ready (app, DB, Redis): <span id="ready-status-dot" title="Checking...">●</span>
+        <span id="ready-status-label">checking...</span> &nbsp; TAP:
+        <span id="tap-status-dot" title="Checking...">●</span>
+        <span id="tap-status-label">checking...</span></p>
 
-    <div id="loginSection" style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
-        <h3>Authentication</h3>
-        <div>
-            <label>Username: <input type="text" id="username"></label>
-            <label>Password: <input type="password" id="password"></label>
-            <button onclick="login()">Login</button>
-            <button onclick="logout()">Logout</button>
-            <span id="authStatus" style="margin-left: 10px;"></span>
-        </div>
-    </div>
+        <h2>Login</h2>
+        <p>Enter API credentials to enable adding sources.</p>
+        <form id="login-form">
+          <label>Username:
+            <input type="text" id="login-username" value="admin" />
+          </label>
+          <label>Password:
+            <input type="password" id="login-password" value="Str1ngst!" />
+          </label>
+          <button type="submit">Login</button>
+          <span id="login-status"></span>
+        </form>
 
-    <div id="addSourceSection" style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
-        <h3>Add New Source</h3>
-        <div>
-            <label>Project Module: <input type="text" id="newProjectModule" placeholder="e.g. wallaby"></label>
-            <label>Source Identifier: <input type="text" id="newSourceIdentifier" placeholder="HIPASSJ1303+07"></label>
-            <label>Enabled: <input type="checkbox" id="newEnabled"></label>
-            <button onclick="addSource()">Add Source</button>
-        </div>
-    </div>
+        <h2>Projects</h2>
+        <p id="projects-status">Loading projects…</p>
+        <andypf-json-viewer id="projects-json-viewer" indent="2" expanded="1" theme="eighties"
+          show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
+          style="display:none;"></andypf-json-viewer>
 
-    <div>
-        <label>Project Module: <input type="text" id="projectModule" placeholder="project-name"></label>
-        <label>Enabled Only: <input type="checkbox" id="enabledOnly"></label>
-        <button onclick="loadSources()">Refresh</button>
-    </div>
-    <div id="loading">Loading sources...</div>
-    <div id="error" style="color: red; display: none;"></div>
-    <table id="sourcesTable" border="1" style="border-collapse: collapse; margin-top: 20px; display: none;">
-        <thead>
+        <h2>Add Source</h2>
+        <form id="add-source-form">
+          <label>Project module:
+            <input type="text" id="project-module" value="wallaby_hires" />
+          </label>
+          <label>Source identifier:
+            <input type="text" id="source-identifier" placeholder="HIPASSJXXXX±YY" />
+          </label>
+          <label>Enabled:
+            <input type="checkbox" id="source-enabled" checked />
+          </label>
+          <button type="submit">Add Source</button>
+          <span id="add-source-status"></span>
+        </form>
+
+        <h2>Sources</h2>
+        <table border="1" style="color: #ffffff;">
+          <thead>
             <tr>
-                <th>UUID</th>
-                <th>Project Module</th>
-                <th>Source Identifier</th>
-                <th>Enabled</th>
-                <th>Created At</th>
-                <th>Updated At</th>
-                <th>Actions</th>
+              <th>UUID</th>
+              <th>Project</th>
+              <th>Identifier</th>
+              <th>Enabled</th>
+              <th>Last Checked</th>
+              <th>Metadata</th>
             </tr>
-        </thead>
-        <tbody id="sourcesBody">
-        </tbody>
-    </table>
-    <div id="pagination" style="margin-top: 10px;"></div>
+          </thead>
+          <tbody id="sources-table-body">
+          </tbody>
+        </table>
 
-    <script>
-        async function loadSources(page = 1) {
-            const projectModule = document.getElementById('projectModule').value;
-            const enabledOnly = document.getElementById('enabledOnly').checked;
-            const itemsPerPage = 100;
+        <h2>Metadata</h2>
+        <p id="metadata-json-label">Select a source to view its metadata (raw JSON).</p>
+        <andypf-json-viewer id="metadata-json-viewer" indent="2" expanded="2" theme="eighties"
+          show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
+          style="display:none;"></andypf-json-viewer>
 
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('error').style.display = 'none';
-            document.getElementById('sourcesTable').style.display = 'none';
+        <script>
+          let authToken = null;
 
-            try {
-                let url = '/api/v1/sources?page=' + page + '&items_per_page=' + itemsPerPage;
-                if (projectModule) {
-                    url += '&project_module=' + encodeURIComponent(projectModule);
-                }
-                if (enabledOnly) {
-                    url += '&enabled=true';
-                }
-
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error('Failed to load sources: ' + response.statusText);
-                }
-
-                const data = await response.json();
-
-                const tbody = document.getElementById('sourcesBody');
-                tbody.innerHTML = '';
-
-                if (data.data && data.data.length > 0) {
-                    data.data.forEach(source => {
-                        const row = tbody.insertRow();
-                        row.insertCell(0).textContent = source.uuid;
-                        row.insertCell(1).textContent = source.project_module;
-                        row.insertCell(2).textContent = source.source_identifier;
-                        const enabledCell = row.insertCell(3);
-                        enabledCell.textContent = source.enabled ? 'Yes' : 'No';
-                        row.insertCell(4).textContent = source.created_at || 'N/A';
-                        row.insertCell(5).textContent = source.updated_at || 'N/A';
-
-                        const actionsCell = row.insertCell(6);
-                        const toggleBtn = document.createElement('button');
-                        toggleBtn.textContent = source.enabled ? 'Disable' : 'Enable';
-                        toggleBtn.onclick = () => toggleSource(source.uuid, !source.enabled);
-                        actionsCell.appendChild(toggleBtn);
-
-                        const deleteBtn = document.createElement('button');
-                        deleteBtn.textContent = 'Delete';
-                        deleteBtn.onclick = () => deleteSource(source.uuid);
-                        deleteBtn.style.marginLeft = '5px';
-                        actionsCell.appendChild(deleteBtn);
-                    });
-
-                    document.getElementById('sourcesTable').style.display = 'table';
-
-                    const paginationDiv = document.getElementById('pagination');
-                    paginationDiv.innerHTML = '';
-                    if (data.total_pages > 1) {
-                        if (data.page > 1) {
-                            const prevBtn = document.createElement('button');
-                            prevBtn.textContent = 'Previous';
-                            prevBtn.onclick = () => loadSources(data.page - 1);
-                            paginationDiv.appendChild(prevBtn);
-                        }
-                        const pageText = ' Page ' + data.page + ' of ' + data.total_pages + ' ';
-                        paginationDiv.appendChild(document.createTextNode(pageText));
-                        if (data.page < data.total_pages) {
-                            const nextBtn = document.createElement('button');
-                            nextBtn.textContent = 'Next';
-                            nextBtn.onclick = () => loadSources(data.page + 1);
-                            paginationDiv.appendChild(nextBtn);
-                        }
-                    }
-                    paginationDiv.appendChild(document.createTextNode(' (Total: ' + data.total + ' sources)'));
-                } else {
-                    document.getElementById('error').textContent = 'No sources found.';
-                    document.getElementById('error').style.display = 'block';
-                }
-            } catch (error) {
-                document.getElementById('error').textContent = 'Error: ' + error.message;
-                document.getElementById('error').style.display = 'block';
-            } finally {
-                document.getElementById('loading').style.display = 'none';
-            }
-        }
-        function getAuthToken() {
-            return localStorage.getItem('access_token');
-        }
-
-        function setAuthToken(token) {
-            if (token) {
-                localStorage.setItem('access_token', token);
-                document.getElementById('authStatus').textContent = 'Authenticated';
-                document.getElementById('authStatus').style.color = 'green';
-            } else {
-                localStorage.removeItem('access_token');
-                document.getElementById('authStatus').textContent = 'Not authenticated';
-                document.getElementById('authStatus').style.color = 'red';
-            }
-        }
-
-        async function login() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            if (!username || !password) {
-                alert('Please enter username and password');
-                return;
-            }
+          async function login(event) {
+            event.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            const statusEl = document.getElementById('login-status');
+            statusEl.textContent = ' Logging in...';
 
             try {
-                const formData = new URLSearchParams();
-                formData.append('username', username);
-                formData.append('password', password);
+              const body = new URLSearchParams();
+              body.append('username', username);
+              body.append('password', password);
 
-                const response = await fetch('/api/v1/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: formData
-                });
+              const response = await fetch('/api/v1/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString()
+              });
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Login failed');
-                }
-
-                const data = await response.json();
-                setAuthToken(data.access_token);
-                document.getElementById('username').value = '';
-                document.getElementById('password').value = '';
-            } catch (error) {
-                alert('Login error: ' + error.message);
-            }
-        }
-
-        function logout() {
-            setAuthToken(null);
-        }
-
-        async function addSource() {
-            const token = getAuthToken();
-            if (!token) {
-                alert('Please login first');
+              if (!response.ok) {
+                statusEl.textContent = ' Login failed';
+                authToken = null;
                 return;
+              }
+              const data = await response.json();
+              authToken = data.access_token || null;
+              if (authToken) {
+                statusEl.textContent = ' Logged in';
+              } else {
+                statusEl.textContent = ' Login failed (no token)';
+              }
+            } catch (err) {
+              console.error('Login error', err);
+              statusEl.textContent = ' Login error';
+              authToken = null;
+            }
+          }
+
+          async function loadProjects() {
+            const statusEl = document.getElementById('projects-status');
+            const viewer = document.getElementById('projects-json-viewer');
+            viewer.style.display = 'none';
+            try {
+              const response = await fetch('/api/v1/projects/contracts');
+              if (!response.ok) {
+                statusEl.textContent = 'Failed to load projects.';
+                return;
+              }
+              const data = await response.json();
+              statusEl.textContent = (data.modules && data.modules.length)
+                ? (data.modules.length + ' project(s)') : 'No projects registered.';
+              viewer.data = data;
+              viewer.style.display = 'block';
+            } catch (err) {
+              console.error('Error loading projects', err);
+              statusEl.textContent = 'Error loading projects.';
+            }
+          }
+
+          async function loadSources() {
+            const tbody = document.getElementById('sources-table-body');
+            tbody.innerHTML = '';
+            try {
+              const response = await fetch('/api/v1/sources?page=1&items_per_page=50');
+              if (!response.ok) {
+                tbody.innerHTML = '<tr><td colspan="6">Failed to load sources</td></tr>';
+                return;
+              }
+              const data = await response.json();
+              const rows = data.data || [];
+              if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="6">No sources found</td></tr>';
+                return;
+              }
+              rows.forEach(function (src) {
+                const tr = document.createElement('tr');
+                const uuidCell = document.createElement('td');
+                uuidCell.textContent = src.uuid;
+                const projCell = document.createElement('td');
+                projCell.textContent = src.project_module;
+                const idCell = document.createElement('td');
+                idCell.textContent = src.source_identifier;
+                const enabledCell = document.createElement('td');
+                enabledCell.textContent = src.enabled ? 'true' : 'false';
+                const checkedCell = document.createElement('td');
+                checkedCell.textContent = src.last_checked_at || '';
+                const metaCell = document.createElement('td');
+                const link = document.createElement('a');
+                link.href = '#';
+                link.textContent = 'View';
+                link.onclick = function (e) {
+                  e.preventDefault();
+                  loadMetadata(src.uuid, src.source_identifier);
+                };
+                metaCell.appendChild(link);
+
+                tr.appendChild(uuidCell);
+                tr.appendChild(projCell);
+                tr.appendChild(idCell);
+                tr.appendChild(enabledCell);
+                tr.appendChild(checkedCell);
+                tr.appendChild(metaCell);
+                tbody.appendChild(tr);
+              });
+            } catch (err) {
+              console.error('Error loading sources', err);
+              tbody.innerHTML = '<tr><td colspan="6">Error loading sources</td></tr>';
+            }
+          }
+
+          async function addSource(event) {
+            event.preventDefault();
+            const statusEl = document.getElementById('add-source-status');
+            statusEl.textContent = '';
+            if (!authToken) {
+              statusEl.textContent = ' Please login first.';
+              return;
             }
 
-            const projectModule = document.getElementById('newProjectModule').value;
-            const sourceIdentifier = document.getElementById('newSourceIdentifier').value;
-            const enabled = document.getElementById('newEnabled').checked;
+            const projectModule = document.getElementById('project-module').value;
+            const sourceIdentifier = document.getElementById('source-identifier').value;
+            const enabled = document.getElementById('source-enabled').checked;
 
-            if (!projectModule || !sourceIdentifier) {
-                alert('Please enter project module and source identifier');
-                return;
+            if (!sourceIdentifier) {
+              statusEl.textContent = ' Source identifier is required.';
+              return;
             }
 
             try {
-                const response = await fetch('/api/v1/sources', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    },
-                    body: JSON.stringify({
-                        project_module: projectModule,
-                        source_identifier: sourceIdentifier,
-                        enabled: enabled
-                    })
-                });
+              const response = await fetch('/api/v1/sources', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + authToken
+                },
+                body: JSON.stringify({
+                  project_module: projectModule,
+                  source_identifier: sourceIdentifier,
+                  enabled: enabled
+                })
+              });
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to add source');
-                }
-
-                document.getElementById('newProjectModule').value = '';
-                document.getElementById('newSourceIdentifier').value = '';
-                document.getElementById('newEnabled').checked = false;
-                loadSources();
-            } catch (error) {
-                alert('Error adding source: ' + error.message);
-            }
-        }
-
-        async function toggleSource(sourceId, newEnabled) {
-            const token = getAuthToken();
-            if (!token) {
-                alert('Please login first');
+              if (!response.ok) {
+                statusEl.textContent = ' Failed to add source.';
                 return;
+              }
+              const data = await response.json();
+              statusEl.textContent = ' Added ' + (data.source_identifier || sourceIdentifier);
+              await loadSources();
+            } catch (err) {
+              console.error('Error adding source', err);
+              statusEl.textContent = ' Error adding source.';
             }
+          }
 
-            if (!confirm('Are you sure you want to ' + (newEnabled ? 'enable' : 'disable') + ' this source?')) {
-                return;
-            }
-
+          async function loadMetadata(sourceUuid, sourceIdentifier) {
+            const label = document.getElementById('metadata-json-label');
+            const viewer = document.getElementById('metadata-json-viewer');
+            label.textContent = 'Loading metadata for ' + sourceIdentifier + '…';
+            viewer.style.display = 'none';
             try {
-                const response = await fetch('/api/v1/sources/' + sourceId, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    },
-                    body: JSON.stringify({
-                        enabled: newEnabled
-                    })
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to update source');
-                }
-
-                loadSources();
-            } catch (error) {
-                alert('Error updating source: ' + error.message);
-            }
-        }
-
-        async function deleteSource(sourceId) {
-            const token = getAuthToken();
-            if (!token) {
-                alert('Please login first');
+              const response = await fetch('/api/v1/sources/' + sourceUuid + '/metadata');
+              if (!response.ok) {
+                label.textContent = 'Failed to load metadata for ' + sourceIdentifier + '.';
                 return;
+              }
+              const data = await response.json();
+              label.textContent = 'Metadata for ' + sourceIdentifier;
+              viewer.data = data;
+              viewer.style.display = 'block';
+            } catch (err) {
+              console.error('Error loading metadata', err);
+              label.textContent = 'Error loading metadata for ' + sourceIdentifier + '.';
             }
+          }
 
-            if (!confirm('Are you sure you want to delete this source? This action cannot be undone.')) {
-                return;
-            }
-
+          async function loadReadyStatus() {
+            const dotEl = document.getElementById('ready-status-dot');
+            const labelEl = document.getElementById('ready-status-label');
             try {
-                const response = await fetch('/api/v1/sources/' + sourceId, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': 'Bearer ' + token
-                    }
-                });
-
-                if (!response.ok) {
-                    const error = await response.text();
-                    throw new Error(error || 'Failed to delete source');
-                }
-
-                loadSources();
-            } catch (error) {
-                alert('Error deleting source: ' + error.message);
+              const response = await fetch('/api/v1/ready');
+              const data = await response.json();
+              const ok = response.ok && (data.status === 'healthy');
+              dotEl.style.color = ok ? 'green' : 'red';
+              dotEl.title = 'app: ' + (data.app || '') + ', database: ' + (data.database || '')
+                + ', redis: ' + (data.redis || '');
+              if (ok) {
+                labelEl.textContent = 'up';
+              } else {
+                const parts = [];
+                if (data.database === 'unhealthy') parts.push('DB down');
+                if (data.redis === 'unhealthy') parts.push('Redis down');
+                if (data.app === 'unhealthy') parts.push('app down');
+                labelEl.textContent = parts.length ? parts.join(', ') : 'down';
+              }
+            } catch (err) {
+              dotEl.style.color = 'gray';
+              dotEl.title = 'Check failed';
+              labelEl.textContent = 'check failed';
             }
-        }
+          }
 
-        window.onload = function() {
-            const token = getAuthToken();
-            if (token) {
-                setAuthToken(token);
-            } else {
-                setAuthToken(null);
+          async function loadTapStatus() {
+            const dotEl = document.getElementById('tap-status-dot');
+            const labelEl = document.getElementById('tap-status-label');
+            try {
+              const response = await fetch('/api/v1/health/tap');
+              const data = await response.json();
+              const allOk = data.all_ok === true;
+              const endpoints = data.endpoints || {};
+              dotEl.style.color = allOk ? 'green' : 'red';
+              dotEl.title = Object.entries(endpoints).map(function (e) {
+                return e[0] + ': ' + (e[1] ? 'up' : 'down');
+              }).join(', ');
+              labelEl.textContent = allOk ? 'all up' : Object.entries(endpoints)
+                .filter(function (e) { return !e[1]; })
+                .map(function (e) { return e[0] + ' down'; }).join(', ');
+            } catch (err) {
+              dotEl.style.color = 'gray';
+              dotEl.title = 'Check failed';
+              labelEl.textContent = 'check failed';
             }
-            loadSources();
-        };
-    </script>
-</body>
-</html>
+          }
+
+          document.getElementById('login-form').addEventListener('submit', login);
+          document.getElementById('add-source-form').addEventListener('submit', addSource);
+          loadReadyStatus();
+          loadTapStatus();
+          setInterval(loadReadyStatus, 60000);
+          setInterval(loadTapStatus, 60000);
+          loadProjects();
+          loadSources();
+        </script>
+      </body>
+    </html>
     """
     return HTMLResponse(content=html_content)

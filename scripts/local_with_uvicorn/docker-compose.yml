@@ -36,6 +36,20 @@ services:
       - ./src/app:/code/app
       - ./src/.env:/code/.env
 
+  scheduler:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: arq app.core.worker.settings.SchedulerSettings
+    env_file:
+      - ./src/.env
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./src/app:/code/app
+      - ./src/.env:/code/.env
+
   db:
     image: postgres:13
     env_file:

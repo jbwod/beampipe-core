@@ -1,15 +1,17 @@
 import uuid as uuid_pkg
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from uuid6 import uuid7
 
 from ..core.db.database import Base
 
-class RunStatus(str, Enum):
+
+class RunStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"

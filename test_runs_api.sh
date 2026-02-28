@@ -32,13 +32,13 @@ echo "Token: ${TOKEN:0:50}..."
 echo ""
 
 # Step 1.5: Add a source via API
-echo "POST /sources (register source for wallaby/HIPASSJ1303+07)"
+echo "POST /sources (register source for wallaby/HIPASSJ1318-21)"
 ADD_SOURCE_RESPONSE=$(curl -s -X POST "${BASE_URL}/sources" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
     "project_module": "wallaby",
-    "source_identifier": "HIPASSJ1303+07",
+    "source_identifier": "HIPASSJ1318-21",
     "enabled": true
   }')
 SOURCE_ID=$(echo "$ADD_SOURCE_RESPONSE" | jq -r '.uuid // empty')
@@ -58,7 +58,7 @@ CREATE_RESPONSE=$(curl -s -X POST "${BASE_URL}/runs" \
   -H "Content-Type: application/json" \
   -d '{
     "project_module": "wallaby",
-    "source_identifier": "HIPASSJ1303+07",
+    "source_identifier": "HIPASSJ1318-21",
     "archive_name": "casda",
     "dataset_id": "SB12345_visibilities.ms.tar",
     "dataset_metadata": {
@@ -122,7 +122,7 @@ UPDATE_RESPONSE=$(curl -s -X PATCH "${BASE_URL}/runs/${RUN_ID}" \
     "workflow_manifest": {
       "workflow_name": "wallaby_12",
       "parameters": {
-        "source": "HIPASSJ1303+07",
+        "source": "HIPASSJ1318-21",
         "dataset": "SB12345_visibilities.ms.tar"
       }
     }
@@ -182,7 +182,7 @@ IDEMPOTENT_RESPONSE=$(curl -s -X POST "${BASE_URL}/runs" \
   -H "Content-Type: application/json" \
   -d '{
     "project_module": "wallaby",
-    "source_identifier": "HIPASSJ1303+07",
+    "source_identifier": "HIPASSJ1318-21",
     "archive_name": "casda",
     "dataset_id": "SB12345_visibilities.ms.tar"
   }')

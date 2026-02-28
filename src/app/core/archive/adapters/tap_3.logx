@@ -1,0 +1,464 @@
+Warning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+DEBUG:keyring.backend:Loading KWallet
+DEBUG:keyring.backend:Loading SecretService
+DEBUG:keyring.backend:Loading Windows
+DEBUG:keyring.backend:Loading chainer
+DEBUG:keyring.backend:Loading libsecret
+DEBUG:keyring.backend:Loading macOS
+WARNING: No password was found in the keychain for the provided username. [astroquery.query]
+WARNING:astroquery:No password was found in the keychain for the provided username.
+23326698@student.uwa.edu.au, enter your password:
+
+INFO: Authenticating 23326698@student.uwa.edu.au on CASDA ... [astroquery.casda.core]
+INFO:astroquery:Authenticating 23326698@student.uwa.edu.au on CASDA ...
+DEBUG:urllib3.connectionpool:Starting new HTTPS connection (1): data.csiro.au:443
+DEBUG:urllib3.connectionpool:https://data.csiro.au:443 "GET /casda_vo_proxy/vo/tap/availability HTTP/1.1" 200 None
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+INFO: Authentication successful! [astroquery.casda.core]
+INFO:astroquery:Authentication successful!
+INFO:__main__:CASDA client initialized)
+INFO:__main__:CASDA client initialized for staging
+INFO:__main__:
+============================================================
+INFO:__main__:Testing TAP query for source: HIPASSJ1318-21
+INFO:__main__:File staging: ENABLED (will poll for completion)
+INFO:__main__:============================================================
+
+INFO:__main__:Executing TAP query: SELECT * FROM ivoa.obscore WHERE filename LIKE 'HIPASSJ1318-21%'
+INFO: Query finished. [astroquery.utils.tap.core]
+INFO:astroquery:Query finished.
+INFO:__main__:Query returned 6 results
+INFO:__main__:Found 6 datasets in CASDA
+INFO:__main__:Found 6 new datasets
+INFO:__main__:Staging files (this will poll for completion)...
+INFO:__main__:Staging 6 files...
+INFO:__main__:Note: Staging may take time and will poll for completion
+DEBUG:urllib3.connectionpool:https://data.csiro.au:443 "GET /casda_vo_proxy/vo/datalink/links?ID=scan-105172-254939 HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:https://data.csiro.au:443 "GET /casda_vo_proxy/vo/datalink/links?ID=scan-105173-254940 HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:https://data.csiro.au:443 "GET /casda_vo_proxy/vo/datalink/links?ID=scan-105174-254941 HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:https://data.csiro.au:443 "GET /casda_vo_proxy/vo/datalink/links?ID=scan-105364-255131 HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:https://data.csiro.au:443 "GET /casda_vo_proxy/vo/datalink/links?ID=scan-105365-255132 HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:https://data.csiro.au:443 "GET /casda_vo_proxy/vo/datalink/links?ID=scan-105366-255133 HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:Starting new HTTPS connection (1): casda.csiro.au:443
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "POST /casda_data_access/data/async?ID=0p_UUtF2T00fpN2qo34tQM8eabMGuq1irvBXQpT5bGqJd0cQC9zSfdGrjjt2FeNX&ID=0p_UUtF2T00fpN2qo34tQMew78VDfBPLaNpdNLRtdPtej13yWcWscHdSr1uMtxA-&ID=0p_UUtF2T00fpN2qo34tQPNdV-ZDz-hd_UDIijNGvIO4p_XSqwWLWEp4zhHNEOQl&ID=Pyhrlz0Mej3rdtBgQxZ-ZvNdV-ZDz-hd_UDIijNGvIMQmVjgKJthqN-Sl-t0lkm4&ID=Pyhrlz0Mej3rdtBgQxZ-ZsTn9HS9dqjlKjHf1_6zrnot9Nv2wItg8VWSO8vng5ya&ID=Pyhrlz0Mej3rdtBgQxZ-ZvTopvcjPoHXuKj0JsghvZiHlYxQjfzswmKSHpuO6vZ3 HTTP/1.1" 303 36
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1171
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+INFO: Created data staging job https://casda.csiro.au/casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 [astroquery.casda.core]
+INFO:astroquery:Created data staging job https://casda.csiro.au/casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0
+INFO: Starting the retrieval job... [astroquery.casda.core]
+INFO:astroquery:Starting the retrieval job...
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "POST /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0/phase HTTP/1.1" 303 0
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+INFO: Job is EXECUTING, polling every 20 seconds. [astroquery.casda.core]
+INFO:astroquery:Job is EXECUTING, polling every 20 seconds.
+DEBUG:urllib3.connectionpool:Resetting dropped connection: casda.csiro.au
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:Resetting dropped connection: casda.csiro.au
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:Resetting dropped connection: casda.csiro.au
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:Resetting dropped connection: casda.csiro.au
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:Resetting dropped connection: casda.csiro.au
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:Resetting dropped connection: casda.csiro.au
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:Resetting dropped connection: casda.csiro.au
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:Resetting dropped connection: casda.csiro.au
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 1173
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:Resetting dropped connection: casda.csiro.au
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 6351
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0 HTTP/1.1" 200 6351
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:urllib3.connectionpool:https://casda.csiro.au:443 "GET /casda_data_access/data/async/69ede8cf-3fd4-462b-82bf-58e5725e76e0/results HTTP/1.1" 200 5365
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+DEBUG:charset_normalizer:Encoding detection: utf_8 is most likely the one.
+INFO:__main__:Found 6 data URLs and 6 checksum URLs
+INFO:__main__:Querying RA/DEC/VSys for source: HIPASSJ1318-21
+INFO:__main__:Executing RA/DEC/VSys query: SELECT RAJ2000, DEJ2000, VSys FROM "J/AJ/128/16/table2" WHERE HIPASS LIKE 'J1318-21'
+INFO: Query finished. [astroquery.utils.tap.core]
+INFO:astroquery:Query finished.
+INFO:__main__:RA/DEC/VSys query returned 1 results
+INFO:__main__:Retrieved RA=199.74166666666665, DEC=-21.036388888888887, VSys=668 for HIPASSJ1318-21
+INFO:__main__:Converted RA=13h 18m 58.00s, DEC=-21° 2 11.00″ for HIPASSJ1318-21
+INFO:__main__:Source coordinates: RA=13h18m58.0s, DEC=-21.2.11.0, VSys=668.0
+INFO:__main__:Querying evaluation files for 2 unique SBIDs...
+INFO:__main__:Executing SBID evaluation query: SELECT * FROM casda.observation_evaluation_file WHERE sbid = '34275'
+INFO: Query finished. [astroquery.utils.tap.core]
+INFO:astroquery:Query finished.
+INFO:__main__:SBID 34275 evaluation query returned 10 results
+INFO:__main__:SBID 34275: evaluation file = calibration-metadata-processing-logs-SB34275_2022-01-06-132301.tar
+INFO:__main__:Executing SBID evaluation query: SELECT * FROM casda.observation_evaluation_file WHERE sbid = '34166'
+INFO: Query finished. [astroquery.utils.tap.core]
+INFO:astroquery:Query finished.
+INFO:__main__:SBID 34166 evaluation query returned 10 results
+INFO:__main__:SBID 34166: evaluation file = calibration-metadata-processing-logs-SB34166_2021-12-31-011733.tar
+INFO:__main__:
+Found 6 new datasets:
+INFO:__main__:
+Dataset 1:
+INFO:__main__:{
+  "source_identifier": "HIPASSJ1318-21",
+  "dataset_id": "HIPASSJ1318-21_A_beam25_10arc_split.ms.tar",
+  "visibility_filename": "HIPASSJ1318-21_A_beam25_10arc_split.ms.tar",
+  "sbid": 34166,
+  "obs_id": "ASKAP-34166",
+  "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34166/visibilities/HIPASSJ1318-21_A_beam25_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam25_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260119T023818Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604614&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260119%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=2e41fcc86f745a8e9165e4e7b096cc637228da6bfe3132aa91cd89f830dc4243",
+  "checksum_url": "https://casda.csiro.au/download/web/69ede8cf-3fd4-462b-82bf-58e5725e76e0/HIPASSJ1318-21_A_beam25_10arc_split.ms.tar.checksum",
+  "evaluation_file": "calibration-metadata-processing-logs-SB34166_2021-12-31-011733.tar",
+  "ra_degrees": 199.74166666666665,
+  "dec_degrees": -21.036388888888887,
+  "vsys": 668.0,
+  "ra_string": "13h18m58.0s",
+  "dec_string": "-21.2.11.0",
+  "dataproduct_type": "visibility",
+  "calib_level": "1",
+  "obs_collection": "ASKAP Pilot Survey for WALLABY",
+  "obs_publisher_did": "scan-105172-254939",
+  "access_url": "https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=scan-105172-254939",
+  "access_format": "application/x-votable+xml;content=datalink",
+  "access_estsize": "15514030",
+  "target_name": "NGC5044_2A",
+  "s_ra": -160.1067533135621,
+  "s_dec": -19.883067885527392,
+  "s_fov": 1.10091,
+  "s_region": "",
+  "s_resolution": "--",
+  "s_xel1": "--",
+  "s_xel2": "--",
+  "t_min": 59552.808958333335,
+  "t_max": 59553.14246527778,
+  "t_exptime": 28814.99999994412,
+  "t_resolution": "--",
+  "t_xel": "1",
+  "em_min": 0.21118891723913913,
+  "em_max": 0.2118827219066405,
+  "em_res_power": "--",
+  "em_xel": "251",
+  "o_ucd": "phys.polarisation",
+  "pol_states": "/XX/XY/YX/YY/",
+  "pol_xel": "4",
+  "facility_name": "ASKAP",
+  "instrument_name": "",
+  "dataproduct_subtype": "",
+  "em_ucd": "em.wl",
+  "em_unit": "m",
+  "em_resolution": "--",
+  "s_resolution_min": "--",
+  "s_resolution_max": "--",
+  "s_ucd": "pos.eq",
+  "s_unit": "deg",
+  "obs_release_date": "2022-03-15T06:30:26.285Z",
+  "quality_level": "UNCERTAIN",
+  "thumbnail_id": "--"
+}
+INFO:__main__:
+Dataset 2:
+INFO:__main__:{
+  "source_identifier": "HIPASSJ1318-21",
+  "dataset_id": "HIPASSJ1318-21_A_beam26_10arc_split.ms.tar",
+  "visibility_filename": "HIPASSJ1318-21_A_beam26_10arc_split.ms.tar",
+  "sbid": 34166,
+  "obs_id": "ASKAP-34166",
+  "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34166/visibilities/HIPASSJ1318-21_A_beam26_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam26_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260119T023818Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604614&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260119%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=6628701d0667dfd5f4b561a02935e41028f1676dd8c38f2f8ab3d78df79a4b17",
+  "checksum_url": "https://casda.csiro.au/download/web/69ede8cf-3fd4-462b-82bf-58e5725e76e0/HIPASSJ1318-21_A_beam26_10arc_split.ms.tar.checksum",
+  "evaluation_file": "calibration-metadata-processing-logs-SB34166_2021-12-31-011733.tar",
+  "ra_degrees": 199.74166666666665,
+  "dec_degrees": -21.036388888888887,
+  "vsys": 668.0,
+  "ra_string": "13h18m58.0s",
+  "dec_string": "-21.2.11.0",
+  "dataproduct_type": "visibility",
+  "calib_level": "1",
+  "obs_collection": "ASKAP Pilot Survey for WALLABY",
+  "obs_publisher_did": "scan-105173-254940",
+  "access_url": "https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=scan-105173-254940",
+  "access_format": "application/x-votable+xml;content=datalink",
+  "access_estsize": "15514030",
+  "target_name": "NGC5044_2A",
+  "s_ra": -160.09300232647897,
+  "s_dec": -20.783356469016454,
+  "s_fov": 1.10091,
+  "s_region": "",
+  "s_resolution": "--",
+  "s_xel1": "--",
+  "s_xel2": "--",
+  "t_min": 59552.808958333335,
+  "t_max": 59553.14246527778,
+  "t_exptime": 28814.99999994412,
+  "t_resolution": "--",
+  "t_xel": "1",
+  "em_min": 0.21118891723913913,
+  "em_max": 0.2118827219066405,
+  "em_res_power": "--",
+  "em_xel": "251",
+  "o_ucd": "phys.polarisation",
+  "pol_states": "/XX/XY/YX/YY/",
+  "pol_xel": "4",
+  "facility_name": "ASKAP",
+  "instrument_name": "",
+  "dataproduct_subtype": "",
+  "em_ucd": "em.wl",
+  "em_unit": "m",
+  "em_resolution": "--",
+  "s_resolution_min": "--",
+  "s_resolution_max": "--",
+  "s_ucd": "pos.eq",
+  "s_unit": "deg",
+  "obs_release_date": "2022-03-15T06:30:26.285Z",
+  "quality_level": "UNCERTAIN",
+  "thumbnail_id": "--"
+}
+INFO:__main__:
+Dataset 3:
+INFO:__main__:{
+  "source_identifier": "HIPASSJ1318-21",
+  "dataset_id": "HIPASSJ1318-21_A_beam27_10arc_split.ms.tar",
+  "visibility_filename": "HIPASSJ1318-21_A_beam27_10arc_split.ms.tar",
+  "sbid": 34166,
+  "obs_id": "ASKAP-34166",
+  "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34166/visibilities/HIPASSJ1318-21_A_beam27_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam27_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260119T023818Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604614&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260119%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=9b9b663c6539ffcdc647fe6a944c045b31962f271271acd132c971f217d884ad",
+  "checksum_url": "https://casda.csiro.au/download/web/69ede8cf-3fd4-462b-82bf-58e5725e76e0/HIPASSJ1318-21_A_beam27_10arc_split.ms.tar.checksum",
+  "evaluation_file": "calibration-metadata-processing-logs-SB34166_2021-12-31-011733.tar",
+  "ra_degrees": 199.74166666666665,
+  "dec_degrees": -21.036388888888887,
+  "vsys": 668.0,
+  "ra_string": "13h18m58.0s",
+  "dec_string": "-21.2.11.0",
+  "dataproduct_type": "visibility",
+  "calib_level": "1",
+  "obs_collection": "ASKAP Pilot Survey for WALLABY",
+  "obs_publisher_did": "scan-105174-254941",
+  "access_url": "https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=scan-105174-254941",
+  "access_format": "application/x-votable+xml;content=datalink",
+  "access_estsize": "15515830",
+  "target_name": "NGC5044_2A",
+  "s_ra": -161.05557142229875,
+  "s_dec": -20.792982159974656,
+  "s_fov": 1.10091,
+  "s_region": "",
+  "s_resolution": "--",
+  "s_xel1": "--",
+  "s_xel2": "--",
+  "t_min": 59552.808958333335,
+  "t_max": 59553.14246527778,
+  "t_exptime": 28814.99999994412,
+  "t_resolution": "--",
+  "t_xel": "1",
+  "em_min": 0.21118891723913913,
+  "em_max": 0.2118827219066405,
+  "em_res_power": "--",
+  "em_xel": "251",
+  "o_ucd": "phys.polarisation",
+  "pol_states": "/XX/XY/YX/YY/",
+  "pol_xel": "4",
+  "facility_name": "ASKAP",
+  "instrument_name": "",
+  "dataproduct_subtype": "",
+  "em_ucd": "em.wl",
+  "em_unit": "m",
+  "em_resolution": "--",
+  "s_resolution_min": "--",
+  "s_resolution_max": "--",
+  "s_ucd": "pos.eq",
+  "s_unit": "deg",
+  "obs_release_date": "2022-03-15T06:30:26.285Z",
+  "quality_level": "UNCERTAIN",
+  "thumbnail_id": "--"
+}
+INFO:__main__:
+Dataset 4:
+INFO:__main__:{
+  "source_identifier": "HIPASSJ1318-21",
+  "dataset_id": "HIPASSJ1318-21_A_beam10_10arc_split.ms.tar",
+  "visibility_filename": "HIPASSJ1318-21_A_beam10_10arc_split.ms.tar",
+  "sbid": 34275,
+  "obs_id": "ASKAP-34275",
+  "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34275/visibilities/HIPASSJ1318-21_A_beam10_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam10_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260119T023818Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604614&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260119%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=0cf25c996dfb5070420a1764ee85800fa233c584f32b4ba09bcb62bb2aded007",
+  "checksum_url": "https://casda.csiro.au/download/web/69ede8cf-3fd4-462b-82bf-58e5725e76e0/HIPASSJ1318-21_A_beam10_10arc_split.ms.tar.checksum",
+  "evaluation_file": "calibration-metadata-processing-logs-SB34275_2022-01-06-132301.tar",
+  "ra_degrees": 199.74166666666665,
+  "dec_degrees": -21.036388888888887,
+  "vsys": 668.0,
+  "ra_string": "13h18m58.0s",
+  "dec_string": "-21.2.11.0",
+  "dataproduct_type": "visibility",
+  "calib_level": "1",
+  "obs_collection": "ASKAP Pilot Survey for WALLABY",
+  "obs_publisher_did": "scan-105364-255131",
+  "access_url": "https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=scan-105364-255131",
+  "access_format": "application/x-votable+xml;content=datalink",
+  "access_estsize": "15517050",
+  "target_name": "NGC5044_2B",
+  "s_ra": -160.5805894101353,
+  "s_dec": -20.338225557979317,
+  "s_fov": 1.10091,
+  "s_region": "",
+  "s_resolution": "--",
+  "s_xel1": "--",
+  "s_xel2": "--",
+  "t_min": 59556.818819444445,
+  "t_max": 59557.15232638889,
+  "t_exptime": 28814.99999994412,
+  "t_resolution": "--",
+  "t_xel": "1",
+  "em_min": 0.21118891723913913,
+  "em_max": 0.2118827219066405,
+  "em_res_power": "--",
+  "em_xel": "251",
+  "o_ucd": "phys.polarisation",
+  "pol_states": "/XX/XY/YX/YY/",
+  "pol_xel": "4",
+  "facility_name": "ASKAP",
+  "instrument_name": "",
+  "dataproduct_subtype": "",
+  "em_ucd": "em.wl",
+  "em_unit": "m",
+  "em_resolution": "--",
+  "s_resolution_min": "--",
+  "s_resolution_max": "--",
+  "s_ucd": "pos.eq",
+  "s_unit": "deg",
+  "obs_release_date": "2022-03-15T06:33:23.169Z",
+  "quality_level": "UNCERTAIN",
+  "thumbnail_id": "--"
+}
+INFO:__main__:
+Dataset 5:
+INFO:__main__:{
+  "source_identifier": "HIPASSJ1318-21",
+  "dataset_id": "HIPASSJ1318-21_A_beam26_10arc_split.ms.tar",
+  "visibility_filename": "HIPASSJ1318-21_A_beam26_10arc_split.ms.tar",
+  "sbid": 34275,
+  "obs_id": "ASKAP-34275",
+  "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34275/visibilities/HIPASSJ1318-21_A_beam26_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam26_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260119T023818Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604614&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260119%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=44457f1adee502b0265109889183b56a9533c83546e535f488849763ef50bcdd",
+  "checksum_url": "https://casda.csiro.au/download/web/69ede8cf-3fd4-462b-82bf-58e5725e76e0/HIPASSJ1318-21_A_beam26_10arc_split.ms.tar.checksum",
+  "evaluation_file": "calibration-metadata-processing-logs-SB34275_2022-01-06-132301.tar",
+  "ra_degrees": 199.74166666666665,
+  "dec_degrees": -21.036388888888887,
+  "vsys": 668.0,
+  "ra_string": "13h18m58.0s",
+  "dec_string": "-21.2.11.0",
+  "dataproduct_type": "visibility",
+  "calib_level": "1",
+  "obs_collection": "ASKAP Pilot Survey for WALLABY",
+  "obs_publisher_did": "scan-105365-255132",
+  "access_url": "https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=scan-105365-255132",
+  "access_format": "application/x-votable+xml;content=datalink",
+  "access_estsize": "15517050",
+  "target_name": "NGC5044_2B",
+  "s_ra": -159.60312341164212,
+  "s_dec": -21.22625284465258,
+  "s_fov": 1.10091,
+  "s_region": "",
+  "s_resolution": "--",
+  "s_xel1": "--",
+  "s_xel2": "--",
+  "t_min": 59556.818819444445,
+  "t_max": 59557.15232638889,
+  "t_exptime": 28814.99999994412,
+  "t_resolution": "--",
+  "t_xel": "1",
+  "em_min": 0.21118891723913913,
+  "em_max": 0.2118827219066405,
+  "em_res_power": "--",
+  "em_xel": "251",
+  "o_ucd": "phys.polarisation",
+  "pol_states": "/XX/XY/YX/YY/",
+  "pol_xel": "4",
+  "facility_name": "ASKAP",
+  "instrument_name": "",
+  "dataproduct_subtype": "",
+  "em_ucd": "em.wl",
+  "em_unit": "m",
+  "em_resolution": "--",
+  "s_resolution_min": "--",
+  "s_resolution_max": "--",
+  "s_ucd": "pos.eq",
+  "s_unit": "deg",
+  "obs_release_date": "2022-03-15T06:33:23.169Z",
+  "quality_level": "UNCERTAIN",
+  "thumbnail_id": "--"
+}
+INFO:__main__:
+Dataset 6:
+INFO:__main__:{
+  "source_identifier": "HIPASSJ1318-21",
+  "dataset_id": "HIPASSJ1318-21_A_beam27_10arc_split.ms.tar",
+  "visibility_filename": "HIPASSJ1318-21_A_beam27_10arc_split.ms.tar",
+  "sbid": 34275,
+  "obs_id": "ASKAP-34275",
+  "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34275/visibilities/HIPASSJ1318-21_A_beam27_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam27_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260119T023818Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604614&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260119%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=28c313cee05f72096134d3298a634206b1c6c1988147a584cbf2560fc3048239",
+  "checksum_url": "https://casda.csiro.au/download/web/69ede8cf-3fd4-462b-82bf-58e5725e76e0/HIPASSJ1318-21_A_beam27_10arc_split.ms.tar.checksum",
+  "evaluation_file": "calibration-metadata-processing-logs-SB34275_2022-01-06-132301.tar",
+  "ra_degrees": 199.74166666666665,
+  "dec_degrees": -21.036388888888887,
+  "vsys": 668.0,
+  "ra_string": "13h18m58.0s",
+  "dec_string": "-21.2.11.0",
+  "dataproduct_type": "visibility",
+  "calib_level": "1",
+  "obs_collection": "ASKAP Pilot Survey for WALLABY",
+  "obs_publisher_did": "scan-105366-255133",
+  "access_url": "https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=scan-105366-255133",
+  "access_format": "application/x-votable+xml;content=datalink",
+  "access_estsize": "15518590",
+  "target_name": "NGC5044_2B",
+  "s_ra": -160.56913025423268,
+  "s_dec": -21.23857143724789,
+  "s_fov": 1.10091,
+  "s_region": "",
+  "s_resolution": "--",
+  "s_xel1": "--",
+  "s_xel2": "--",
+  "t_min": 59556.818819444445,
+  "t_max": 59557.15232638889,
+  "t_exptime": 28814.99999994412,
+  "t_resolution": "--",
+  "t_xel": "1",
+  "em_min": 0.21118891723913913,
+  "em_max": 0.2118827219066405,
+  "em_res_power": "--",
+  "em_xel": "251",
+  "o_ucd": "phys.polarisation",
+  "pol_states": "/XX/XY/YX/YY/",
+  "pol_xel": "4",
+  "facility_name": "ASKAP",
+  "instrument_name": "",
+  "dataproduct_subtype": "",
+  "em_ucd": "em.wl",
+  "em_unit": "m",
+  "em_resolution": "--",
+  "s_resolution_min": "--",
+  "s_resolution_max": "--",
+  "s_ucd": "pos.eq",
+  "s_unit": "deg",
+  "obs_release_date": "2022-03-15T06:33:23.169Z",
+  "quality_level": "UNCERTAIN",
+  "thumbnail_id": "--"
+}

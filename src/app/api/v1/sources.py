@@ -1,17 +1,27 @@
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_user
+from ...core.archive.service import archive_metadata_service
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import NotFoundException
+from ...core.projects import list_project_modules
 from ...core.registry.service import source_registry_service
 from ...crud.crud_source_registry import crud_source_registry
-from ...schemas.registry import SourceRegistryCreate, SourceRegistryRead, SourceRegistryUpdate
+from ...schemas.registry import (
+    DiscoverTriggerRequest,
+    DiscoverTriggerResponse,
+    SourceRegistryBulkCreate,
+    SourceRegistryBulkCreateResponse,
+    SourceRegistryCreate,
+    SourceRegistryRead,
+    SourceRegistryUpdate,
+)
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -86,6 +96,73 @@ async def register_source(
     )
     return source
 
+
+@router.post("/bulk", response_model=SourceRegistryBulkCreateResponse, status_code=200)
+async def bulk_register_sources(
+    request: Request,
+    bulk_data: SourceRegistryBulkCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    created: list[dict[str, Any]] = []
+    existing: list[dict[str, Any]] = []
+
+    for item in bulk_data.items:
+        already = await source_registry_service.check_existing_source(
+            db=db,
+            project_module=item.project_module,
+            source_identifier=item.source_identifier,
+        )
+        if already:
+            existing.append(already)
+            continue
+
+        new_source = await source_registry_service.register_source(
+            db=db,
+            project_module=item.project_module,
+            source_identifier=item.source_identifier,
+            enabled=item.enabled,
+        )
+        created.append(new_source)
+
+    return {
+        "created": created,
+        "existing": existing,
+        "total_created": len(created),
+        "total_existing": len(existing),
+    }
+
+
+@router.post("/discover", response_model=DiscoverTriggerResponse, status_code=200)
+async def trigger_discovery(
+    request: Request,
+    body: DiscoverTriggerRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    available = list_project_modules()
+    if body.project_module not in available:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown project_module '{body.project_module}'. Available: {available}",
+        )
+    if body.source_identifier is not None:
+        source_identifiers: list[str] | None = [body.source_identifier]
+    else:
+        source_identifiers = body.source_identifiers
+
+    identifiers = await source_registry_service.mark_sources_for_rediscovery(
+        db=db,
+        project_module=body.project_module,
+        source_identifiers=source_identifiers,
+    )
+    return {
+        "project_module": body.project_module,
+        "marked_count": len(identifiers),
+        "source_identifiers": identifiers,
+    }
+
+
 @router.get("/{source_id}")
 async def get_source(
     request: Request,
@@ -110,6 +187,45 @@ async def get_source(
         source_id=source_id,
     )
     return source
+
+
+@router.get("/{source_id}/metadata")
+async def get_source_metadata(
+    request: Request,
+    source_id: UUID,
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    """Get archive metadata for a source.
+
+    Returns all metadata entries (grouped by SBID) for the specified source.
+
+    Args:
+        request: FastAPI request object
+        source_id: Source UUID
+        db: Database session
+
+    Returns:
+        Dictionary containing source information and list of metadata entries
+
+    Raises:
+        NotFoundException: If source not found
+    """
+    source = await source_registry_service.get_source(
+        db=db,
+        source_id=source_id,
+    )
+
+    metadata_list = await archive_metadata_service.list_metadata_for_source(
+        db=db,
+        project_module=source["project_module"],
+        source_identifier=source["source_identifier"],
+    )
+
+    return {
+        "source": source,
+        "metadata": metadata_list,
+        "metadata_count": len(metadata_list),
+    }
 
 @router.patch("/{source_id}")
 async def update_source(
@@ -140,6 +256,8 @@ async def update_source(
         db=db,
         source_id=source_id,
         enabled=source_data.enabled,
+        stale_after_hours=source_data.stale_after_hours,
+        update_stale_after_hours="stale_after_hours" in source_data.model_fields_set,
     )
     return source
 

@@ -7,11 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_user
 from ...core.db.database import async_get_db
-from ...core.exceptions.http_exceptions import BadRequestException, NotFoundException
+from ...core.exceptions.http_exceptions import NotFoundException
 from ...core.ledger.service import run_ledger_service
 from ...crud.crud_run_record import crud_run_records
 from ...models.ledger import RunStatus
-from ...schemas.ledger import RunRecordRead, RunRecordCreate, RunRecordUpdate
+from ...schemas.ledger import RunRecordCreate, RunRecordRead, RunRecordUpdate
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 

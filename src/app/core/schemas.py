@@ -23,6 +23,12 @@ class ReadyCheck(BaseModel):
     timestamp: str
 
 
+class TapHealthCheck(BaseModel):
+    all_ok: bool
+    endpoints: dict[str, bool]
+    timestamp: str
+
+
 # -------------- mixins --------------
 class UUIDSchema(BaseModel):
     uuid: uuid_pkg.UUID = Field(default_factory=uuid7)

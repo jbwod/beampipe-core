@@ -4,21 +4,23 @@ FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
 # Set environment variables for uv
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
+ENV UV_CACHE_DIR=/tmp/uv-cache
 
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
+COPY beampipe-wallaby /app/beampipe-wallaby
 
 # Install dependencies first (for better layer caching)
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-install-project --all-groups
+RUN mkdir -p /tmp/uv-cache && chmod 777 /tmp/uv-cache \
+    && uv sync --locked --no-install-project --all-groups
 
 # Copy the project source code
 COPY . /app
 
 # Install the project in non-editable mode
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-editable --all-groups
+RUN mkdir -p /tmp/uv-cache && chmod 777 /tmp/uv-cache \
+    && uv sync --locked --no-editable --all-groups
 
 # --------- Final Stage ---------
 FROM python:3.11-slim-bookworm

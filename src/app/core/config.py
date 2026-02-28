@@ -1,8 +1,13 @@
 import os
-from enum import Enum
+from enum import StrEnum
+from typing import Literal
 
 from pydantic import SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LoggingSettings(BaseSettings):
+    LOG_VERBOSITY: Literal["full", "medium", "minimal"] = "medium"
 
 
 class AppSettings(BaseSettings):
@@ -97,6 +102,8 @@ class ClientSideCacheSettings(BaseSettings):
 class RedisQueueSettings(BaseSettings):
     REDIS_QUEUE_HOST: str = "localhost"
     REDIS_QUEUE_PORT: int = 6379
+    WORKER_QUEUE_NAME: str = "arq:queue"
+    SCHEDULER_QUEUE_NAME: str = "arq:scheduler"
 
 
 class RedisRateLimiterSettings(BaseSettings):
@@ -135,7 +142,7 @@ class CRUDAdminSettings(BaseSettings):
     CRUD_ADMIN_REDIS_SSL: bool = False
 
 
-class EnvironmentOption(str, Enum):
+class EnvironmentOption(StrEnum):
     LOCAL = "local"
     STAGING = "staging"
     PRODUCTION = "production"
@@ -155,7 +162,25 @@ class RunLedgerSettings(BaseSettings):
     MAX_RETRIES: int = 3
 
 
+class DiscoverySettings(BaseSettings):
+    DISCOVERY_BATCH_SIZE: int = 25
+    DISCOVERY_BATCH_CONCURRENCY: int = 5
+    DISCOVERY_STALE_HOURS: int = 24
+    DISCOVERY_SCHEDULE_MINUTES: int = 1
+    DISCOVERY_TAP_TIMEOUT_SECONDS: int = 120
+    DISCOVERY_RETRY_COOLDOWN_MINUTES: int = 60
+    DISCOVERY_MAX_FAILURES_BEFORE_BACKOFF_MULTIPLIER: int = 3
+    DISCOVERY_MAX_SOURCES_PER_RUN: int = 500
+    DISCOVERY_MAX_QUEUE_DEPTH: int | None = None
+    DISCOVERY_TAP_HEALTH_CHECK_ENABLED: bool = True
+    DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS: float = 10.0
+
+
+class ArchiveSettings(BaseSettings):
+    ARCHIVE_METADATA_VALIDATE_JSON: bool = False
+
 class Settings(
+    LoggingSettings,
     AppSettings,
     SQLiteSettings,
     PostgresSettings,
@@ -171,6 +196,8 @@ class Settings(
     EnvironmentSettings,
     CORSSettings,
     RunLedgerSettings,
+    DiscoverySettings,
+    ArchiveSettings,
 ):
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".env"),

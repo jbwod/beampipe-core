@@ -7,14 +7,11 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_run_record import crud_run_records
-from ...models.ledger import RunRecord, RunStatus
+from ...models.ledger import RunStatus
 from ...schemas.ledger import RunRecordCreateInternal, RunRecordRead
-from ..config import settings
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
 from ..registry.service import source_registry_service
 
@@ -51,7 +48,12 @@ class RunLedgerService:
             return run
         except Exception as e:
             logger.exception(
-                f"Error checking existing run for {project_module}/{source_identifier}/{dataset_id}: {e}"
+                "event=ledger_check_run_error "
+                "project_module=%s source_identifier=%s dataset_id=%s error=%s",
+                project_module,
+                source_identifier,
+                dataset_id,
+                e,
             )
             return None
 
@@ -107,8 +109,12 @@ class RunLedgerService:
         if existing:
             existing_uuid = existing.get("uuid")
             logger.info(
-                f"Run already exists for {project_module}/{source_identifier}/{dataset_id}, "
-                f"returning existing run {existing_uuid}"
+                "event=ledger_run_exists "
+                "project_module=%s source_identifier=%s dataset_id=%s existing_uuid=%s",
+                project_module,
+                source_identifier,
+                dataset_id,
+                existing_uuid,
             )
             return existing
 
@@ -127,10 +133,24 @@ class RunLedgerService:
                 db=db, object=run_data, schema_to_select=RunRecordRead
             )
             run_uuid = run.get("uuid")
-            logger.info(f"Created new run {run_uuid} for {project_module}/{source_identifier}/{dataset_id}")
+            logger.info(
+                "event=ledger_run_created "
+                "run_uuid=%s project_module=%s source_identifier=%s dataset_id=%s",
+                run_uuid,
+                project_module,
+                source_identifier,
+                dataset_id,
+            )
             return run
         except Exception as e:
-            logger.exception(f"Error creating run for {project_module}/{source_identifier}/{dataset_id}: {e}")
+            logger.exception(
+                "event=ledger_run_create_error "
+                "project_module=%s source_identifier=%s dataset_id=%s error=%s",
+                project_module,
+                source_identifier,
+                dataset_id,
+                e,
+            )
             raise
 
     @staticmethod
@@ -185,8 +205,8 @@ class RunLedgerService:
         completed_at_value = run.get("completed_at")
 
         # status transition if status is being changed
-        if status and status != current_status_value:
-            current_status = RunStatus(current_status_value)
+        if status and status != current_status_value and current_status_value is not None:
+            current_status = RunStatus(str(current_status_value))
             if not RunLedgerService._validate_status_transition(current_status, status):
                 raise BadRequestException(
                     f"Invalid status transition from {current_status.value} to {status.value}"
@@ -236,7 +256,10 @@ class RunLedgerService:
             raise NotFoundException(f"Run {run_id} not found after update")
 
         logger.info(
-            f"Updated run {run_id}: status={status}, scheduler_job_id={scheduler_job_id}"
+            "event=ledger_run_updated run_id=%s status=%s scheduler_job_id=%s",
+            run_id,
+            status,
+            scheduler_job_id,
         )
         return updated_run
 

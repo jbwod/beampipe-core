@@ -1,24 +1,27 @@
 import asyncio
-import logging
 
 import uvloop
-from arq.worker import Worker
+
+from .tasks import (
+    discover_batch,
+    discover_schedule_task,
+    enqueue_timer_task,
+    sample_background_task,
+    shutdown,
+    startup,
+    timer_task,
+)
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(_loop)
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-
-# -------- background tasks --------
-async def sample_background_task(ctx: Worker, name: str) -> str:
-    await asyncio.sleep(5)
-    return f"Task {name} is complete!"
-
-
-# -------- base functions --------
-async def startup(ctx: Worker) -> None:
-    logging.info("Worker Started")
-
-
-async def shutdown(ctx: Worker) -> None:
-    logging.info("Worker end")
+__all__ = [
+    "discover_batch",
+    "discover_schedule_task",
+    "enqueue_timer_task",
+    "sample_background_task",
+    "shutdown",
+    "startup",
+    "timer_task",
+]

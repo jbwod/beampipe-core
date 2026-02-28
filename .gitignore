@@ -143,6 +143,13 @@ src/.env
 /Dockerfile
 /docker-compose.yml
 
+.beampipe-wallaby/
+
 # Don't ignore files inside of script folder:
 !scripts/*
 
+src/app/core/archive/adapters/test.py
+
+dlg/*
+
+wallaby-hires-beampipe/*

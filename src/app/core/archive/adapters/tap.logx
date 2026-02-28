@@ -1,0 +1,31 @@
+INFO: Query finished. [astroquery.utils.tap.core]
+Visibility files: 6
+dataproduct_type calib_level ... thumbnail_id                  filename                 
+                             ...                                                        
+---------------- ----------- ... ------------ ------------------------------------------
+      visibility           1 ...           -- HIPASSJ1303+07_A_beam06_10arc_split.ms.tar
+      visibility           1 ...           -- HIPASSJ1303+07_A_beam19_10arc_split.ms.tar
+      visibility           1 ...           -- HIPASSJ1303+07_A_beam20_10arc_split.ms.tar
+      visibility           1 ...           -- HIPASSJ1303+07_B_beam06_10arc_split.ms.tar
+      visibility           1 ...           -- HIPASSJ1303+07_B_beam18_10arc_split.ms.tar
+      visibility           1 ...           -- HIPASSJ1303+07_B_beam19_10arc_split.ms.tar
+INFO: Query finished. [astroquery.utils.tap.core]
+
+Evaluation files for SBID 33681: 9
+ sbid project_code       format       ...      released_date       observation_id project_id
+----- ------------ ------------------ ... ------------------------ -------------- ----------
+33681        AS102                txt ... 2022-03-15T06:23:30.066Z           1877         16
+33681        AS102 validation-metrics ... 2022-03-15T06:23:30.066Z           1877         16
+33681        AS102                txt ... 2022-03-15T06:23:30.066Z           1877         16
+33681        AS103  validation-report ... 2022-11-16T11:22:50.835Z           1877         17
+33681        AS102  validation-report ... 2022-03-15T06:23:30.066Z           1877         16
+33681        AS102  validation-report ... 2022-03-15T06:23:30.066Z           1877         16
+33681        AS102        calibration ... 2022-03-15T06:23:30.066Z           1877         16
+33681        AS102  validation-report ... 2022-03-15T06:23:30.066Z           1877         16
+33681        AS102        calibration ... 2022-03-15T06:23:30.066Z           1877         16
+INFO: Query finished. [astroquery.utils.tap.core]
+
+Coordinates: 0
+RAJ2000 DEJ2000  VSys 
+                km / s
+------- ------- ------

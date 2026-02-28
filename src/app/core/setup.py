@@ -52,7 +52,12 @@ async def close_redis_cache_pool() -> None:
 
 # -------------- queue --------------
 async def create_redis_queue_pool() -> None:
-    queue.pool = await create_pool(RedisSettings(host=settings.REDIS_QUEUE_HOST, port=settings.REDIS_QUEUE_PORT))
+    queue.pool = await create_pool(
+        RedisSettings(
+            host=settings.REDIS_QUEUE_HOST,
+            port=settings.REDIS_QUEUE_PORT,
+        )
+    )
 
 
 async def close_redis_queue_pool() -> None:
@@ -207,13 +212,13 @@ def create_application(
 
     application = FastAPI(lifespan=lifespan, **kwargs)
     application.include_router(router)
-    
+
     # test
     from ..views import router as views_router
     application.include_router(views_router)
 
     if isinstance(settings, ClientSideCacheSettings):
-        application.add_middleware(ClientCacheMiddleware, max_age=settings.CLIENT_CACHE_MAX_AGE)
+        application.add_middleware(ClientCacheMiddleware, max_age=settings.CLIENT_CACHE_MAX_AGE)  # type: ignore[arg-type]
 
     if isinstance(settings, CORSSettings):
         application.add_middleware(
