@@ -36,40 +36,6 @@
 > - **`Direct-to-Compute`**: integrates with existing workflow management and HPC Tooling.
 
 ## `Modular by design`
-> Designed from the ground-up to be Survey-Agnostic, a pluggable module based system to allow not only allows new data-stores to be configured, but new workflows, schedulers or compute environments. The example module was constructed for the [`wallaby-hires`](https://github.com/ICRAR/wallaby-hires) project and workflow, integrating ingestion with CASDA and HPC Compute on [pawsey-setonix](https://pawsey.org.au/systems/setonix/).
-
-
-
-### The "backend"
-> Based on the excellent, [FastAPI boilerplate](https://github.com/benavlabs/FastAPI-boilerplate)
-*  Fully async FastAPI + SQLAlchemy 2.0
-* 🧱 Pydantic v2 models & validation
-* 🔐 JWT auth (access + refresh), cookies for refresh
-* 🧰 FastCRUD for efficient CRUD & pagination
-* 🚦 ARQ background jobs (Redis)
-* 🧊 Redis caching (server + client-side headers)
-* 🌐 Configurable CORS middleware for frontend integration
-* 🐳 One-command Docker Compose
-* 🚀 NGINX & Gunicorn recipes for prod
-
-> - **`Idempotent run ledger`**: records each trigger to guarantee completeness, avoid duplicate processing, and enable safe retries.
-
-> - **`Scheduler-aware orchestration`**: submits workloads to batch schedulers with queue/cluster constraints in mind.
-
-> - **`Workflow-agnostic execution`**: treats pipelines as portable work items to support [DALiuGE](https://daliuge.icrar.org/) or future WMS.
-
-> - **`Deterministic provenance`**: captures inputs, parameters, container digests, checksum outputs, and signatures for reproducibility.
-
-## `Core Module Features`
-> - **`Source registry`**: register and manage astronomical sources via common-ID (API + basic web UI at `/sources`) and supports bulk registration.
-
-> - **`Run ledger enforcement`**: validates runs against registered/enabled sources to prevent invalid triggers.
-
-> - **`Trigger and Schedule Setup`**: monitors and polls configured storage archives for new-to-process observation datasets. Configurable parameters give control to frequency, batch-size and lifetime.
-
-> - **`Direct-to-Compute`**: integrates with existing workflow management and HPC Tooling.
-
-## `Modular by design`
 > Designed from the ground-up to be Survey-Agnostic, a pluggable module based system to allow not only allows new data-sets to be configured, but new workflows, schedulers or compute environments. The example module was constructed for the [`wallaby-hires`](https://github.com/ICRAR/wallaby-hires) project and workflow, integrating ingestion with CASDA and HPC Compute on [pawsey-setonix](https://pawsey.org.au/systems/setonix/).
 
 ### `Adding a project module`
