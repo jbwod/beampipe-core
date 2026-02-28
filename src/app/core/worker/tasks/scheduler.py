@@ -3,8 +3,6 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from arq.worker import Worker
-
 from ...archive.discovery import discover_schedule
 from ...config import settings
 from ...db.database import local_session
@@ -13,20 +11,22 @@ from ...projects import list_project_modules, load_project_module
 logger = logging.getLogger(__name__)
 
 
-async def sample_background_task(ctx: Worker, name: str) -> str:
+async def sample_background_task(ctx: dict[str, Any], name: str) -> str:
     _ = ctx
     await asyncio.sleep(5)
     return f"Task {name} is complete!"
 
 
-async def discover_schedule_task(ctx: Worker, project_module: str | None = None) -> dict[str, Any]:
+async def discover_schedule_task(
+    ctx: dict[str, Any], project_module: str | None = None
+) -> dict[str, Any]:
     logger.debug(
         "event=discover_schedule_task_started project_module=%s",
         project_module or "all",
     )
     try:
         async with local_session() as db:
-            redis = getattr(ctx, "redis", None)
+            redis = ctx.get("redis")
             if redis is None:
                 raise RuntimeError("Redis not available on worker context")
             result = await discover_schedule(db=db, redis=redis, project_module=project_module)
@@ -78,8 +78,8 @@ async def discover_schedule_task(ctx: Worker, project_module: str | None = None)
         }
 
 
-async def enqueue_timer_task(ctx: Worker) -> dict[str, Any]:
-    redis = getattr(ctx, "redis", None)
+async def enqueue_timer_task(ctx: dict[str, Any]) -> dict[str, Any]:
+    redis = ctx.get("redis")
     if redis is None:
         raise RuntimeError("Redis queue is not available for timer enqueue")
 
@@ -92,7 +92,7 @@ async def enqueue_timer_task(ctx: Worker) -> dict[str, Any]:
     return {"status": "ok", "job_id": job_id}
 
 
-async def timer_task(ctx: Worker) -> dict[str, Any]:
+async def timer_task(ctx: dict[str, Any]) -> dict[str, Any]:
     _ = ctx
     modules = list_project_modules()
     logger.debug("event=timer_task_modules project_modules=%s", modules)
