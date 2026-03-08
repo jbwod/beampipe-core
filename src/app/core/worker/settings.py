@@ -1,6 +1,8 @@
 from arq import cron
 from arq.connections import RedisSettings
 
+from ...core import logger as _app_logger  # noqa: F401
+
 from ...core.config import settings
 from .functions import (
     discover_batch,

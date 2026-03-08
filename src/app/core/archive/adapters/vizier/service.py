@@ -2,10 +2,13 @@
 Vizier adapter services.
 """
 
+import logging
 from typing import Optional
 
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
+
+logger = logging.getLogger(__name__)
 
 VIZIER_TAP_URL = "http://tapvizier.cds.unistra.fr/TAPVizieR/tap"
 # UWS async endpoint for health check (returns 200 + XML when up)
@@ -36,9 +39,13 @@ class VizierDiscoverAdapter:
 def query(query: str, tap_url: Optional[str] = None) -> Table:
     """Run a TAP query against Vizier (or an overridden TAP URL)."""
     tap_endpoint = tap_url or VIZIER_TAP_URL
+    logger.debug("event=vizier_tap_query query=%s", query[:200] + "..." if len(query) > 200 else query)
     try:
         viziertap = TapPlus(url=tap_endpoint, verbose=False)
         job = viziertap.launch_job_async(query)
-        return job.get_results()
+        results = job.get_results()
+        logger.debug("event=vizier_tap_query_result row_count=%s", len(results))
+        return results
     except Exception as e:
+        logger.error("event=vizier_tap_query_error error=%s query_snippet=%s", e, query[:150])
         raise RuntimeError(f"Vizier TAP query failed: {e}") from e

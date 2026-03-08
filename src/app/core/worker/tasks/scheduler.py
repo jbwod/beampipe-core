@@ -112,7 +112,7 @@ async def timer_task(ctx: dict[str, Any]) -> dict[str, Any]:
             continue
         ping_fn = getattr(module, "ping", None)
         if callable(ping_fn):
-            logger.info("event=timer_task_ping module=%s", name)
+            logger.debug("event=timer_task_ping module=%s", name)
             ping_fn()
             logger.debug("event=timer_task_ping_done module=%s", name)
 

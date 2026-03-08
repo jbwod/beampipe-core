@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -11,7 +12,7 @@ from ...core.archive.service import archive_metadata_service
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import NotFoundException
 from ...core.projects import list_project_modules
-from ...core.registry.service import source_registry_service
+from ...core.registry.service import invalid_project_module_message, source_registry_service
 from ...crud.crud_source_registry import crud_source_registry
 from ...schemas.registry import (
     DiscoverTriggerRequest,
@@ -24,6 +25,16 @@ from ...schemas.registry import (
 )
 
 router = APIRouter(prefix="/sources", tags=["sources"])
+logger = logging.getLogger(__name__)
+
+
+def _ensure_valid_project_module(project_module: str) -> None:
+    available_modules = list_project_modules()
+    if project_module not in available_modules:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=invalid_project_module_message(project_module, available_modules),
+        )
 
 @router.get("", response_model=PaginatedListResponse[SourceRegistryRead])
 async def list_sources(
@@ -88,11 +99,17 @@ async def register_source(
     Returns:
         Source registry entry (existing or newly created)
     """
+    _ensure_valid_project_module(source_data.project_module)
     source = await source_registry_service.register_source(
         db=db,
         project_module=source_data.project_module,
         source_identifier=source_data.source_identifier,
         enabled=source_data.enabled,
+    )
+    logger.info(
+        "event=sources_register project_module=%s source_identifier=%s",
+        source_data.project_module,
+        source_data.source_identifier,
     )
     return source
 
@@ -108,6 +125,7 @@ async def bulk_register_sources(
     existing: list[dict[str, Any]] = []
 
     for item in bulk_data.items:
+        _ensure_valid_project_module(item.project_module)
         already = await source_registry_service.check_existing_source(
             db=db,
             project_module=item.project_module,
@@ -125,6 +143,11 @@ async def bulk_register_sources(
         )
         created.append(new_source)
 
+    logger.info(
+        "event=sources_bulk_register total_created=%s total_existing=%s",
+        len(created),
+        len(existing),
+    )
     return {
         "created": created,
         "existing": existing,
@@ -140,12 +163,7 @@ async def trigger_discovery(
     current_user: Annotated[dict, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
-    available = list_project_modules()
-    if body.project_module not in available:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown project_module '{body.project_module}'. Available: {available}",
-        )
+    _ensure_valid_project_module(body.project_module)
     if body.source_identifier is not None:
         source_identifiers: list[str] | None = [body.source_identifier]
     else:
@@ -155,6 +173,11 @@ async def trigger_discovery(
         db=db,
         project_module=body.project_module,
         source_identifiers=source_identifiers,
+    )
+    logger.info(
+        "event=sources_trigger_discovery project_module=%s marked_count=%s",
+        body.project_module,
+        len(identifiers),
     )
     return {
         "project_module": body.project_module,
