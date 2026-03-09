@@ -116,5 +116,29 @@ class ArchiveMetadataService:
         # FastCRUD returns {"data": [...], "total_count": N}
         return cast(list[dict[str, Any]], records.get("data", []))
 
+    @staticmethod
+    async def delete_metadata_for_source_except_sbids(
+        db: AsyncSession,
+        project_module: str,
+        source_identifier: str,
+        keep_sbids: list[str],
+    ) -> int:
+        """Delete metadata rows for a source except the supplied SBIDs."""
+        filters: dict[str, Any] = {
+            "project_module": project_module,
+            "source_identifier": source_identifier,
+        }
+        if keep_sbids:
+            filters["sbid__not_in"] = keep_sbids
+
+        count = await crud_archive_metadata.count(db=db, **filters)
+        await crud_archive_metadata.db_delete(
+            db=db,
+            allow_multiple=True,
+            commit=False,
+            **filters,
+        )
+        return count
+
 
 archive_metadata_service = ArchiveMetadataService()

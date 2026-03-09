@@ -48,6 +48,18 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
         default=None,
         description="Hash of last discovery state; used to skip writes when unchanged.",
     )
+    discovery_claimed_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when the current discovery lease was acquired.",
+    )
+    discovery_claim_expires_at: datetime | None = Field(
+        default=None,
+        description="When the current discovery lease expires; null means no active lease.",
+    )
+    discovery_job_id: str | None = Field(
+        default=None,
+        description="Identifier of the most recent queued discovery job for this source.",
+    )
 
     @field_serializer("last_checked_at")
     def serialize_last_checked_at(self, last_checked_at: datetime | None, _info):  # type: ignore[override]
@@ -59,6 +71,20 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
     def serialize_last_attempted_at(self, last_attempted_at: datetime | None, _info):  # type: ignore[override]
         if last_attempted_at is not None:
             return last_attempted_at.isoformat()
+        return None
+
+    @field_serializer("discovery_claimed_at")
+    def serialize_discovery_claimed_at(self, discovery_claimed_at: datetime | None, _info):  # type: ignore[override]
+        if discovery_claimed_at is not None:
+            return discovery_claimed_at.isoformat()
+        return None
+
+    @field_serializer("discovery_claim_expires_at")
+    def serialize_discovery_claim_expires_at(
+        self, discovery_claim_expires_at: datetime | None, _info
+    ):  # type: ignore[override]
+        if discovery_claim_expires_at is not None:
+            return discovery_claim_expires_at.isoformat()
         return None
 
 
