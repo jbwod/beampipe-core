@@ -38,7 +38,13 @@ def _stable_json_dumps(value: Any) -> str:
 
 def _payload_signature_and_raw(payload: dict[str, Any]) -> tuple[str, str]:
     raw = _stable_json_dumps(payload)
-    return hashlib.sha256(raw.encode()).hexdigest(), raw
+    sig = hashlib.sha256(raw.encode()).hexdigest()
+    logger.debug(
+        "event=discovery_payload_signature raw_len=%s hash=%s",
+        len(raw),
+        sig[:16] + "..." if len(sig) > 16 else sig,
+    )
+    return sig, raw
 
 
 def _dataset_sort_key(normalized_dataset: dict[str, Any]) -> tuple[str, str, str]:
@@ -63,6 +69,12 @@ def metadata_payload_by_sbid(
         if normalized_flags:
             metadata_json["discovery_flags"] = normalized_flags
         payload_by_sbid[str(sbid)] = metadata_json
+    logger.debug(
+        "event=discovery_metadata_payload_by_sbid sbids=%s dataset_counts=%s has_flags=%s",
+        list(payload_by_sbid.keys()),
+        [len(p.get("datasets", [])) for p in payload_by_sbid.values()],
+        bool(normalized_flags),
+    )
     return payload_by_sbid
 
 
@@ -87,6 +99,12 @@ def existing_signature_from_records(records: list[dict[str, Any]]) -> str:
         metadata_json = _to_jsonable(rec.get("metadata_json") or {})
         canonical[sbid] = metadata_json
     sig, _ = _payload_signature_and_raw(canonical)
+    logger.debug(
+        "event=discovery_existing_signature_from_records record_count=%s sbids=%s sig_prefix=%s",
+        len(records),
+        list(canonical.keys()),
+        sig[:16] + "..." if len(sig) > 16 else sig,
+    )
     return sig
 
 
