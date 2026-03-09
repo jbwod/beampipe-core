@@ -1,10 +1,14 @@
 """Tests for discovery worker tasks."""
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from src.app.core.archive import discovery as discovery_service
 from src.app.core.worker.tasks import discovery as discovery_task
+from src.app.core.worker.tasks import discovery_batch
+from src.app.core.worker.tasks import discovery_execution
+from src.app.core.worker.tasks import discovery_process
 
 
 # ---- Retry / timeout ----
@@ -19,7 +23,7 @@ async def test_run_discover_with_retry_does_not_retry_on_value_error():
         raise ValueError("bad")
 
     with pytest.raises(ValueError, match="bad"):
-        await discovery_task._run_discover_with_retry(
+        await discovery_execution.run_discover_with_retry(
             discover_callable=discover,
             source_identifier="x",
             tap_timeout=1,
@@ -37,7 +41,7 @@ async def test_run_prepare_once_enforces_timeout():
         return ([], {})
 
     with pytest.raises(TimeoutError):
-        await discovery_task._run_prepare_once(
+        await discovery_execution.run_prepare_once(
             prepare_callable=slow,
             source_identifier="x",
             query_results=[],
@@ -50,9 +54,9 @@ async def test_run_prepare_once_enforces_timeout():
 
 def test_resolve_module_adapters_raises_for_missing_adapter():
     module = SimpleNamespace(__name__="m", REQUIRED_ADAPTERS=["casda"])
-    with patch.object(discovery_task, "get_adapter", return_value=None):
+    with patch.object(discovery_batch, "get_adapter", return_value=None):
         with pytest.raises(ValueError, match="Required adapter 'casda' is not registered"):
-            discovery_task._resolve_module_adapters(module)
+            discovery_batch.resolve_module_adapters(module)
 
 
 # ---- _process_source: bundle shape ----
@@ -68,10 +72,10 @@ def _fake_module():
 @pytest.mark.asyncio
 async def test_process_source_empty_query_results_returns_no_datasets():
     with (
-        patch.object(discovery_task, "_run_discover_with_retry", AsyncMock(return_value={"query_results": []})),
-        patch.object(discovery_task, "_run_prepare_once", AsyncMock()) as run_prepare,
+        patch.object(discovery_process, "run_discover_with_retry", AsyncMock(return_value={"query_results": []})),
+        patch.object(discovery_process, "run_prepare_once", AsyncMock()) as run_prepare,
     ):
-        out = await discovery_task._process_source(
+        out = await discovery_process.process_source(
             module=_fake_module(),
             project_module="p",
             source_identifier="s",
@@ -86,10 +90,10 @@ async def test_process_source_empty_query_results_returns_no_datasets():
 @pytest.mark.asyncio
 async def test_process_source_missing_query_results_raises():
     with patch.object(
-        discovery_task, "_run_discover_with_retry", AsyncMock(return_value={"enrichments": {}})
+        discovery_process, "run_discover_with_retry", AsyncMock(return_value={"enrichments": {}})
     ):
         with pytest.raises(ValueError, match="missing bundle keys"):
-            await discovery_task._process_source(
+            await discovery_process.process_source(
                 module=_fake_module(),
                 project_module="p",
                 source_identifier="s",
@@ -101,12 +105,12 @@ async def test_process_source_missing_query_results_raises():
 @pytest.mark.asyncio
 async def test_process_source_query_results_must_be_length_checkable():
     with patch.object(
-        discovery_task,
-        "_run_discover_with_retry",
+        discovery_process,
+        "run_discover_with_retry",
         AsyncMock(return_value={"query_results": object(), "enrichments": {}}),
     ):
         with pytest.raises(ValueError, match="length-checkable"):
-            await discovery_task._process_source(
+            await discovery_process.process_source(
                 module=_fake_module(),
                 project_module="p",
                 source_identifier="s",
@@ -120,11 +124,11 @@ async def test_process_source_prepare_missing_identity_raises():
     bundle = {"query_results": [{"f": "a"}], "enrichments": {}}
     prepared = ([{"sbid": "1"}], {})  # missing dataset_id / visibility_filename
     with (
-        patch.object(discovery_task, "_run_discover_with_retry", AsyncMock(return_value=bundle)),
-        patch.object(discovery_task, "_run_prepare_once", AsyncMock(return_value=prepared)),
+        patch.object(discovery_process, "run_discover_with_retry", AsyncMock(return_value=bundle)),
+        patch.object(discovery_process, "run_prepare_once", AsyncMock(return_value=prepared)),
     ):
         with pytest.raises(ValueError, match="dataset_id.*visibility_filename"):
-            await discovery_task._process_source(
+            await discovery_process.process_source(
                 module=_fake_module(),
                 project_module="p",
                 source_identifier="s",
@@ -138,10 +142,10 @@ async def test_process_source_passes_bundle_to_prepare():
     bundle = {"query_results": [{"f": "a"}], "enrichments": {}}
     prepared = ([{"sbid": "1", "dataset_id": "d1"}], {"flag": True})
     with (
-        patch.object(discovery_task, "_run_discover_with_retry", AsyncMock(return_value=bundle)),
-        patch.object(discovery_task, "_run_prepare_once", AsyncMock(return_value=prepared)) as run_prepare,
+        patch.object(discovery_process, "run_discover_with_retry", AsyncMock(return_value=bundle)),
+        patch.object(discovery_process, "run_prepare_once", AsyncMock(return_value=prepared)) as run_prepare,
     ):
-        out = await discovery_task._process_source(
+        out = await discovery_process.process_source(
             module=_fake_module(),
             project_module="p",
             source_identifier="s",
