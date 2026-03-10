@@ -99,6 +99,7 @@ def main() -> int:
 
     # Embed manifest in graph (beampipe-ingest receives inline JSON; no second file)
     from app.core.orchestration.manifest import apply_manifest_to_lg, prepare_manifest_embed
+
     test_manifest = {
         "datasets": [{"visibility_filename": "test.ms", "evaluation_file": "/pb.fits"}],
         "run_context": {"source_identifier": "test-source", "run_uuid": "test-run-123"},
@@ -113,32 +114,23 @@ def main() -> int:
     #     lg_name, json_data (LG JSON string), algo, num_par, num_islands
     #   Response: HTML (PGT viewer) or error; PGT id = {lg_name basename}1_pgt.graph
     lg_name = os.path.basename(GRAPH_FILE)
-    pgt_base = os.path.splitext(lg_name)[0]
-    pgt_id = f"{pgt_base}1_pgt.graph"
+
+    client = DaliugeTranslatorClient(base_url=args.tm_url, verify=verify, timeout=60.0)
     try:
-        data = {"lg_name": lg_name, "json_data": json.dumps(graph_json), "algo": "metis", "num_par": 1, "num_islands": 0}
-        r = requests.post(f"{args.tm_url.rstrip('/')}/gen_pgt", data=data, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=60, verify=verify)
-        r.raise_for_status()
-    except Exception as e:
-        err = getattr(getattr(e, "response", None), "text", "")[:800] or ""
-        print(f"gen_pgt failed: {e}  {err}", file=sys.stderr)
-        return 1
+        pgt_id = client.translate_lg_to_pgt(lg_name, graph_json, algo="metis", num_par=1, num_islands=0)
+    finally:
+        client.close()
     print(f"PGT: {pgt_id}")
 
     # Translator: PGT = PG (translator_rest.py gen_pg L554)
     # REST: GET {tm_url}/gen_pg?pgt_id=...&dlg_mgr_host=...&dlg_mgr_port=...
     #   Query: pgt_id (PGT id), dlg_mgr_host (DIM host for TM to call), dlg_mgr_port (DIM port)
     #   TM uses host:port to GET /api/nodes from DIM, then maps PGT to PG. Response: JSON PG spec (list).
+    client = DaliugeTranslatorClient(base_url=args.tm_url, verify=verify, timeout=60.0)
     try:
-        r = requests.get(f"{args.tm_url.rstrip('/')}/gen_pg", params={"pgt_id": pgt_id, "dlg_mgr_host": dim_host_tm, "dlg_mgr_port": dim_port_tm}, timeout=60, verify=verify)
-        if args.verbose and not r.ok:
-            print(r.text[:1500], file=sys.stderr)
-        r.raise_for_status()
-        pg_spec = r.json()
-    except Exception as e:
-        err = getattr(getattr(e, "response", None), "text", "")[:800] or ""
-        print(f"gen_pg failed: {e}  {err}", file=sys.stderr)
-        return 1
+        pg_spec = client.translate_pgt_to_pg(pgt_id, dim_host_for_tm=dim_host_tm, dim_port_for_tm=dim_port_tm)
+    finally:
+        client.close()
 
     if not isinstance(pg_spec, list) or len(pg_spec) == 0:
         print("Empty PG", file=sys.stderr)
