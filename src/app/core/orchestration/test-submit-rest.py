@@ -14,45 +14,23 @@ import sys
 import time
 from typing import Any
 from urllib.parse import quote
+
 import requests
+
+#  (PYTHONPATH=../../.. from src/app/core/orchestration)
+_ORCH_DIR = os.path.dirname(os.path.abspath(__file__))
+_SRC = os.path.abspath(os.path.join(_ORCH_DIR, "..", "..", ".."))
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
+from app.core.utils.daliuge import get_roots
+from app.core.orchestration.translator_client import DaliugeTranslatorClient
 
 GRAPH_FILE = "test_graphs/test-manifest.graph"
 TM_URL = "http://dlg-tm.desk"
 DIM_HOST = "dlg-dim.desk"
 DIM_PORT = 8001
 
-
-
-def _links(links: Any) -> list[str]:
-    if isinstance(links, list):
-        out = []
-        for x in links:
-            out.extend(x.keys() if isinstance(x, dict) else (x if isinstance(x, list) else [x]))
-        return out
-    return list(links.keys()) if isinstance(links, dict) else []
-
-
-def get_roots(pg_spec: list[dict]) -> set[str]:
-    """(see dlg/daliuge-common/dlg/common/__init__.py get_roots L219-266)."""
-    all_oids, nonroots = set(), set()
-    for d in pg_spec:
-        if not isinstance(d, dict) or "oid" not in d:
-            continue
-        oid = d["oid"]
-        all_oids.add(oid)
-        ct = d.get("categoryType") or d.get("type") or ""
-        if ct in ("Application", "app", "Socket", "socket"):
-            if d.get("inputs") or d.get("streamingInputs"):
-                nonroots.add(oid)
-            if d.get("outputs"):
-                nonroots |= set(_links(d["outputs"]))
-        elif ct in ("Data", "data"):
-            if d.get("producers"):
-                nonroots.add(oid)
-            for k in ("consumers", "streamingConsumers"):
-                if d.get(k):
-                    nonroots |= set(_links(d[k]))
-    return all_oids - nonroots
 
 
 def main() -> int:
