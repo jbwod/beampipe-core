@@ -82,6 +82,7 @@ def stage_data(
                 casda._complete_job(job_url, verbose)  # type: ignore[attr-defined]
                 results_url = f"{job_url}/results"
                 session = getattr(casda, "_session", None)
+                # change to httpx at some point
                 response = session.get(results_url) if session else requests.get(results_url)
                 response.raise_for_status()
                 data_url_by_scan_id, checksum_url_by_scan_id = _parse_job_results(response.text)
