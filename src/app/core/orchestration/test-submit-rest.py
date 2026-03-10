@@ -3,21 +3,24 @@
   DIM:         POST /api/sessions (body: sessionId) = POST /api/sessions/{id}/graph/append (body: PG) = POST /api/sessions/{id}/deploy (form: completed=roots)
   Poll:        GET /api/sessions/{id}/status  then  GET /api/sessions/{id}/graph/status
 
-cd /beampipe-core/src/app/core/orchestration && python3 submit_hello_universe.py  --proxied --insecure
+  Test with embedded manifest (beampipe-ingest + test-manifest.graph):
+  cd src/app/core/orchestration && PYTHONPATH=../../.. python3 submit_hello_universe-no-dg.py --proxied --insecure
 
 """
 import argparse
 import json
+import os
 import sys
 import time
 from typing import Any
 from urllib.parse import quote
 import requests
 
-GRAPH_FILE = "test_graphs/HelloWorld-Universe.graph"
+GRAPH_FILE = "test_graphs/test-manifest.graph"
 TM_URL = "http://dlg-tm.desk"
 DIM_HOST = "dlg-dim.desk"
 DIM_PORT = 8001
+
 
 
 def _links(links: Any) -> list[str]:
@@ -116,20 +119,32 @@ def main() -> int:
         print(f"Not found: {GRAPH_FILE} (run from orchestration dir)", file=sys.stderr)
         return 1
 
+    # Embed manifest in graph (beampipe-ingest receives inline JSON; no second file)
+    from app.core.orchestration.manifest import apply_manifest_to_lg, prepare_manifest_embed
+    test_manifest = {
+        "datasets": [{"visibility_filename": "test.ms", "evaluation_file": "/pb.fits"}],
+        "run_context": {"source_identifier": "test-source", "run_uuid": "test-run-123"},
+    }
+    manifest_with_embed = prepare_manifest_embed(test_manifest)
+    apply_manifest_to_lg(graph_json, manifest_with_embed)
+    print("Applied embedded manifest to beampipe-ingest")
+
     # Translator: LG = PGT (dlg translator_rest.py gen_pgt POST L440)
     # REST: POST {tm_url}/gen_pgt
     #   Body: application/x-www-form-urlencoded
     #     lg_name, json_data (LG JSON string), algo, num_par, num_islands
     #   Response: HTML (PGT viewer) or error; PGT id = {lg_name basename}1_pgt.graph
+    lg_name = os.path.basename(GRAPH_FILE)
+    pgt_base = os.path.splitext(lg_name)[0]
+    pgt_id = f"{pgt_base}1_pgt.graph"
     try:
-        data = {"lg_name": "HelloWorld-Universe.graph", "json_data": json.dumps(graph_json), "algo": "metis", "num_par": 1, "num_islands": 0}
+        data = {"lg_name": lg_name, "json_data": json.dumps(graph_json), "algo": "metis", "num_par": 1, "num_islands": 0}
         r = requests.post(f"{args.tm_url.rstrip('/')}/gen_pgt", data=data, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=60, verify=verify)
         r.raise_for_status()
     except Exception as e:
         err = getattr(getattr(e, "response", None), "text", "")[:800] or ""
         print(f"gen_pgt failed: {e}  {err}", file=sys.stderr)
         return 1
-    pgt_id = "HelloWorld-Universe1_pgt.graph"
     print(f"PGT: {pgt_id}")
 
     # Translator: PGT = PG (translator_rest.py gen_pg L554)
@@ -153,7 +168,7 @@ def main() -> int:
     drops = pg_spec[1:] if isinstance(pg_spec[0], str) else pg_spec
     specs = [x for x in drops if isinstance(x, dict) and x.get("oid")]
     roots = list(get_roots(specs))
-    session_id = f"HelloUniverse_{time.strftime('%Y-%m-%dT%H-%M-%S')}"
+    session_id = f"TestManifest_{time.strftime('%Y-%m-%dT%H-%M-%S')}"
     print(f"PG: {len(specs)} nodes, {len(roots)} roots  session: {session_id}")
 
     # DIM: create session, append PG, deploy (dlg/clients.py create_session L59, append_graph L81, deploy_session L68)
