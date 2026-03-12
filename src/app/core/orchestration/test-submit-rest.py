@@ -13,9 +13,10 @@ import os
 import sys
 import time
 from typing import Any
-from urllib.parse import quote
 
 import requests
+
+from app.core.orchestration.deploy_client import deploy_session, wait_until_finished
 
 #  (PYTHONPATH=../../.. from src/app/core/orchestration)
 _ORCH_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -102,6 +103,7 @@ def main() -> int:
     from app.core.orchestration.manifest import inject_manifest_config_into_graph
 
     test_manifest = {
+        "datasets": [{"visibility_filename": "test.ms", "evaluation_file": "/pb.fits"}],
         "run_context": {"source_identifier": "test-source", "run_uuid": "test-run-123-injection-test"},
     }
     # manifest_with_embed = prepare_manifest_embed(test_manifest)
@@ -125,16 +127,6 @@ def main() -> int:
         client.close()
     print(f"PGT: {pgt_id}")
 
-    # Translator: PGT = PG (translator_rest.py gen_pg L554)
-    # REST: GET {tm_url}/gen_pg?pgt_id=...&dlg_mgr_host=...&dlg_mgr_port=...
-    #   Query: pgt_id (PGT id), dlg_mgr_host (DIM host for TM to call), dlg_mgr_port (DIM port)
-    #   TM uses host:port to GET /api/nodes from DIM, then maps PGT to PG. Response: JSON PG spec (list).
-    client = DaliugeTranslatorClient(base_url=args.tm_url, verify=verify, timeout=60.0)
-    try:
-        pg_spec = client.translate_pgt_to_pg(pgt_id, dim_host_for_tm=dim_host_tm, dim_port_for_tm=dim_port_tm)
-    finally:
-        client.close()
-
     if not isinstance(pg_spec, list) or len(pg_spec) == 0:
         print("Empty PG", file=sys.stderr)
         return 1
@@ -144,7 +136,8 @@ def main() -> int:
     session_id = f"TestManifest_{run_suffix}"
     print(f"PG: {len(specs)} nodes, {len(roots)} roots  session: {session_id}")
 
-    # DIM: create session, append PG, deploy (dlg/clients.py create_session L59, append_graph L81, deploy_session L68)
+    # DIM: create session, append PG, deploy; poll until finished (see rest_deploy.py)
+        # DIM: create session, append PG, deploy (dlg/clients.py create_session L59, append_graph L81, deploy_session L68)
     # REST: POST {dim_base}/api/sessions
     #   Body: JSON {"sessionId": "<id>"}
     # REST: POST {dim_base}/api/sessions/{sessionId}/graph/append
@@ -152,9 +145,7 @@ def main() -> int:
     # REST: POST {dim_base}/api/sessions/{sessionId}/deploy
     #   Body: application/x-www-form-urlencoded  completed=<comma-separated root OIDs>
     try:
-        requests.post(f"{dim_base}/api/sessions", json={"sessionId": session_id}, timeout=30, verify=verify).raise_for_status()
-        requests.post(f"{dim_base}/api/sessions/{quote(session_id)}/graph/append", json=pg_spec, timeout=60, verify=verify).raise_for_status()
-        requests.post(f"{dim_base}/api/sessions/{quote(session_id)}/deploy", data={"completed": ",".join(roots)} if roots else None, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=30, verify=verify).raise_for_status()
+        deploy_session(dim_base, session_id, pg_spec, roots, verify=verify)
     except Exception as e:
         print(f"DIM failed: {e}", file=sys.stderr)
         return 1
@@ -164,35 +155,7 @@ def main() -> int:
         print(f"{dim_base}/session?sessionId={session_id}")
         return 0
 
-    # DIM: poll session status
-    # REST: GET {dim_base}/api/sessions/{sessionId}/status  = JSON session status (e.g. 4 = FINISHED, 3 = ERROR)
-    while True:
-        try:
-            r = requests.get(f"{dim_base}/api/sessions/{quote(session_id)}/status", timeout=10, verify=verify)
-            r.raise_for_status()
-            status = r.json()
-        except Exception as e:
-            print(f"status: {e}", file=sys.stderr)
-            time.sleep(5)
-            continue
-        s = str(status)
-        if "4" in s or "FINISHED" in s or "Finished" in s:
-            print("Session finished.")
-            # DIM: per-DROP status (dlg/clients.py graph_status)
-            # REST: GET {dim_base}/api/sessions/{sessionId}/graph/status  = JSON dict { drop_uid: status, ... }
-            try:
-                r = requests.get(f"{dim_base}/api/sessions/{quote(session_id)}/graph/status", timeout=10, verify=verify)
-                r.raise_for_status()
-                graph_status = r.json()
-                print(json.dumps(graph_status, indent=2))
-            except Exception as e:
-                print(f"(graph/status: {e})")
-            return 0
-        if "3" in s or "ERROR" in s or "Error" in s:
-            print("Session error.", file=sys.stderr)
-            print(json.dumps(status, indent=2), file=sys.stderr)
-            return 1
-        time.sleep(3)
+    return wait_until_finished(dim_base, session_id, verify=verify)
 
 
 if __name__ == "__main__":
