@@ -3,6 +3,6 @@
 Handles submission and management of workflows on HPC schedulers.
 """
 
-from .manifest import prepare_manifest_embed
+from .manifest import inject_manifest_config_into_graph
 
-__all__ = ["prepare_manifest_embed"]
+__all__ = ["inject_manifest_config_into_graph"]
