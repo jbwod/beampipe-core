@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -47,7 +48,10 @@ class DaliugeTranslatorClient:
         )
         resp.raise_for_status()
 
-        # PGT id convention follows current translator naming used in scripts
+        # Turns out it increments the pgt_id by 1, it doesn't overwrite the previous one.
+        match = re.search(r'var\s+pgtName\s*=\s*"([^"]+)";', resp.text or "")
+        if match:
+            return match.group(1)
         pgt_base = lg_name.rsplit(".", 1)[0]
         return f"{pgt_base}1_pgt.graph"
 

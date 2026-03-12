@@ -98,26 +98,29 @@ def main() -> int:
         return 1
 
     # Embed manifest in graph (beampipe-ingest receives inline JSON; no second file)
-    from app.core.orchestration.manifest import apply_manifest_to_lg, prepare_manifest_embed
+    # from app.core.orchestration.manifest import apply_manifest_to_lg, prepare_manifest_embed
+    from app.core.orchestration.manifest import inject_manifest_config_into_graph
 
     test_manifest = {
-        "datasets": [{"visibility_filename": "test.ms", "evaluation_file": "/pb.fits"}],
-        "run_context": {"source_identifier": "test-source", "run_uuid": "test-run-123"},
+        "run_context": {"source_identifier": "test-source", "run_uuid": "test-run-123-injection-test"},
     }
-    manifest_with_embed = prepare_manifest_embed(test_manifest)
-    apply_manifest_to_lg(graph_json, manifest_with_embed)
-    print("Applied embedded manifest to beampipe-ingest")
+    # manifest_with_embed = prepare_manifest_embed(test_manifest)
+    # apply_manifest_to_lg(graph_json, manifest_with_embed)
+    # print("Applied embedded manifest to beampipe-ingest")
+    inject_manifest_config_into_graph(graph_json, test_manifest)
+    print("Injected manifest config into graph (beampipe-ingest)")
 
-    # Translator: LG = PGT (dlg translator_rest.py gen_pgt POST L440)
-    # REST: POST {tm_url}/gen_pgt
-    #   Body: application/x-www-form-urlencoded
-    #     lg_name, json_data (LG JSON string), algo, num_par, num_islands
-    #   Response: HTML (PGT viewer) or error; PGT id = {lg_name basename}1_pgt.graph
+    run_suffix = time.strftime("%Y-%m-%dT%H-%M-%S")
+    # Fixed lg_name so gen_pg finds the PGT (translator stores by base + "1_pgt.graph"; unique lg_name 404s).
     lg_name = os.path.basename(GRAPH_FILE)
 
+    # Translator: LG = PGT, then gen_pg
     client = DaliugeTranslatorClient(base_url=args.tm_url, verify=verify, timeout=60.0)
     try:
         pgt_id = client.translate_lg_to_pgt(lg_name, graph_json, algo="metis", num_par=1, num_islands=0)
+        pg_spec = client.translate_pgt_to_pg(
+            pgt_id, dim_host_for_tm=dim_host_tm, dim_port_for_tm=dim_port_tm
+        )
     finally:
         client.close()
     print(f"PGT: {pgt_id}")
@@ -138,7 +141,7 @@ def main() -> int:
     drops = pg_spec[1:] if isinstance(pg_spec[0], str) else pg_spec
     specs = [x for x in drops if isinstance(x, dict) and x.get("oid")]
     roots = list(get_roots(specs))
-    session_id = f"TestManifest_{time.strftime('%Y-%m-%dT%H-%M-%S')}"
+    session_id = f"TestManifest_{run_suffix}"
     print(f"PG: {len(specs)} nodes, {len(roots)} roots  session: {session_id}")
 
     # DIM: create session, append PG, deploy (dlg/clients.py create_session L59, append_graph L81, deploy_session L68)
