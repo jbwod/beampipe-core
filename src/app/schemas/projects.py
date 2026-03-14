@@ -20,6 +20,8 @@ class ProjectModuleContractStatus(BaseModel):
         default_factory=list,
         description="Discover bundle enrichment keys this module uses (e.g. ra_dec_vsys, sbid_to_eval_file)",
     )
+    graph_path: str | None = Field(default=None, description="Local path to .graph file if set")
+    graph_github_url: str | None = Field(default=None, description="GitHub raw URL to graph if set")
 
 
 class ProjectModuleContractListResponse(BaseModel):
