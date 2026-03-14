@@ -34,6 +34,24 @@ metadata_by_source = {
                 "discovery_flags": {},
             }
         }
+    ],
+    "HIPASSJ1318-22": [
+        {
+            "metadata_json": {
+                "datasets": [
+                    {
+                        "sbid": 12345,
+                        "dataset_id": "vis_12345_1",
+                        "visibility_filename": "vis_12345_1.ms",
+                        "ra_string": "11h11m11s",
+                        "dec_string": "-11.11.11",
+                        "vsys": 1234.5,
+                        "evaluation_file": "SB11111_eval.tar",
+                    }
+                ],
+                "discovery_flags": {},
+            }
+        }
     ]
 }
 
