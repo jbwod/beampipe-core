@@ -16,16 +16,15 @@ from typing import Any
 
 import requests
 
-from app.core.orchestration.deploy_client import deploy_session, wait_until_finished
-
 #  (PYTHONPATH=../../.. from src/app/core/orchestration)
 _ORCH_DIR = os.path.dirname(os.path.abspath(__file__))
 _SRC = os.path.abspath(os.path.join(_ORCH_DIR, "..", "..", ".."))
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
+from app.core.orchestration.daliuge.deploy_client import DaliugeDeployClient
+from app.core.orchestration.daliuge.translator_client import DaliugeTranslatorClient
 from app.core.utils.daliuge import get_roots
-from app.core.orchestration.translator_client import DaliugeTranslatorClient
 
 GRAPH_FILE = "test_graphs/test-manifest.graph"
 TM_URL = "http://dlg-tm.desk"
@@ -117,14 +116,14 @@ def main() -> int:
     lg_name = os.path.basename(GRAPH_FILE)
 
     # Translator: LG = PGT, then gen_pg
-    client = DaliugeTranslatorClient(base_url=args.tm_url, verify=verify, timeout=60.0)
+    translator_client = DaliugeTranslatorClient(base_url=args.tm_url, verify=verify, timeout=60.0)
     try:
-        pgt_id = client.translate_lg_to_pgt(lg_name, graph_json, algo="metis", num_par=1, num_islands=0)
-        pg_spec = client.translate_pgt_to_pg(
+        pgt_id = translator_client.translate_lg_to_pgt(lg_name, graph_json, algo="metis", num_par=1, num_islands=0)
+        pg_spec = translator_client.translate_pgt_to_pg(
             pgt_id, dim_host_for_tm=dim_host_tm, dim_port_for_tm=dim_port_tm
         )
     finally:
-        client.close()
+        translator_client.close()
     print(f"PGT: {pgt_id}")
 
     if not isinstance(pg_spec, list) or len(pg_spec) == 0:
@@ -144,18 +143,26 @@ def main() -> int:
     #   Body: JSON PG spec (list of DROP specs)
     # REST: POST {dim_base}/api/sessions/{sessionId}/deploy
     #   Body: application/x-www-form-urlencoded  completed=<comma-separated root OIDs>
+    deploy_client = DaliugeDeployClient(
+        base_url=dim_base,
+        verify=verify,
+        timeout=60.0,
+    )
     try:
-        deploy_session(dim_base, session_id, pg_spec, roots, verify=verify)
-    except Exception as e:
-        print(f"DIM failed: {e}", file=sys.stderr)
-        return 1
-    print("Deployed.")
+        try:
+            deploy_client.deploy_session(session_id, pg_spec, roots)
+        except Exception as e:
+            print(f"DIM failed: {e}", file=sys.stderr)
+            return 1
+        print("Deployed.")
 
-    if args.no_wait:
-        print(f"{dim_base}/session?sessionId={session_id}")
-        return 0
+        if args.no_wait:
+            print(f"{dim_base}/session?sessionId={session_id}")
+            return 0
 
-    return wait_until_finished(dim_base, session_id, verify=verify)
+        return deploy_client.wait_until_finished(session_id)
+    finally:
+        deploy_client.close()
 
 
 if __name__ == "__main__":
