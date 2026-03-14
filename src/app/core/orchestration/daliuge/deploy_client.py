@@ -15,60 +15,74 @@ Poll: GET {dim_base}/api/sessions/{sessionId}/status  = JSON session status (e.g
 import json
 import sys
 import time
+from dataclasses import dataclass
 from urllib.parse import quote
 
 import httpx
 
 
-def deploy_session(
-    dim_base: str,
-    session_id: str,
-    pg_spec: list,
-    roots: list[str],
-    *,
-    verify: bool = True,
-    timeout_create: float = 30.0,
-    timeout_append: float = 60.0,
-    timeout_deploy: float = 30.0,
-) -> None:
-    """Create session, append graph, deploy. Raises on HTTP error."""
-    base = dim_base.rstrip("/")
-    sid = quote(session_id)
-    with httpx.Client(verify=verify) as client:
-        client.post(
-            f"{base}/api/sessions",
+@dataclass
+class DaliugeDeployClient:
+    """Helper for DIM REST deploy and session polling."""
+
+    base_url: str
+    verify: bool = True
+    timeout: float = 60.0
+    timeout_create: float = 30.0
+    timeout_append: float = 60.0
+    timeout_deploy: float = 30.0
+
+    def __post_init__(self) -> None:
+        self._client = httpx.Client(
+            base_url=self.base_url.rstrip("/"),
+            verify=self.verify,
+            timeout=self.timeout,
+        )
+
+    def close(self) -> None:
+        self._client.close()
+
+    def deploy_session(
+        self,
+        session_id: str,
+        pg_spec: list,
+        roots: list[str],
+    ) -> None:
+        """Create session, append graph, deploy. Raises on HTTP error."""
+        sid = quote(session_id)
+        self._client.post(
+            "/api/sessions",
             json={"sessionId": session_id},
-            timeout=timeout_create,
+            timeout=self.timeout_create,
         ).raise_for_status()
-        client.post(
-            f"{base}/api/sessions/{sid}/graph/append",
+        self._client.post(
+            f"/api/sessions/{sid}/graph/append",
             json=pg_spec,
-            timeout=timeout_append,
+            timeout=self.timeout_append,
         ).raise_for_status()
         data = {"completed": ",".join(roots)} if roots else None
-        client.post(
-            f"{base}/api/sessions/{sid}/deploy",
+        self._client.post(
+            f"/api/sessions/{sid}/deploy",
             data=data,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=timeout_deploy,
+            timeout=self.timeout_deploy,
         ).raise_for_status()
 
-
-def wait_until_finished(
-    dim_base: str,
-    session_id: str,
-    *,
-    verify: bool = True,
-    poll_interval: float = 3.0,
-    timeout: float = 10.0,
-) -> int:
-    """Poll session status until FINISHED or ERROR. Prints status; returns 0 on success, 1 on error."""
-    base = dim_base.rstrip("/")
-    sid = quote(session_id)
-    with httpx.Client(verify=verify) as client:
+    def wait_until_finished(
+        self,
+        session_id: str,
+        *,
+        poll_interval: float = 3.0,
+        timeout: float = 10.0,
+    ) -> int:
+        """Poll session status until FINISHED or ERROR. Prints status; returns 0 on success, 1 on error."""
+        sid = quote(session_id)
         while True:
             try:
-                r = client.get(f"{base}/api/sessions/{sid}/status", timeout=timeout)
+                r = self._client.get(
+                    f"/api/sessions/{sid}/status",
+                    timeout=timeout,
+                )
                 r.raise_for_status()
                 status = r.json()
             except Exception as e:
@@ -79,7 +93,10 @@ def wait_until_finished(
             if "4" in s or "FINISHED" in s or "Finished" in s:
                 print("Session finished.")
                 try:
-                    r = client.get(f"{base}/api/sessions/{sid}/graph/status", timeout=timeout)
+                    r = self._client.get(
+                        f"/api/sessions/{sid}/graph/status",
+                        timeout=timeout,
+                    )
                     r.raise_for_status()
                     print(json.dumps(r.json(), indent=2))
                 except Exception as e:
