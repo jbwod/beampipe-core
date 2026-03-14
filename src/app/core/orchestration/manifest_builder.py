@@ -37,7 +37,7 @@ async def build_manifest(
         if records:
             metadata_by_source[source_identifier] = records
 
-    build_fn = getattr(module, "build_manifest_sources", None)
+    build_fn = getattr(module, "manifest", None)
     if not callable(build_fn):
         raise ValueError(
             f"Project module '{project_module}' must implement build_manifest_sources"
