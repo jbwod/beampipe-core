@@ -1,25 +1,11 @@
 """Service layer for project module discovery/contracts."""
 
-import json
 from pathlib import Path
 from typing import Any
 
 import httpx
 
 from . import list_project_modules, load_project_module
-
-
-def get_manifest_schema(project_module: str) -> dict[str, Any] | str | None:
-    """Load MANIFEST_SCHEMA"""
-    module = load_project_module(project_module)
-    schema = getattr(module, "MANIFEST_SCHEMA", None)
-    if schema is None:
-        return None
-    if isinstance(schema, dict):
-        return schema
-    if isinstance(schema, str):
-        return schema
-    return None
 
 
 def get_graph_path(project_module: str) -> str | None:
@@ -52,24 +38,6 @@ def resolve_graph_content(project_module: str) -> str:
     )
 
 
-def load_manifest_schema_dict(project_module: str) -> dict[str, Any] | None:
-    """Load manifest schema as a dict. If MANIFEST_SCHEMA read and parse JSON."""
-    module = load_project_module(project_module)
-    schema = getattr(module, "MANIFEST_SCHEMA", None)
-    if schema is None:
-        return None
-    if isinstance(schema, dict):
-        return schema
-    if isinstance(schema, str):
-        p = Path(schema)
-        if not p.is_absolute() and hasattr(module, "__file__"):
-            base = Path(module.__file__).parent
-            p = base / schema
-        if p.exists():
-            return json.loads(p.read_text())
-    return None
-
-
 class ProjectModuleService:
     @staticmethod
     def get_contract_status(project_module: str) -> dict[str, Any]:
@@ -81,7 +49,6 @@ class ProjectModuleService:
             enrichment_keys: list[str] = []
             if isinstance(enrichment_keys_raw, list):
                 enrichment_keys = [k for k in enrichment_keys_raw if isinstance(k, str)]
-            manifest_schema = getattr(module, "MANIFEST_SCHEMA", None)
             graph_path = getattr(module, "GRAPH_PATH", None)
             graph_github_url = getattr(module, "GRAPH_GITHUB_URL", None)
             return {
@@ -91,11 +58,10 @@ class ProjectModuleService:
                 "error": None,
                 "exports": [
                     symbol
-                    for symbol in ["discover", "prepare_metadata", "stage", "REQUIRED_ADAPTERS"]
+                    for symbol in ["discover", "prepare_metadata", "stage", "build_manifest_sources", "REQUIRED_ADAPTERS"]
                     if hasattr(module, symbol)
                 ],
                 "enrichment_keys": enrichment_keys,
-                "manifest_schema": manifest_schema is not None,
                 "graph_path": graph_path,
                 "graph_github_url": graph_github_url,
             }
@@ -107,7 +73,6 @@ class ProjectModuleService:
                 "error": str(exc),
                 "exports": [],
                 "enrichment_keys": [],
-                "manifest_schema": False,
                 "graph_path": None,
                 "graph_github_url": None,
             }
