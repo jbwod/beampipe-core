@@ -6,6 +6,10 @@ class DiscoverBundle(TypedDict, total=False):
     query_results: Any
     enrichments: dict[str, Any]
 
+# MANIFEST_SCHEMA
+# GRAPH_PATH
+# GRAPH_GITHUB_URL
+
 class ProjectDiscoveryModule(Protocol):
     REQUIRED_ADAPTERS: list[str]
     def discover(self, source_identifier: str, adapters: dict[str, Any] | None = None) -> DiscoverBundle: ...

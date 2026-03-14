@@ -50,3 +50,12 @@ def debug_print_modules(target: str | None = None) -> None:
         module = load_project_module(target)
         name = getattr(module, "PROJECT_NAME", None)
         print(f"Loaded module '{target}', PROJECT_NAME={name}")
+
+
+from .service import (
+    get_graph_github_url,
+    get_graph_path,
+    get_manifest_schema,
+    load_manifest_schema_dict,
+    resolve_graph_content,
+)
