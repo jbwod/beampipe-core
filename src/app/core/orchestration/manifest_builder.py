@@ -40,12 +40,12 @@ async def build_manifest(
     build_fn = getattr(module, "manifest", None)
     if not callable(build_fn):
         raise ValueError(
-            f"Project module '{project_module}' must implement build_manifest_sources"
+            f"Project module '{project_module}' must implement manifest"
         )
     sources = build_fn(
         metadata_by_source,
-        # staged_urls_by_scan_id=staged_urls_by_scan_id or {},
-        # eval_urls_by_sbid=eval_urls_by_sbid or {},
+        staged_urls_by_scan_id=staged_urls_by_scan_id or {},
+        eval_urls_by_sbid=eval_urls_by_sbid or {},
     )
 
     manifest: dict[str, Any] = {

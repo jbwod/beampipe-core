@@ -182,6 +182,12 @@ class DiscoverySettings(BaseSettings):
 class ArchiveSettings(BaseSettings):
     ARCHIVE_METADATA_VALIDATE_JSON: bool = False
 
+
+class CasdaSettings(BaseSettings):
+    CASDA_USERNAME: str | None = None
+    CASDA_PASSWORD: str | None = None
+
+
 class Settings(
     LoggingSettings,
     AppSettings,
@@ -201,6 +207,7 @@ class Settings(
     RunLedgerSettings,
     DiscoverySettings,
     ArchiveSettings,
+    CasdaSettings,
 ):
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".env"),
