@@ -185,7 +185,7 @@ class ArchiveSettings(BaseSettings):
 
 class CasdaSettings(BaseSettings):
     CASDA_USERNAME: str | None = None
-    CASDA_PASSWORD: str | None = None
+    CASDA_PASSWORD: SecretStr | None = None
 
 
 class Settings(

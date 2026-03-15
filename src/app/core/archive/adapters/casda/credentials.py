@@ -18,7 +18,8 @@ def _get_casda_password() -> Optional[str]:
         return p
     try:
         from ....config import settings
-        return getattr(settings, "CASDA_PASSWORD", None) or None
+        pw = getattr(settings, "CASDA_PASSWORD", None)
+        return pw.get_secret_value() if pw else None
     except Exception:
         return None
 
