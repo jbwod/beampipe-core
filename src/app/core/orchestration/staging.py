@@ -28,7 +28,7 @@ async def stage_sources_for_manifest(
     *,
     adapters: dict[str, Any] | None = None,
     service_name: str = "async_service",
-) -> tuple[dict[str, str], dict[str, str]]:
+) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
     module = load_project_module(project_module)
     if adapters is None:
         adapters = resolve_module_adapters(module) or {}
@@ -74,7 +74,7 @@ async def stage_sources_for_manifest(
 
     if not tables_to_stage:
         logger.debug("event=stage_sources_no_datasets project_module=%s", project_module)
-        return {}, {}
+        return {}, {}, {}
 
     # https://docs.astropy.org/en/latest/api/astropy.table.vstack.html
     combined_table = vstack(tables_to_stage)
@@ -82,9 +82,10 @@ async def stage_sources_for_manifest(
 
     # Stage visibilities (access_url from metadata)
     all_staged: dict[str, str] = {}
+    all_checksums: dict[str, str] = {}
     all_eval: dict[str, str] = {}
     try:
-        data_urls, _checksum_urls = casda_stage_data(
+        data_urls, checksum_urls = casda_stage_data(
             casda,
             combined_table,
             verbose=True,
@@ -92,6 +93,8 @@ async def stage_sources_for_manifest(
         )
         for scan_id, url in data_urls.items():
             all_staged[scan_id] = url
+        for scan_id, url in checksum_urls.items():
+            all_checksums[scan_id] = url
     except Exception as e:
         logger.error(
             "event=stage_sources_error project_module=%s error=%s",
@@ -117,4 +120,4 @@ async def stage_sources_for_manifest(
                 e,
             )
 
-    return all_staged, all_eval
+    return all_staged, all_eval, all_checksums
