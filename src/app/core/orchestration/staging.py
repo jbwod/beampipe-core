@@ -28,7 +28,7 @@ async def stage_sources_for_manifest(
     *,
     adapters: dict[str, Any] | None = None,
     service_name: str = "async_service",
-) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+) -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:
     module = load_project_module(project_module)
     if adapters is None:
         adapters = resolve_module_adapters(module) or {}
@@ -74,7 +74,7 @@ async def stage_sources_for_manifest(
 
     if not tables_to_stage:
         logger.debug("event=stage_sources_no_datasets project_module=%s", project_module)
-        return {}, {}, {}
+        return {}, {}, {}, {}
 
     # https://docs.astropy.org/en/latest/api/astropy.table.vstack.html
     combined_table = vstack(tables_to_stage)
@@ -84,6 +84,7 @@ async def stage_sources_for_manifest(
     all_staged: dict[str, str] = {}
     all_checksums: dict[str, str] = {}
     all_eval: dict[str, str] = {}
+    all_eval_checksums: dict[str, str] = {}
     try:
         data_urls, checksum_urls = casda_stage_data(
             casda,
@@ -108,11 +109,13 @@ async def stage_sources_for_manifest(
     eval_table = metadata_records_to_eval_staging_table(all_records)
     if len(eval_table) > 0:
         try:
-            eval_urls = casda_stage_eval_data(
+            eval_urls, eval_checksum_urls = casda_stage_eval_data(
                 casda, eval_table, verbose=True, service_name=service_name
             )
             for sbid, url in eval_urls.items():
                 all_eval[sbid] = url
+            for sbid, url in eval_checksum_urls.items():
+                all_eval_checksums[sbid] = url
         except Exception as e:
             logger.warning(
                 "event=stage_sources_eval_error project_module=%s error=%s",
@@ -120,4 +123,4 @@ async def stage_sources_for_manifest(
                 e,
             )
 
-    return all_staged, all_eval, all_checksums
+    return all_staged, all_eval, all_checksums, all_eval_checksums

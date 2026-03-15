@@ -162,45 +162,62 @@ def stage_eval_data(
     eval_table: Table,
     verbose: bool = True,
     service_name: str = "async_service",
-) -> dict[str, str]:
-    """Stage evaluation files; returns eval_urls_by_sbid."""
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Stage evaluation files; returns (eval_urls_by_sbid, eval_checksum_urls_by_sbid)."""
     if len(eval_table) == 0:
-        return {}
+        return {}, {}
 
     logger.debug("event=casda_eval_staging_start result_count=%s", len(eval_table))
     try:
         xml_text = _run_staging_job(casda, eval_table, service_name, verbose)
-        eval_url_by_filename = _parse_eval_job_results(xml_text)
+        eval_url_by_filename, eval_checksum_url_by_filename = _parse_eval_job_results(xml_text)
         sbid_col = _safe_table_column(eval_table, "sbid")
         filename_col = _safe_table_column(eval_table, "filename")
         eval_urls_by_sbid: dict[str, str] = {}
+        eval_checksum_urls_by_sbid: dict[str, str] = {}
         for i, fn in enumerate(filename_col):
             if i < len(sbid_col):
                 sbid = str(sbid_col[i])
-                url = eval_url_by_filename.get(str(fn))
+                fn_str = str(fn)
+                url = eval_url_by_filename.get(fn_str)
+                checksum_url = eval_checksum_url_by_filename.get(fn_str)
                 if url and sbid:
                     eval_urls_by_sbid[sbid] = url
-        logger.debug("event=casda_eval_staging_complete count=%s", len(eval_urls_by_sbid))
-        return eval_urls_by_sbid
+                if checksum_url and sbid:
+                    eval_checksum_urls_by_sbid[sbid] = checksum_url
+        logger.debug(
+            "event=casda_eval_staging_complete count=%s checksum_count=%s",
+            len(eval_urls_by_sbid),
+            len(eval_checksum_urls_by_sbid),
+        )
+        return eval_urls_by_sbid, eval_checksum_urls_by_sbid
     except RuntimeError as e:
         logger.error("event=casda_eval_staging_unsupported error=%s", e)
-        return {}
+        return {}, {}
     except Exception as e:
         logger.warning("event=casda_eval_staging_error error=%s", e)
-        return {}
+        return {}, {}
 
 
-def _parse_eval_job_results(xml_text: str) -> dict[str, str]:
-    """Parse CASDA job results for evaluation files; return filename -> url."""
-    result: dict[str, str] = {}
-    for _result_id, url in iter_uws_results(xml_text):
-        if ".checksum" in url:
-            #come back and sort this
-            continue
-        fn = extract_filename_from_url(url)
-        if fn:
-            result[fn] = url
-    return result
+def _parse_eval_job_results(xml_text: str) -> tuple[dict[str, str], dict[str, str]]:
+    """Parse CASDA job results for evaluation files.
+
+    Returns (eval_url_by_filename, eval_checksum_url_by_filename).
+    CASDA uses result_id like evaluation-10584 and evaluation-10584.checksum.
+    """
+    eval_url_by_filename: dict[str, str] = {}
+    eval_checksum_url_by_filename: dict[str, str] = {}
+    for result_id, url in iter_uws_results(xml_text):
+        if ".checksum" in result_id:
+            fn = extract_filename_from_url(url)
+            if fn and fn.endswith(".checksum"):
+                base = fn.removesuffix(".checksum")
+                eval_checksum_url_by_filename[base] = url
+        else:
+            fn = extract_filename_from_url(url)
+            if fn:
+                eval_url_by_filename[fn] = url
+    return eval_url_by_filename, eval_checksum_url_by_filename
 
 
 def _extract_scan_id(obs_publisher_did: str) -> Optional[str]:

@@ -20,6 +20,7 @@ async def build_manifest(
     staged_urls_by_scan_id: dict[str, str] | None = None,
     eval_urls_by_sbid: dict[str, str] | None = None,
     checksum_urls_by_scan_id: dict[str, str] | None = None,
+    eval_checksum_urls_by_sbid: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """
     1. Loads project module and fetches metadata from archive_metadata.
@@ -48,6 +49,7 @@ async def build_manifest(
         staged_urls_by_scan_id=staged_urls_by_scan_id or {},
         eval_urls_by_sbid=eval_urls_by_sbid or {},
         checksum_urls_by_scan_id=checksum_urls_by_scan_id or {},
+        eval_checksum_urls_by_sbid=eval_checksum_urls_by_sbid or {},
     )
 
     manifest: dict[str, Any] = {
