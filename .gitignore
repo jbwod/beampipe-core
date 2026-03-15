@@ -153,3 +153,5 @@ src/app/core/archive/adapters/test.py
 dlg/*
 
 wallaby-hires-beampipe/*
+
+scripts/calibration_files/*
