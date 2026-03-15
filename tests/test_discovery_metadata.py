@@ -3,7 +3,7 @@ from unittest.mock import ANY, AsyncMock
 import pytest
 
 from app.core.registry.service import SourceRegistryService
-from app.core.utils.discovery import (
+from app.core.utils import (
     NO_DATASETS_PAYLOAD,
     discovery_signature,
     metadata_payload_by_sbid,

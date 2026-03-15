@@ -9,7 +9,7 @@ from src.app.core.projects.contracts import (
     get_discover_enrichment,
     validate_project_module_interface,
 )
-from src.app.core.utils.discovery import validate_prepared_metadata_records
+from app.core.utils import validate_prepared_metadata_records
 
 
 def test_validate_project_module_interface_accepts_valid_module():
