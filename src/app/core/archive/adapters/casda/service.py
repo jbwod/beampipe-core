@@ -10,7 +10,7 @@ import requests
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 
-from ....utils.uws import extract_filename_from_url, iter_uws_results
+from ....utils import extract_filename_from_url, iter_uws_results
 
 logger = logging.getLogger(__name__)
 

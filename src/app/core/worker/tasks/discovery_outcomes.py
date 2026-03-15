@@ -4,7 +4,7 @@ from typing import Any, cast
 
 from ...archive.service import archive_metadata_service
 from ...registry.service import source_registry_service
-from ...utils.discovery import (
+from ...utils import (
     NO_DATASETS_PAYLOAD,
     NO_DATASETS_SIGNATURE,
     existing_signature_from_records,

@@ -11,7 +11,7 @@ from ...config import settings
 from ...db.database import local_session
 from ...projects import list_project_modules, load_project_module
 from ...registry.service import invalid_project_module_message, source_registry_service
-from ...utils.discovery import (
+from ...utils import (
     discovery_signature,
     group_metadata_by_sbid,
     metadata_payload_by_sbid,

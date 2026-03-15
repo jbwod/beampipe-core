@@ -5,7 +5,7 @@ import time
 from typing import Any
 
 from ...projects.contracts import extract_discover_bundle
-from ...utils.discovery import validate_prepared_metadata_records
+from ...utils import validate_prepared_metadata_records
 from .discovery_execution import (
     extract_prepare_result,
     run_discover_with_retry,
