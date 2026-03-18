@@ -8,51 +8,41 @@ from ..models.ledger import RunStatus
 
 
 # /Users/jblackwo/beampipe-core/docs/user-guide/database/schemas.md
-class RunRecordBase(BaseModel):
+class RunSourceSpec(BaseModel):
+    """Per-source spec with optional SBID filter."""
+
+    source_identifier: Annotated[str, Field(min_length=1, max_length=100)]
+    sbids: list[str] | None = Field(default=None, description="Optional: restrict to these SBIDs for this source")
+
+
+class BatchRunRecordBase(BaseModel):
     project_module: Annotated[
-        str, Field(min_length=1, max_length=50, examples=["wallaby"], description="Project module identifier")
+        str, Field(min_length=1, max_length=50, examples=["wallaby_hires"], description="Project module identifier")
     ]
-    source_identifier: Annotated[
-        str,
-        Field(
-            min_length=1,
-            max_length=100,
-            examples=["HIPASSXXXX+XX"],
-            description="Source identifier",
-        ),
+    sources: Annotated[
+        list[RunSourceSpec],
+        Field(min_length=1, description="Sources with optional per-source SBID filters"),
     ]
     archive_name: Annotated[
         str, Field(min_length=1, max_length=50, examples=["casda"], description="Archive name")
     ]
-    dataset_id: Annotated[
-        str,
-        Field(
-            min_length=1,
-            max_length=255,
-            examples=["SBXXXXX_visibilities.ms.tar"],
-            description="Dataset identifier",
-        ),
-    ]
 
 
-class RunRecordCreate(RunRecordBase):
+class BatchRunRecordCreate(BatchRunRecordBase):
     model_config = ConfigDict(extra="forbid")
 
-    dataset_metadata: dict | None = Field(default=None, description="Full dataset metadata")
     created_by_id: int | None = Field(default=None, description="User ID who triggered the run")
 
 
-class RunRecordCreateInternal(RunRecordCreate):
+class BatchRunRecordCreateInternal(BatchRunRecordCreate):
     status: RunStatus = Field(default=RunStatus.PENDING, description="Initial run status")
 
 
-class RunRecordRead(TimestampSchema, RunRecordBase, UUIDSchema):
+class BatchRunRecordRead(TimestampSchema, BatchRunRecordBase, UUIDSchema):
     model_config = ConfigDict(from_attributes=True)
 
-    dataset_metadata: dict | None = None
     status: RunStatus
     workflow_manifest: dict | None = None
-    workflow_type: str | None = None
     scheduler_name: str | None = None
     scheduler_job_id: str | None = None
     retry_count: int = 0
@@ -62,7 +52,7 @@ class RunRecordRead(TimestampSchema, RunRecordBase, UUIDSchema):
     completed_at: datetime | None = None
 
 
-class RunRecordUpdate(BaseModel):
+class BatchRunRecordUpdate(BaseModel):
     """Schema for updating run records via API.
 
     Note: status, started_at, and completed_at are managed automatically
@@ -72,21 +62,37 @@ class RunRecordUpdate(BaseModel):
 
     status: RunStatus | None = Field(default=None, description="New run status")
     workflow_manifest: dict | None = Field(default=None, description="Workflow manifest JSON")
-    workflow_type: str | None = Field(default=None, max_length=50, description="Type of workflow")
     scheduler_name: str | None = Field(default=None, max_length=50, description="Name of scheduler")
     scheduler_job_id: str | None = Field(default=None, max_length=100, description="Scheduler job ID")
     last_error: str | None = Field(default=None, description="Error message if run failed")
 
 
-class RunRecordUpdateInternal(RunRecordUpdate):
+class BatchRunRecordUpdateInternal(BatchRunRecordUpdate):
     updated_at: datetime
     started_at: datetime | None = None
     completed_at: datetime | None = None
 
 
-
-class RunRecordDelete(BaseModel):
+class BatchRunRecordDelete(BaseModel):
     model_config = ConfigDict(extra="forbid")
     is_deleted: bool = Field(default=True, description="Soft delete flag for the run record")
     deleted_at: datetime | None = Field(default=None, description="Timestamp when the record was deleted")
 
+
+# Prepare run (validate + preview, no DB write)
+class PrepareRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_module: Annotated[str, Field(min_length=1, max_length=50)]
+    sources: Annotated[list[RunSourceSpec], Field(min_length=1)]
+
+
+class PrepareRunResponse(BaseModel):
+    """Preview of what would be included in a run."""
+
+    project_module: str
+    sources: list[RunSourceSpec]
+    sources_preview: list[dict]  # per-source: source_identifier, sbid_count, dataset_count
+    total_datasets: int
+    valid: bool
+    errors: list[str] = Field(default_factory=list)

@@ -2,7 +2,7 @@ import uuid as uuid_pkg
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,19 +20,16 @@ class RunStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
-class RunRecord(Base):
-    __tablename__ = "run_record"
+class BatchRunRecord(Base):
+    __tablename__ = "batch_run_record"
 
     # Required
     project_module: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    source_identifier: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    sources: Mapped[list] = mapped_column(JSONB, nullable=False)  # list[{source_identifier, sbids?}]
     archive_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    dataset_id: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # Optional
-    dataset_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    # Optional workflow
     workflow_manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
-    workflow_type: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
     scheduler_name: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
     scheduler_job_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True, default=None)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
@@ -57,10 +54,4 @@ class RunRecord(Base):
         UUID(as_uuid=True), primary_key=True, default_factory=uuid7, unique=True, init=False
     )
 
-    # unique constraint
-    __table_args__ = (
-        UniqueConstraint(
-            "project_module", "source_identifier", "dataset_id", name="uq_run_record_composite"
-        ),
-        Index("idx_run_record_status", "status"),
-    )
+    __table_args__ = (Index("idx_batch_run_record_status", "status"),)

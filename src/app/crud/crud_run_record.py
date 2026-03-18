@@ -1,22 +1,21 @@
 from fastcrud import FastCRUD
 
-#/Users/jblackwo/beampipe-core/docs/user-guide/database/crud.md
-from ..models.ledger import RunRecord
+# /Users/jblackwo/beampipe-core/docs/user-guide/database/crud.md
+from ..models.ledger import BatchRunRecord
 from ..schemas.ledger import (
-    RunRecordCreateInternal,
-    RunRecordDelete,
-    RunRecordRead,
-    RunRecordUpdate,
-    RunRecordUpdateInternal,
+    BatchRunRecordCreateInternal,
+    BatchRunRecordDelete,
+    BatchRunRecordRead,
+    BatchRunRecordUpdate,
+    BatchRunRecordUpdateInternal,
 )
 
-CRUDRunRecord = FastCRUD[
-    RunRecord,
-    RunRecordCreateInternal,
-    RunRecordDelete,
-    RunRecordUpdate,
-    RunRecordUpdateInternal,
-    RunRecordRead,
+CRUDBatchRunRecord = FastCRUD[
+    BatchRunRecord,
+    BatchRunRecordCreateInternal,
+    BatchRunRecordDelete,
+    BatchRunRecordUpdate,
+    BatchRunRecordUpdateInternal,
+    BatchRunRecordRead,
 ]
-crud_run_records = CRUDRunRecord(RunRecord)
-
+crud_batch_run_records = CRUDBatchRunRecord(BatchRunRecord)
