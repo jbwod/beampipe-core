@@ -1,27 +1,31 @@
-# --------- requirements ---------
+# --------- Builder Stage ---------
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
 
-FROM python:3.11 as requirements-stage
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+ENV UV_CACHE_DIR=/tmp/uv-cache
 
-WORKDIR /tmp
+WORKDIR /app
 
-RUN pip install poetry
+COPY pyproject.toml uv.lock README.md ./
+COPY beampipe-wallaby /app/beampipe-wallaby
+COPY src /app/src
 
-COPY ./pyproject.toml ./poetry.lock* /tmp/
+RUN mkdir -p /tmp/uv-cache && chmod 777 /tmp/uv-cache \
+    && uv sync --locked --no-editable --no-dev
 
-RUN poetry export -f requirements.txt --output requirements.txt --without-hashes --with dev
+# --------- Final Stage ---------
+FROM python:3.11-slim-bookworm
 
+RUN groupadd --gid 1000 app \
+    && useradd --uid 1000 --gid app --shell /bin/bash --create-home app
 
-# --------- final image build ---------
-FROM python:3.11
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
+USER app
 WORKDIR /code
 
-COPY --from=requirements-stage /tmp/requirements.txt /code/requirements.txt
+COPY --from=builder --chown=app:app /app/src/app /code/app
 
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
-
-COPY ./src/app /code/app
-
-# -------- replace with comment to run with gunicorn --------
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-# CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000"]
+CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000"]

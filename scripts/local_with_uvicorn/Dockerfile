@@ -8,15 +8,14 @@ ENV UV_CACHE_DIR=/tmp/uv-cache
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 COPY beampipe-wallaby /app/beampipe-wallaby
 
 # Install dependencies first (for better layer caching)
 RUN mkdir -p /tmp/uv-cache && chmod 777 /tmp/uv-cache \
     && uv sync --locked --no-install-project --all-groups
 
-# Copy the project source code
-COPY . /app
+COPY src /app/src
 
 # Install the project in non-editable mode
 RUN mkdir -p /tmp/uv-cache && chmod 777 /tmp/uv-cache \
