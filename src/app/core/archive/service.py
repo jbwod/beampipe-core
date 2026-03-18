@@ -105,13 +105,29 @@ class ArchiveMetadataService:
         db: AsyncSession,
         project_module: str,
         source_identifier: str,
+        sbids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """List archive metadata entries for a source."""
+        """List archive metadata entries for a source.
+
+        Args:
+            db: Database session
+            project_module: Project module identifier
+            source_identifier: Source identifier
+            sbids: Optional list of SBIDs to filter to; if provided, only returns records for these SBIDs
+
+        Returns:
+            List of archive metadata records
+        """
+        filters: dict[str, Any] = {
+            "project_module": project_module,
+            "source_identifier": source_identifier,
+        }
+        if sbids is not None and len(sbids) > 0:
+            filters["sbid__in"] = sbids
         records = await crud_archive_metadata.get_multi(
             db=db,
-            project_module=project_module,
-            source_identifier=source_identifier,
             schema_to_select=ArchiveMetadataRead,
+            **filters,
         )
         # FastCRUD returns {"data": [...], "total_count": N}
         return cast(list[dict[str, Any]], records.get("data", []))
