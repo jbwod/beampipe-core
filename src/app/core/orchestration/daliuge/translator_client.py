@@ -1,9 +1,12 @@
+import json
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-import json
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -68,6 +71,13 @@ class DaliugeTranslatorClient:
             "dlg_mgr_port": str(dim_port_for_tm),
         }
         resp = self._client.get("/gen_pg", params=params)
+        if resp.status_code >= 500:
+            logger.error(
+                "gen_pg failed: status=%s url=%s body=%s",
+                resp.status_code,
+                resp.url,
+                resp.text[:500] if resp.text else "(empty)",
+            )
         resp.raise_for_status()
         return resp.json()
 
