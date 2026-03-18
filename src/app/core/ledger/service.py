@@ -1,17 +1,17 @@
 """Run ledger service.
 
-Provides idempotent run tracking and duplicate prevention.
+Provides run tracking for batch workflow submissions (multiple sources, datasets).
 """
 import logging
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 
-from ...crud.crud_run_record import crud_run_records
+from ...crud.crud_run_record import crud_batch_run_records
 from ...models.ledger import RunStatus
-from ...schemas.ledger import RunRecordCreateInternal, RunRecordRead
+from ...schemas.ledger import BatchRunRecordCreateInternal, BatchRunRecordRead
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
 from ..registry.service import source_registry_service
 
@@ -20,135 +20,75 @@ logger = logging.getLogger(__name__)
 
 class RunLedgerService:
     @staticmethod
-    async def check_existing_run(
-        db: AsyncSession,
-        project_module: str,
-        source_identifier: str,
-        dataset_id: str,
-    ) -> dict[str, Any] | None:
-        """Check if a run already exists for the given key.
-
-        Args:
-            db: Database session
-            project_module: Project module identifier
-            source_identifier: Source identifier
-            dataset_id: Dataset identifier
-
-        Returns:
-            Existing RunRecord if found, None otherwise
-        """
-        try:
-            run = await crud_run_records.get(
-                db=db,
-                project_module=project_module,
-                source_identifier=source_identifier,
-                dataset_id=dataset_id,
-                schema_to_select=RunRecordRead,
-            )
-            return run
-        except Exception as e:
-            logger.exception(
-                "event=ledger_check_run_error "
-                "project_module=%s source_identifier=%s dataset_id=%s error=%s",
-                project_module,
-                source_identifier,
-                dataset_id,
-                e,
-            )
-            return None
-
-    @staticmethod
     async def create_run(
         db: AsyncSession,
         project_module: str,
-        source_identifier: str,
-        dataset_id: str,
+        sources: list,
         archive_name: str,
-        dataset_metadata: dict | None = None,
         created_by_id: int | None = None,
     ) -> dict[str, Any]:
-        """Create a new run record with check.
+        """Create a new batch run record.
 
-        If a run exist with the same key, returns the existing run.
-        Otherwise, creates a new run
+        Validates all sources are registered and enabled.
 
         Args:
             db: Database session
             project_module: Project module identifier
-            source_identifier: Source identifier
-            dataset_id: Dataset identifier
-            archive_name: Archive name
-            dataset_metadata: Full dataset metadata
+            sources: List of RunSourceSpec (source_identifier, optional sbids per source)
+            archive_name: Archive name (e.g. casda)
             created_by_id: User ID who triggered the run
 
         Returns:
-            RunRecord (existing or newly created)
+            BatchRunRecord (newly created)
 
         Raises:
-            BadRequestException: If source is not registered in the source registry or is disabled
+            BadRequestException: If any source is not registered or disabled
         """
-        # Validate source is registered and enabled
-        registered_source = await source_registry_service.check_existing_source(
-            db, project_module, source_identifier
-        )
-        if not registered_source:
-            raise BadRequestException(
-                f"Source {source_identifier} is not registered for project {project_module}. "
-                "Register the source first before creating a run."
+        # Validate all sources are registered and enabled
+        for spec in sources:
+            sid = spec.get("source_identifier") if isinstance(spec, dict) else getattr(spec, "source_identifier", None)
+            if not sid:
+                raise BadRequestException("Each source must have source_identifier")
+            registered_source = await source_registry_service.check_existing_source(
+                db, project_module, sid
             )
-        if not registered_source.get("enabled", False):
-            raise BadRequestException(
-                f"Source {source_identifier} is registered but disabled for project {project_module}. "
-                "Enable the source first before creating a run."
-            )
+            if not registered_source:
+                raise BadRequestException(
+                    f"Source {sid} is not registered for project {project_module}. "
+                    "Register the source first before creating a run."
+                )
+            if not registered_source.get("enabled", False):
+                raise BadRequestException(
+                    f"Source {sid} is registered but disabled for project {project_module}. "
+                    "Enable the source first before creating a run."
+                )
 
-        # Check for existing
-        existing = await RunLedgerService.check_existing_run(
-            db, project_module, source_identifier, dataset_id
-        )
-        if existing:
-            existing_uuid = existing.get("uuid")
-            logger.info(
-                "event=ledger_run_exists "
-                "project_module=%s source_identifier=%s dataset_id=%s existing_uuid=%s",
-                project_module,
-                source_identifier,
-                dataset_id,
-                existing_uuid,
-            )
-            return existing
-
-        # Create new run
         try:
-            run_data = RunRecordCreateInternal(
+            run_data = BatchRunRecordCreateInternal(
                 project_module=project_module,
-                source_identifier=source_identifier,
-                dataset_id=dataset_id,
+                sources=sources,
                 archive_name=archive_name,
-                dataset_metadata=dataset_metadata,
                 created_by_id=created_by_id,
                 status=RunStatus.PENDING,
             )
-            run = await crud_run_records.create(
-                db=db, object=run_data, schema_to_select=RunRecordRead
+            run = await crud_batch_run_records.create(
+                db=db, object=run_data, schema_to_select=BatchRunRecordRead
             )
             run_uuid = run.get("uuid")
             logger.info(
                 "event=ledger_run_created "
-                "run_uuid=%s project_module=%s source_identifier=%s dataset_id=%s",
+                "run_uuid=%s project_module=%s source_count=%s",
                 run_uuid,
                 project_module,
-                source_identifier,
-                dataset_id,
+                len(sources),
             )
             return run
         except Exception as e:
             logger.exception(
                 "event=ledger_run_create_error "
-                "project_module=%s source_identifier=%s dataset_id=%s error=%s",
+                "project_module=%s sources=%s error=%s",
                 project_module,
-                source_identifier,
-                dataset_id,
+                sources,
                 e,
             )
             raise
@@ -172,7 +112,6 @@ class RunLedgerService:
         status: RunStatus | None = None,
         scheduler_job_id: str | None = None,
         scheduler_name: str | None = None,
-        workflow_type: str | None = None,
         workflow_manifest: dict | None = None,
         error: str | None = None,
     ) -> dict[str, Any]:
@@ -184,7 +123,6 @@ class RunLedgerService:
             status: New status for the run
             scheduler_job_id: ID from the HPC scheduler
             scheduler_name: Name of the scheduler
-            workflow_type: Type of workflow
             workflow_manifest: JSON manifest of the workflow
             error: Error message if the run failed
 
@@ -195,8 +133,9 @@ class RunLedgerService:
             NotFoundException: If run not found
             BadRequestException: If status transition is invalid
         """
-        # Get existing
-        run = await crud_run_records.get(db=db, uuid=run_id, schema_to_select=RunRecordRead)
+        run = await crud_batch_run_records.get(
+            db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+        )
         if not run:
             raise NotFoundException(f"Run {run_id} not found")
 
@@ -204,7 +143,6 @@ class RunLedgerService:
         started_at_value = run.get("started_at")
         completed_at_value = run.get("completed_at")
 
-        # status transition if status is being changed
         if status and status != current_status_value and current_status_value is not None:
             current_status = RunStatus(str(current_status_value))
             if not RunLedgerService._validate_status_transition(current_status, status):
@@ -212,13 +150,11 @@ class RunLedgerService:
                     f"Invalid status transition from {current_status.value} to {status.value}"
                 )
 
-        # Prepare
         update_data: dict[str, Any] = {}
         now = datetime.now(UTC)
 
         if status:
             update_data["status"] = status
-            # timestamp management
             if status == RunStatus.RUNNING and not started_at_value:
                 update_data["started_at"] = now
             elif status in [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED]:
@@ -229,28 +165,20 @@ class RunLedgerService:
             update_data["scheduler_job_id"] = scheduler_job_id
         if scheduler_name is not None:
             update_data["scheduler_name"] = scheduler_name
-        if workflow_type is not None:
-            update_data["workflow_type"] = workflow_type
         if workflow_manifest is not None:
             update_data["workflow_manifest"] = workflow_manifest
         if error is not None:
             update_data["last_error"] = error
 
-        # Always update updated_at
         update_data["updated_at"] = now
 
         if not update_data:
-            # No changes to make
             return run
 
-        # Update run
-        await crud_run_records.update(
-            db=db, object=update_data, uuid=run_id
-        )
+        await crud_batch_run_records.update(db=db, object=update_data, uuid=run_id)
 
-        # Fetch
-        updated_run = await crud_run_records.get(
-            db=db, uuid=run_id, schema_to_select=RunRecordRead
+        updated_run = await crud_batch_run_records.get(
+            db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
         )
         if not updated_run:
             raise NotFoundException(f"Run {run_id} not found after update")
@@ -263,13 +191,5 @@ class RunLedgerService:
         )
         return updated_run
 
-    # @staticmethod
-    # async def mark_for_retry(
-    #     db: AsyncSession,
-    #     run_id: UUID,
-    # ) -> RunRecord:
 
-
-
-# instance
 run_ledger_service = RunLedgerService()

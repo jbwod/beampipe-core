@@ -1,14 +1,14 @@
 """Run ledger module.
 
-Maintains a persistent ledger of all workflow runs to ensure idempotency,
-prevent duplicates, and support safe retries.
+Maintains a persistent ledger of all workflow runs for history tracking
+and scheduler integration.
 """
 
-from .models import RunRecord, RunStatus
+from .models import BatchRunRecord, RunStatus
 from .service import RunLedgerService, run_ledger_service
 
 __all__ = [
-    "RunRecord",
+    "BatchRunRecord",
     "RunStatus",
     "RunLedgerService",
     "run_ledger_service",

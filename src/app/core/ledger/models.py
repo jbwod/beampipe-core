@@ -1,6 +1,5 @@
 """Run ledger database models."""
 
-from ...models.ledger import RunRecord, RunStatus
+from ...models.ledger import BatchRunRecord, RunStatus
 
-__all__ = ["RunRecord", "RunStatus"]
-
+__all__ = ["BatchRunRecord", "RunStatus"]
