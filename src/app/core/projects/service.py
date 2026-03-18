@@ -1,11 +1,20 @@
 """Service layer for project module discovery/contracts."""
 
+import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import httpx
 
+from app.core.config import settings
+
 from . import list_project_modules, load_project_module
+
+logger = logging.getLogger(__name__)
+
+_GRAPH_FETCH_TIMEOUT = 30.0
+_GRAPH_FETCH_RETRIES = 3
 
 
 def get_graph_path(project_module: str) -> str | None:
@@ -21,21 +30,36 @@ def get_graph_github_url(project_module: str) -> str | None:
 
 
 def resolve_graph_content(project_module: str) -> str:
-    """Resolve graph content from GRAPH_PATH or GRAPH_GITHUB_URL."""
     path = get_graph_path(project_module)
     if path:
         p = Path(path)
         if p.exists():
+            logger.info("Resolved graph from local path: %s", path)
             return p.read_text()
         raise FileNotFoundError(f"Graph path not found: {path}")
+
     url = get_graph_github_url(project_module)
-    if url:
-        resp = httpx.get(url, timeout=30.0)
-        resp.raise_for_status()
-        return resp.text
-    raise ValueError(
-        f"Project module '{project_module}' has no GRAPH_PATH or GRAPH_GITHUB_URL"
-    )
+    if not url:
+        raise ValueError(
+            f"Project module '{project_module}' has no GRAPH_PATH or GRAPH_GITHUB_URL"
+        )
+
+    last_error: Exception | None = None
+    for attempt in range(1, _GRAPH_FETCH_RETRIES + 1):
+        try:
+            logger.info("Fetching graph from GitHub (attempt %d/%d): %s", attempt, _GRAPH_FETCH_RETRIES, url)
+            resp = httpx.get(url, timeout=_GRAPH_FETCH_TIMEOUT)
+            resp.raise_for_status()
+            content = resp.text
+            json.loads(content)
+            logger.info("Resolved graph from GitHub: %s", url)
+            return content
+        except (httpx.HTTPError, json.JSONDecodeError) as e:
+            last_error = e
+            logger.warning("Graph fetch attempt %d/%d failed: %s", attempt, _GRAPH_FETCH_RETRIES, e)
+            if attempt == _GRAPH_FETCH_RETRIES:
+                raise
+    raise last_error or RuntimeError("Graph fetch failed")
 
 
 class ProjectModuleService:
