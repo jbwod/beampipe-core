@@ -20,10 +20,17 @@ from ..worker.tasks.discovery_batch import resolve_module_adapters
 logger = logging.getLogger(__name__)
 
 
+def _get_sbids_for_source(spec: dict | Any) -> list[str] | None:
+    """Extract sbids from a source spec (dict or RunSourceSpec)."""
+    if isinstance(spec, dict):
+        return spec.get("sbids")
+    return getattr(spec, "sbids", None)
+
+
 async def stage_sources_for_manifest(
     db: AsyncSession,
     project_module: str,
-    source_identifiers: list[str],
+    sources: list,
     casda_username: str,
     *,
     adapters: dict[str, Any] | None = None,
@@ -36,11 +43,16 @@ async def stage_sources_for_manifest(
     # Collect tables to stage
     tables_to_stage: list[Table] = []
     all_records: list[dict[str, Any]] = []
-    for source_identifier in source_identifiers:
+    for spec in sources:
+        sid = spec.get("source_identifier") if isinstance(spec, dict) else getattr(spec, "source_identifier", None)
+        if not sid:
+            continue
+        sbids = _get_sbids_for_source(spec)
         records = await archive_metadata_service.list_metadata_for_source(
             db=db,
             project_module=project_module,
-            source_identifier=source_identifier,
+            source_identifier=sid,
+            sbids=sbids,
         )
         all_records.extend(records)
         table = metadata_records_to_staging_table(records)

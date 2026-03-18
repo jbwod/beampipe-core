@@ -11,10 +11,16 @@ from ..projects import load_project_module
 logger = logging.getLogger(__name__)
 
 
+def _get_sbids_for_source(spec: Any) -> list[str] | None:
+    if isinstance(spec, dict):
+        return spec.get("sbids")
+    return getattr(spec, "sbids", None)
+
+
 async def build_manifest(
     db: AsyncSession,
     project_module: str,
-    source_identifiers: list[str],
+    sources: list,
     *,
     credentials_ini_url: str = "",
     staged_urls_by_scan_id: dict[str, str] | None = None,
@@ -30,14 +36,19 @@ async def build_manifest(
     module = load_project_module(project_module)
     metadata_by_source: dict[str, list[dict[str, Any]]] = {}
 
-    for source_identifier in source_identifiers:
+    for spec in sources:
+        sid = spec.get("source_identifier") if isinstance(spec, dict) else getattr(spec, "source_identifier", None)
+        if not sid:
+            continue
+        sbids = _get_sbids_for_source(spec)
         records = await archive_metadata_service.list_metadata_for_source(
             db=db,
             project_module=project_module,
-            source_identifier=source_identifier,
+            source_identifier=sid,
+            sbids=sbids,
         )
         if records:
-            metadata_by_source[source_identifier] = records
+            metadata_by_source[sid] = records
 
     build_fn = getattr(module, "manifest", None)
     if not callable(build_fn):
