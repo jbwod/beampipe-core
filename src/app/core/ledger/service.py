@@ -13,7 +13,7 @@ from ...crud.crud_run_record import crud_batch_run_records
 from ...models.ledger import RunStatus
 from ...schemas.ledger import BatchRunRecordCreateInternal, BatchRunRecordRead
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
-from ..registry.service import source_registry_service
+from ..utils.registry import validate_source_spec
 
 logger = logging.getLogger(__name__)
 
@@ -46,22 +46,9 @@ class RunLedgerService:
         """
         # Validate all sources are registered and enabled
         for spec in sources:
-            sid = spec.get("source_identifier") if isinstance(spec, dict) else getattr(spec, "source_identifier", None)
-            if not sid:
-                raise BadRequestException("Each source must have source_identifier")
-            registered_source = await source_registry_service.check_existing_source(
-                db, project_module, sid
-            )
-            if not registered_source:
-                raise BadRequestException(
-                    f"Source {sid} is not registered for project {project_module}. "
-                    "Register the source first before creating a run."
-                )
-            if not registered_source.get("enabled", False):
-                raise BadRequestException(
-                    f"Source {sid} is registered but disabled for project {project_module}. "
-                    "Enable the source first before creating a run."
-                )
+            _, _, err = await validate_source_spec(db, project_module, spec)
+            if err:
+                raise BadRequestException(err)
 
         try:
             run_data = BatchRunRecordCreateInternal(
