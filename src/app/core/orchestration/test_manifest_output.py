@@ -1,8 +1,9 @@
 import json
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from _paths import setup_sys_path
+
+setup_sys_path()
 
 from app.core.projects import load_project_module
 

@@ -3,9 +3,7 @@
   DIM:         POST /api/sessions (body: sessionId) = POST /api/sessions/{id}/graph/append (body: PG) = POST /api/sessions/{id}/deploy (form: completed=roots)
   Poll:        GET /api/sessions/{id}/status  then  GET /api/sessions/{id}/graph/status
 
-  Test with embedded manifest (beampipe-ingest + test-manifest.graph):
-  cd src/app/core/orchestration && PYTHONPATH=../../.. python3 submit_hello_universe-no-dg.py --proxied --insecure
-
+  uv run python src/app/core/orchestration/test-submit-rest.py --proxied --insecure
 """
 import argparse
 import json
@@ -16,17 +14,16 @@ from typing import Any
 
 import requests
 
-#  (PYTHONPATH=../../.. from src/app/core/orchestration)
-_ORCH_DIR = os.path.dirname(os.path.abspath(__file__))
-_SRC = os.path.abspath(os.path.join(_ORCH_DIR, "..", "..", ".."))
-if _SRC not in sys.path:
-    sys.path.insert(0, _SRC)
+from _paths import ORCH_DIR, setup_sys_path
+
+setup_sys_path()
 
 from app.core.orchestration.daliuge.deploy_client import DaliugeDeployClient
 from app.core.orchestration.daliuge.translator_client import DaliugeTranslatorClient
 from app.core.utils.daliuge import get_roots
 
-GRAPH_FILE = "test_graphs/test-manifest.graph"
+GRAPH_FILE = ORCH_DIR / "test_graphs" / "test-manifest.graph"
+OUTPUT_MANIFEST = ORCH_DIR / "output_manifest.json"
 TM_URL = "http://dlg-tm.desk"
 DIM_HOST = "dlg-dim.desk"
 DIM_PORT = 8001
@@ -63,7 +60,7 @@ def main() -> int:
 
     if args.validate:
         try:
-            with open(GRAPH_FILE) as f:
+            with open(GRAPH_FILE, encoding="utf-8") as f:
                 g = json.load(f)
             print(f"Graph OK: {len(g.get('nodeDataArray', []))} nodes, {len(g.get('linkDataArray', []))} links")
         except FileNotFoundError:
@@ -91,20 +88,22 @@ def main() -> int:
         return 0
 
     try:
-        with open(GRAPH_FILE) as f:
+        with open(GRAPH_FILE, encoding="utf-8") as f:
             graph_json = json.load(f)
     except FileNotFoundError:
-        print(f"Not found: {GRAPH_FILE} (run from orchestration dir)", file=sys.stderr)
+        print(f"Not found: {GRAPH_FILE}", file=sys.stderr)
         return 1
 
     # Embed manifest in graph (beampipe-ingest receives inline JSON; no second file)
     # from app.core.orchestration.manifest import apply_manifest_to_lg, prepare_manifest_embed
     from app.core.orchestration.manifest import inject_manifest_config_into_graph
 
-    test_manifest = {
-        "datasets": [{"visibility_filename": "test.ms", "evaluation_file": "/pb.fits"}],
-        "run_context": {"source_identifier": "test-source", "run_uuid": "test-run-123-injection-test"},
-    }
+    # test_manifest = {
+    #     "datasets": [{"visibility_filename": "test.ms", "evaluation_file": "/pb.fits"}],
+    #     "run_context": {"source_identifier": "test-source", "run_uuid": "test-run-123-injection-test"},
+    # }
+    with open(OUTPUT_MANIFEST, encoding="utf-8") as mf:
+        test_manifest = json.load(mf)
     # manifest_with_embed = prepare_manifest_embed(test_manifest)
     # apply_manifest_to_lg(graph_json, manifest_with_embed)
     # print("Applied embedded manifest to beampipe-ingest")
@@ -113,7 +112,7 @@ def main() -> int:
 
     run_suffix = time.strftime("%Y-%m-%dT%H-%M-%S")
     # Fixed lg_name so gen_pg finds the PGT (translator stores by base + "1_pgt.graph"; unique lg_name 404s).
-    lg_name = os.path.basename(GRAPH_FILE)
+    lg_name = GRAPH_FILE.name
 
     # Translator: LG = PGT, then gen_pg
     translator_client = DaliugeTranslatorClient(base_url=args.tm_url, verify=verify, timeout=60.0)
