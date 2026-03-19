@@ -25,6 +25,8 @@ class RunLedgerService:
         project_module: str,
         sources: list,
         archive_name: str,
+        *,
+        execution_profile_id: UUID | None = None,
         created_by_id: int | None = None,
     ) -> dict[str, Any]:
         """Create a new batch run record.
@@ -55,6 +57,7 @@ class RunLedgerService:
                 project_module=project_module,
                 sources=sources,
                 archive_name=archive_name,
+                execution_profile_id=execution_profile_id,
                 created_by_id=created_by_id,
                 status=RunStatus.PENDING,
             )

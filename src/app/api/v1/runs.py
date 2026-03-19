@@ -78,6 +78,7 @@ async def create_run(
         project_module=run_data.project_module,
         sources=[s.model_dump() for s in run_data.sources],
         archive_name=run_data.archive_name,
+        execution_profile_id=run_data.execution_profile_id,
         created_by_id=current_user.get("id"),
     )
 

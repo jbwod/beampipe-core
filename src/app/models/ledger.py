@@ -29,6 +29,13 @@ class BatchRunRecord(Base):
     archive_name: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # Optional workflow
+    execution_profile_id: Mapped[uuid_pkg.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("daliuge_execution_profile.uuid"),
+        nullable=True,
+        index=True,
+        default=None,
+    )
     workflow_manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
     scheduler_name: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
     scheduler_job_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True, default=None)

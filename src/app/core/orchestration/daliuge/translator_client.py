@@ -27,7 +27,6 @@ class DaliugeTranslatorClient:
     def close(self) -> None:
         self._client.close()
 
-# TODO come back to this
     def translate_lg_to_pgt(
         self,
         lg_name: str,

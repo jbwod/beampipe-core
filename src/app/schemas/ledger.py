@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,6 +32,7 @@ class BatchRunRecordBase(BaseModel):
 class BatchRunRecordCreate(BatchRunRecordBase):
     model_config = ConfigDict(extra="forbid")
 
+    execution_profile_id: UUID | None = Field(default=None, description="DALiuGE execution profile to use")
     created_by_id: int | None = Field(default=None, description="User ID who triggered the run")
 
 
@@ -41,6 +43,7 @@ class BatchRunRecordCreateInternal(BatchRunRecordCreate):
 class BatchRunRecordRead(TimestampSchema, BatchRunRecordBase, UUIDSchema):
     model_config = ConfigDict(from_attributes=True)
 
+    execution_profile_id: UUID | None = None
     status: RunStatus
     workflow_manifest: dict | None = None
     scheduler_name: str | None = None
