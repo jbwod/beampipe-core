@@ -2,6 +2,7 @@ import json
 import logging
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..archive.service import archive_metadata_service
@@ -10,11 +11,87 @@ from ..ledger.service import run_ledger_service
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..utils.registry import validate_source_spec
 from ...models.ledger import RunStatus
+from ...crud.crud_daliuge_execution_profile import crud_daliuge_execution_profile
+from ...models.daliuge import DaliugeExecutionProfile
+from ...schemas.daliuge import DaliugeExecutionProfileRead
 from .manifest import inject_manifest_config_into_graph
 from .manifest_builder import _get_sbids_for_source, build_manifest
 from .staging import stage_sources_for_manifest
 
 logger = logging.getLogger(__name__)
+
+
+async def _resolve_execution_profile(
+    db: AsyncSession, run: dict
+) -> dict:
+    """Resolve DALiuGE execution profile: run's profile_id > project default > global default."""
+    # 1. Run has explicit profile_id
+    profile_id = run.get("execution_profile_id")
+    if profile_id:
+        profile = await crud_daliuge_execution_profile.get(
+            db=db, uuid=profile_id, schema_to_select=DaliugeExecutionProfileRead
+        )
+        if profile:
+            return {
+                "algo": profile["algo"],
+                "num_par": profile["num_par"],
+                "num_islands": profile["num_islands"],
+                "tm_url": profile["tm_url"],
+                "dim_host_for_tm": profile["dim_host_for_tm"],
+                "dim_port_for_tm": profile["dim_port_for_tm"],
+                "deploy_host": profile["deploy_host"],
+                "deploy_port": profile["deploy_port"],
+                "verify_ssl": profile["verify_ssl"],
+            }
+
+    # # 2. Project default (project_module=X, is_default=True)
+    # project_module = run.get("project_module")
+    # if project_module:
+    #     result = await db.execute(
+    #         select(DaliugeExecutionProfile).where(
+    #             DaliugeExecutionProfile.project_module == project_module,
+    #             DaliugeExecutionProfile.is_default.is_(True),
+    #         ).limit(1)
+    #     )
+    #     row = result.scalar_one_or_none()
+    #     if row:
+    #         return {
+    #             "algo": row.algo,
+    #             "num_par": row.num_par,
+    #             "num_islands": row.num_islands,
+    #             "tm_url": row.tm_url,
+    #             "dim_host_for_tm": row.dim_host_for_tm,
+    #             "dim_port_for_tm": row.dim_port_for_tm,
+    #             "deploy_host": row.deploy_host,
+    #             "deploy_port": row.deploy_port,
+    #             "verify_ssl": row.verify_ssl,
+    #         }
+
+    # # 3. Global default (project_module=None, is_default=True)
+    # result = await db.execute(
+    #     select(DaliugeExecutionProfile).where(
+    #         DaliugeExecutionProfile.project_module.is_(None),
+    #         DaliugeExecutionProfile.is_default.is_(True),
+    #     ).limit(1)
+    # )
+    # row = result.scalar_one_or_none()
+    # if row:
+    #     return {
+    #         "algo": row.algo,
+    #         "num_par": row.num_par,
+    #         "num_islands": row.num_islands,
+    #         "tm_url": row.tm_url,
+    #         "dim_host_for_tm": row.dim_host_for_tm,
+    #         "dim_port_for_tm": row.dim_port_for_tm,
+    #         "deploy_host": row.deploy_host,
+    #         "deploy_port": row.deploy_port,
+    #         "verify_ssl": row.verify_ssl,
+    #     }
+
+    raise ValueError(
+        "No DALiuGE execution profile found. Create a profile via POST /api/v1/execution-profiles "
+        "and set is_default=True for a global default, or pass execution_profile_id when creating a run."
+    )
 
 
 async def prepare_run(
@@ -151,26 +228,24 @@ async def execute_run(
                     from pathlib import Path
                     lg_name = Path(graph_path).name
 
-                # dim_host = settings.DALUGE_DIM_HOST
-                # dim_port = settings.DALUGE_DIM_PORT
-                dim_host_tm = settings.DALUGE_DIM_HOST_FOR_TM
-                dim_port_tm = settings.DALUGE_DIM_PORT_FOR_TM
-                deploy_host = settings.DALUGE_DIM_DEPLOY_HOST
-                deploy_port = settings.DALUGE_DIM_DEPLOY_PORT
+                profile = await _resolve_execution_profile(db, run)
 
                 translator = DaliugeTranslatorClient(
-                    base_url=settings.DALUGE_TM_URL,
-                    verify=settings.DALUGE_VERIFY_SSL,
+                    base_url=profile["tm_url"],
+                    verify=profile["verify_ssl"],
                 )
                 try:
-                    # need to get this configurable per project
                     pgt_id = translator.translate_lg_to_pgt(
-                        lg_name, graph_json, algo="metis", num_par=1, num_islands=0
+                        lg_name,
+                        graph_json,
+                        algo=profile["algo"],
+                        num_par=profile["num_par"],
+                        num_islands=profile["num_islands"],
                     )
                     pg_spec = translator.translate_pgt_to_pg(
                         pgt_id,
-                        dim_host_for_tm=dim_host_tm,
-                        dim_port_for_tm=dim_port_tm,
+                        dim_host_for_tm=profile["dim_host_for_tm"],
+                        dim_port_for_tm=profile["dim_port_for_tm"],
                     )
                 finally:
                     translator.close()
@@ -183,7 +258,8 @@ async def execute_run(
                 roots = list(get_roots(specs))
                 session_id = f"BeampipeRun_{run_id}"
 
-                # revisit
+                deploy_host = profile["deploy_host"]
+                deploy_port = profile["deploy_port"]
                 dim_base = (
                     f"http://{deploy_host}:{deploy_port}"
                     if deploy_port != 80
@@ -191,7 +267,7 @@ async def execute_run(
                 )
                 deploy = DaliugeDeployClient(
                     base_url=dim_base,
-                    verify=settings.DALUGE_VERIFY_SSL,
+                    verify=profile["verify_ssl"],
                 )
                 try:
                     deploy.deploy_session(session_id, pg_spec, roots)
