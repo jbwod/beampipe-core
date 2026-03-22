@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from .datasets import router as datasets_router
+from .execution_profiles import router as execution_profiles_router
 from .health import router as health_router
 from .login import router as login_router
 from .logout import router as logout_router
@@ -20,5 +21,6 @@ router.include_router(tasks_router)
 router.include_router(datasets_router)
 router.include_router(workflows_router)
 router.include_router(runs_router)
+router.include_router(execution_profiles_router)
 router.include_router(sources_router)
 router.include_router(projects_router)
