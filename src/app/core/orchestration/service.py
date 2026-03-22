@@ -2,18 +2,16 @@ import json
 import logging
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...crud.crud_daliuge_execution_profile import crud_daliuge_execution_profile
+from ...models.ledger import RunStatus
+from ...schemas.daliuge import DaliugeExecutionProfileRead
 from ..archive.service import archive_metadata_service
 from ..config import settings
 from ..ledger.service import run_ledger_service
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..utils.registry import validate_source_spec
-from ...models.ledger import RunStatus
-from ...crud.crud_daliuge_execution_profile import crud_daliuge_execution_profile
-from ...models.daliuge import DaliugeExecutionProfile
-from ...schemas.daliuge import DaliugeExecutionProfileRead
 from .manifest import inject_manifest_config_into_graph
 from .manifest_builder import _get_sbids_for_source, build_manifest
 from .staging import stage_sources_for_manifest
@@ -42,6 +40,8 @@ async def _resolve_execution_profile(
                 "deploy_host": profile["deploy_host"],
                 "deploy_port": profile["deploy_port"],
                 "verify_ssl": profile["verify_ssl"],
+                "deployment_backend": profile.get("deployment_backend") or "rest_dim",
+                "deployment_config": profile.get("deployment_config"),
             }
 
     # # 2. Project default (project_module=X, is_default=True)
@@ -159,10 +159,9 @@ async def execute_run(
     """
     from ...crud.crud_run_record import crud_batch_run_records
     from ...schemas.ledger import BatchRunRecordRead
-
+    from ..utils.daliuge import get_roots
     from .daliuge.deploy_client import DaliugeDeployClient
     from .daliuge.translator_client import DaliugeTranslatorClient
-    from ..utils.daliuge import get_roots
 
     run = await crud_batch_run_records.get(
         db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
@@ -258,34 +257,61 @@ async def execute_run(
                 roots = list(get_roots(specs))
                 session_id = f"BeampipeRun_{run_id}"
 
-                deploy_host = profile["deploy_host"]
-                deploy_port = profile["deploy_port"]
-                dim_base = (
-                    f"http://{deploy_host}:{deploy_port}"
-                    if deploy_port != 80
-                    else f"http://{deploy_host}"
-                )
-                deploy = DaliugeDeployClient(
-                    base_url=dim_base,
-                    verify=profile["verify_ssl"],
-                )
-                try:
-                    deploy.deploy_session(session_id, pg_spec, roots)
-                finally:
-                    deploy.close()
+                deployment_backend = profile.get("deployment_backend") or "rest_dim"
+                if deployment_backend == "rest_dim":
+                    deploy_host = profile["deploy_host"]
+                    deploy_port = profile["deploy_port"]
+                    if deploy_host is None or deploy_port is None:
+                        raise ValueError(
+                            "REST DIM deploy requires deploy_host and deploy_port on the execution profile"
+                        )
+                    dim_base = (
+                        f"http://{deploy_host}:{deploy_port}"
+                        if deploy_port != 80
+                        else f"http://{deploy_host}"
+                    )
+                    deploy = DaliugeDeployClient(
+                        base_url=dim_base,
+                        verify=profile["verify_ssl"],
+                    )
+                    try:
+                        deploy.deploy_session(session_id, pg_spec, roots)
+                    finally:
+                        deploy.close()
 
+                    await run_ledger_service.update_run_status(
+                        db=db,
+                        run_id=run_id,
+                        status=RunStatus.COMPLETED,
+                        scheduler_name="daliuge",
+                        scheduler_job_id=session_id,
+                    )
+                    return {
+                        "run_id": str(run_id),
+                        "status": "completed",
+                        "scheduler_job_id": session_id,
+                        "manifest": manifest,
+                    }
+
+                # slurm_remote tbd
+                logger.warning(
+                    "event=execute_run_slurm_remote_skip_dim run_id=%s backend=%s",
+                    run_id,
+                    deployment_backend,
+                )
                 await run_ledger_service.update_run_status(
                     db=db,
                     run_id=run_id,
                     status=RunStatus.COMPLETED,
-                    scheduler_name="daliuge",
-                    scheduler_job_id=session_id,
+                    scheduler_name="pending_slurm",
+                    scheduler_job_id=None,
                 )
                 return {
                     "run_id": str(run_id),
                     "status": "completed",
-                    "scheduler_job_id": session_id,
+                    "scheduler_job_id": None,
                     "manifest": manifest,
+                    "deployment_backend": deployment_backend,
                 }
 
         await run_ledger_service.update_run_status(

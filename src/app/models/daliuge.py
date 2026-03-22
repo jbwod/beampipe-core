@@ -2,7 +2,7 @@ import uuid as uuid_pkg
 from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, Index, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from uuid6 import uuid7
 
@@ -22,7 +22,15 @@ class DaliugeExecutionProfile(Base):
     tm_url: Mapped[str] = mapped_column(String(255), nullable=False)
     dim_host_for_tm: Mapped[str] = mapped_column(String(100), nullable=False)
     dim_port_for_tm: Mapped[int] = mapped_column(nullable=False)
-    deploy_host: Mapped[str] = mapped_column(String(100), nullable=False)
+    deploy_host: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
+    deploy_port: Mapped[int | None] = mapped_column(nullable=True, default=None)
+    deployment_backend: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="rest_dim",
+        server_default="rest_dim",
+    )
+    deployment_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
 
     # Optional with defaults
     description: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
@@ -31,7 +39,6 @@ class DaliugeExecutionProfile(Base):
     algo: Mapped[str] = mapped_column(String(20), nullable=False, default="metis")
     num_par: Mapped[int] = mapped_column(nullable=False, default=1)
     num_islands: Mapped[int] = mapped_column(nullable=False, default=0)
-    deploy_port: Mapped[int] = mapped_column(nullable=False, default=8001)
     verify_ssl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default_factory=lambda: datetime.now(UTC), nullable=False
