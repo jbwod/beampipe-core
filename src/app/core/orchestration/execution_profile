@@ -1,0 +1,15 @@
+{
+  "name": "local-dlg-proxied-insecure",
+  "description": "(dlg-tm.desk, DIM via proxy :80, translator to dlg-dim:8001)",
+  "project_module": null,
+  "is_default": true,
+  "algo": "metis",
+  "num_par": 1,
+  "num_islands": 0,
+  "tm_url": "http://dlg-tm.desk",
+  "dim_host_for_tm": "dlg-dim",
+  "dim_port_for_tm": 8001,
+  "deploy_host": "dlg-dim.desk",
+  "deploy_port": 80,
+  "verify_ssl": false
+}
