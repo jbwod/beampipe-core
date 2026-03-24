@@ -1,10 +1,13 @@
 import json
 import logging
+from pathlib import Path
 from uuid import UUID
 
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_daliuge_execution_profile import crud_daliuge_execution_profile
+from ...models.daliuge import DaliugeExecutionProfile
 from ...models.ledger import RunStatus
 from ...schemas.daliuge import DaliugeExecutionProfileRead
 from ..archive.service import archive_metadata_service
@@ -19,74 +22,68 @@ from .staging import stage_sources_for_manifest
 logger = logging.getLogger(__name__)
 
 
+def _profile_to_dict(profile: dict) -> dict:
+    return {
+        "algo": profile["algo"],
+        "num_par": profile["num_par"],
+        "num_islands": profile["num_islands"],
+        "tm_url": profile.get("tm_url"),
+        "dim_host_for_tm": profile.get("dim_host_for_tm"),
+        "dim_port_for_tm": profile.get("dim_port_for_tm"),
+        "deploy_host": profile.get("deploy_host"),
+        "deploy_port": profile.get("deploy_port"),
+        "verify_ssl": profile["verify_ssl"],
+        "deployment_backend": profile.get("deployment_backend"),
+        "deployment_config": profile.get("deployment_config"),
+    }
+
+
 async def _resolve_execution_profile(
     db: AsyncSession, run: dict
 ) -> dict:
     """Resolve DALiuGE execution profile: run's profile_id > project default > global default."""
-    # 1. Run has explicit profile_id
+
+    async def _load_by_uuid(uid) -> dict | None:
+        p = await crud_daliuge_execution_profile.get(
+            db=db, uuid=uid, schema_to_select=DaliugeExecutionProfileRead
+        )
+        return _profile_to_dict(p) if p else None
+
     profile_id = run.get("execution_profile_id")
     if profile_id:
-        profile = await crud_daliuge_execution_profile.get(
-            db=db, uuid=profile_id, schema_to_select=DaliugeExecutionProfileRead
+        got = await _load_by_uuid(profile_id)
+        if got:
+            return got
+
+    project_module = run.get("project_module")
+    if project_module:
+        result = await db.execute(
+            select(DaliugeExecutionProfile.uuid).where(
+                and_(
+                    DaliugeExecutionProfile.project_module == project_module,
+                    DaliugeExecutionProfile.is_default.is_(True),
+                )
+            ).limit(1)
         )
-        if profile:
-            return {
-                "algo": profile["algo"],
-                "num_par": profile["num_par"],
-                "num_islands": profile["num_islands"],
-                "tm_url": profile["tm_url"],
-                "dim_host_for_tm": profile["dim_host_for_tm"],
-                "dim_port_for_tm": profile["dim_port_for_tm"],
-                "deploy_host": profile["deploy_host"],
-                "deploy_port": profile["deploy_port"],
-                "verify_ssl": profile["verify_ssl"],
-                "deployment_backend": profile.get("deployment_backend") or "rest_dim",
-                "deployment_config": profile.get("deployment_config"),
-            }
+        row = result.scalar_one_or_none()
+        if row:
+            got = await _load_by_uuid(row)
+            if got:
+                return got
 
-    # # 2. Project default (project_module=X, is_default=True)
-    # project_module = run.get("project_module")
-    # if project_module:
-    #     result = await db.execute(
-    #         select(DaliugeExecutionProfile).where(
-    #             DaliugeExecutionProfile.project_module == project_module,
-    #             DaliugeExecutionProfile.is_default.is_(True),
-    #         ).limit(1)
-    #     )
-    #     row = result.scalar_one_or_none()
-    #     if row:
-    #         return {
-    #             "algo": row.algo,
-    #             "num_par": row.num_par,
-    #             "num_islands": row.num_islands,
-    #             "tm_url": row.tm_url,
-    #             "dim_host_for_tm": row.dim_host_for_tm,
-    #             "dim_port_for_tm": row.dim_port_for_tm,
-    #             "deploy_host": row.deploy_host,
-    #             "deploy_port": row.deploy_port,
-    #             "verify_ssl": row.verify_ssl,
-    #         }
-
-    # # 3. Global default (project_module=None, is_default=True)
-    # result = await db.execute(
-    #     select(DaliugeExecutionProfile).where(
-    #         DaliugeExecutionProfile.project_module.is_(None),
-    #         DaliugeExecutionProfile.is_default.is_(True),
-    #     ).limit(1)
-    # )
-    # row = result.scalar_one_or_none()
-    # if row:
-    #     return {
-    #         "algo": row.algo,
-    #         "num_par": row.num_par,
-    #         "num_islands": row.num_islands,
-    #         "tm_url": row.tm_url,
-    #         "dim_host_for_tm": row.dim_host_for_tm,
-    #         "dim_port_for_tm": row.dim_port_for_tm,
-    #         "deploy_host": row.deploy_host,
-    #         "deploy_port": row.deploy_port,
-    #         "verify_ssl": row.verify_ssl,
-    #     }
+    result = await db.execute(
+        select(DaliugeExecutionProfile.uuid).where(
+            and_(
+                DaliugeExecutionProfile.project_module.is_(None),
+                DaliugeExecutionProfile.is_default.is_(True),
+            )
+        ).limit(1)
+    )
+    row = result.scalar_one_or_none()
+    if row:
+        got = await _load_by_uuid(row)
+        if got:
+            return got
 
     raise ValueError(
         "No DALiuGE execution profile found. Create a profile via POST /api/v1/execution-profiles "
@@ -160,8 +157,8 @@ async def execute_run(
     from ...crud.crud_run_record import crud_batch_run_records
     from ...schemas.ledger import BatchRunRecordRead
     from ..utils.daliuge import get_roots
-    from .daliuge.deploy_client import DaliugeDeployClient
-    from .daliuge.translator_client import DaliugeTranslatorClient
+    from .rest_client.deploy_client import DaliugeDeployClient
+    from .rest_client.translator_client import DaliugeTranslatorClient
 
     run = await crud_batch_run_records.get(
         db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
@@ -224,13 +221,27 @@ async def execute_run(
                 graph_path = get_graph_path(project_module)
                 lg_name = f"{project_module}.graph"
                 if graph_path:
-                    from pathlib import Path
                     lg_name = Path(graph_path).name
 
                 profile = await _resolve_execution_profile(db, run)
+                deployment_backend = profile.get("deployment_backend")
+
+                if deployment_backend == "slurm_remote":
+                   logger.info("event=execute_run_slurm_remote deployment_backend=%s", deployment_backend)
+                   return
+                # rest_dim: TM gen_pgt + gen_pg + DIM (requires tm_url, dim_*, deploy_*)
+                tm_url = profile.get("tm_url")
+                if not tm_url:
+                    raise ValueError("rest_dim requires tm_url on the execution profile")
+                dim_host = profile.get("dim_host_for_tm")
+                dim_port = profile.get("dim_port_for_tm")
+                if dim_host is None or dim_port is None:
+                    raise ValueError(
+                        "rest_dim requires dim_host_for_tm and dim_port_for_tm for gen_pg"
+                    )
 
                 translator = DaliugeTranslatorClient(
-                    base_url=profile["tm_url"],
+                    base_url=tm_url,
                     verify=profile["verify_ssl"],
                 )
                 try:
@@ -243,8 +254,8 @@ async def execute_run(
                     )
                     pg_spec = translator.translate_pgt_to_pg(
                         pgt_id,
-                        dim_host_for_tm=profile["dim_host_for_tm"],
-                        dim_port_for_tm=profile["dim_port_for_tm"],
+                        dim_host_for_tm=dim_host,
+                        dim_port_for_tm=dim_port,
                     )
                 finally:
                     translator.close()
@@ -257,61 +268,38 @@ async def execute_run(
                 roots = list(get_roots(specs))
                 session_id = f"BeampipeRun_{run_id}"
 
-                deployment_backend = profile.get("deployment_backend") or "rest_dim"
-                if deployment_backend == "rest_dim":
-                    deploy_host = profile["deploy_host"]
-                    deploy_port = profile["deploy_port"]
-                    if deploy_host is None or deploy_port is None:
-                        raise ValueError(
-                            "REST DIM deploy requires deploy_host and deploy_port on the execution profile"
-                        )
-                    dim_base = (
-                        f"http://{deploy_host}:{deploy_port}"
-                        if deploy_port != 80
-                        else f"http://{deploy_host}"
+                deploy_host = profile.get("deploy_host")
+                deploy_port = profile.get("deploy_port")
+                if deploy_host is None or deploy_port is None:
+                    raise ValueError(
+                        "REST DIM deploy requires deploy_host and deploy_port on the execution profile"
                     )
-                    deploy = DaliugeDeployClient(
-                        base_url=dim_base,
-                        verify=profile["verify_ssl"],
-                    )
-                    try:
-                        deploy.deploy_session(session_id, pg_spec, roots)
-                    finally:
-                        deploy.close()
-
-                    await run_ledger_service.update_run_status(
-                        db=db,
-                        run_id=run_id,
-                        status=RunStatus.COMPLETED,
-                        scheduler_name="daliuge",
-                        scheduler_job_id=session_id,
-                    )
-                    return {
-                        "run_id": str(run_id),
-                        "status": "completed",
-                        "scheduler_job_id": session_id,
-                        "manifest": manifest,
-                    }
-
-                # slurm_remote tbd
-                logger.warning(
-                    "event=execute_run_slurm_remote_skip_dim run_id=%s backend=%s",
-                    run_id,
-                    deployment_backend,
+                dim_base = (
+                    f"http://{deploy_host}:{deploy_port}"
+                    if deploy_port != 80
+                    else f"http://{deploy_host}"
                 )
+                deploy = DaliugeDeployClient(
+                    base_url=dim_base,
+                    verify=profile["verify_ssl"],
+                )
+                try:
+                    deploy.deploy_session(session_id, pg_spec, roots)
+                finally:
+                    deploy.close()
+
                 await run_ledger_service.update_run_status(
                     db=db,
                     run_id=run_id,
                     status=RunStatus.COMPLETED,
-                    scheduler_name="pending_slurm",
-                    scheduler_job_id=None,
+                    scheduler_name="daliuge",
+                    scheduler_job_id=session_id,
                 )
                 return {
                     "run_id": str(run_id),
                     "status": "completed",
-                    "scheduler_job_id": None,
+                    "scheduler_job_id": session_id,
                     "manifest": manifest,
-                    "deployment_backend": deployment_backend,
                 }
 
         await run_ledger_service.update_run_status(
