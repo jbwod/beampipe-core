@@ -304,27 +304,6 @@ async def discover_schedule(
                 job_ids.append(job.job_id)
                 total_sources += len(batch)
                 remaining_sources -= len(batch)
-                try:
-                    await source_registry_service.attach_claim_job_id(
-                        db=db,
-                        project_module=module_name,
-                        source_identifiers=batch,
-                        claim_token=claim_token,
-                        job_id=str(job.job_id),
-                        commit=False,
-                    )
-                    await db.commit()
-                except Exception as exc:
-                    await db.rollback()
-                    logger.warning(
-                        "event=discover_schedule_attach_job_id_error project_module=%s batch_size=%s job_id=%s claim_token=%s error=%s",
-                        module_name,
-                        len(batch),
-                        job.job_id,
-                        claim_token,
-                        exc,
-                        exc_info=True,
-                    )
                 continue
 
             enqueue_failures += 1
@@ -349,7 +328,8 @@ async def discover_schedule(
                 except Exception as exc:
                     await db.rollback()
                     logger.warning(
-                        "event=discover_schedule_release_claim_error project_module=%s batch_size=%s claim_token=%s error=%s",
+                        "event=discover_schedule_release_claim_error "
+                        "project_module=%s batch_size=%s claim_token=%s error=%s",
                         release_module,
                         len(release_batch),
                         claim_token,
