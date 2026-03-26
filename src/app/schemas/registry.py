@@ -48,17 +48,17 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
         default=None,
         description="Hash of last discovery state; used to skip writes when unchanged.",
     )
-    discovery_claimed_at: datetime | None = Field(
-        default=None,
-        description="Timestamp when the current discovery lease was acquired.",
-    )
     discovery_claim_expires_at: datetime | None = Field(
         default=None,
         description="When the current discovery lease expires; null means no active lease.",
     )
-    discovery_job_id: str | None = Field(
+    workflow_run_pending: bool = Field(
+        default=False,
+        description="True when source has newly discovered metadata awaiting orchestration.",
+    )
+    workflow_run_pending_at: datetime | None = Field(
         default=None,
-        description="Identifier of the most recent queued discovery job for this source.",
+        description="Timestamp when source was marked pending for workflow run.",
     )
 
     @field_serializer("last_checked_at")
@@ -73,18 +73,18 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
             return last_attempted_at.isoformat()
         return None
 
-    @field_serializer("discovery_claimed_at")
-    def serialize_discovery_claimed_at(self, discovery_claimed_at: datetime | None, _info):  # type: ignore[override]
-        if discovery_claimed_at is not None:
-            return discovery_claimed_at.isoformat()
-        return None
-
     @field_serializer("discovery_claim_expires_at")
     def serialize_discovery_claim_expires_at(
         self, discovery_claim_expires_at: datetime | None, _info
     ):  # type: ignore[override]
         if discovery_claim_expires_at is not None:
             return discovery_claim_expires_at.isoformat()
+        return None
+
+    @field_serializer("workflow_run_pending_at")
+    def serialize_workflow_run_pending_at(self, workflow_run_pending_at: datetime | None, _info):  # type: ignore[override]
+        if workflow_run_pending_at is not None:
+            return workflow_run_pending_at.isoformat()
         return None
 
 
@@ -101,7 +101,7 @@ class SourceRegistryUpdate(BaseModel):
 
 
 class SourceRegistryUpdateInternal(SourceRegistryUpdate):
-    updated_at: datetime
+    pass
 
 
 class SourceRegistryDelete(BaseModel):

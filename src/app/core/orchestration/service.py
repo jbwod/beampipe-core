@@ -14,6 +14,7 @@ from ..archive.service import archive_metadata_service
 from ..config import settings
 from ..ledger.service import run_ledger_service
 from ..projects.service import get_graph_path, resolve_graph_content
+from ..registry.service import source_registry_service
 from ..utils.registry import validate_source_spec
 from .manifest import inject_manifest_config_into_graph
 from .manifest_builder import _get_sbids_for_source, build_manifest
@@ -302,6 +303,17 @@ async def execute_run(
                     "manifest": manifest,
                 }
 
+        source_identifiers = [
+            str(spec.get("source_identifier"))
+            for spec in sources
+            if isinstance(spec, dict) and spec.get("source_identifier")
+        ]
+        await source_registry_service.clear_workflow_pending_for_sources(
+            db=db,
+            project_module=project_module,
+            source_identifiers=source_identifiers,
+            commit=False,
+        )
         await run_ledger_service.update_run_status(
             db=db, run_id=run_id, status=RunStatus.COMPLETED
         )

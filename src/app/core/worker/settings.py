@@ -2,16 +2,17 @@ from arq import cron
 from arq.connections import RedisSettings
 
 from ...core import logger as _app_logger  # noqa: F401
-
 from ...core.config import settings
 from .functions import (
     discover_batch,
     discover_schedule_task,
     enqueue_timer_task,
+    execute_run_job,
     sample_background_task,
     shutdown,
     startup,
     timer_task,
+    workflow_run_schedule_task,
 )
 
 REDIS_QUEUE_HOST = settings.REDIS_QUEUE_HOST
@@ -26,7 +27,7 @@ def _discovery_schedule_minutes() -> set[int]:
 
 
 class WorkerSettings:
-    functions = [sample_background_task, discover_batch, timer_task]
+    functions = [sample_background_task, discover_batch, timer_task, execute_run_job]
     redis_settings = RedisSettings(host=REDIS_QUEUE_HOST, port=REDIS_QUEUE_PORT)
     queue_name = settings.WORKER_QUEUE_NAME
     on_startup = startup
@@ -37,7 +38,12 @@ class WorkerSettings:
 
 
 class SchedulerSettings:
-    functions = [sample_background_task, discover_schedule_task, enqueue_timer_task]
+    functions = [
+        sample_background_task,
+        discover_schedule_task,
+        workflow_run_schedule_task,
+        enqueue_timer_task,
+    ]
     redis_settings = RedisSettings(host=REDIS_QUEUE_HOST, port=REDIS_QUEUE_PORT)
     queue_name = settings.SCHEDULER_QUEUE_NAME
     on_startup = startup
@@ -50,6 +56,11 @@ class SchedulerSettings:
         cron(
             discover_schedule_task,  # type: ignore[arg-type]
             minute=_discovery_schedule_minutes(),
+            second={0},
+        ),
+        cron(
+            workflow_run_schedule_task,  # type: ignore[arg-type]
+            minute=set(range(0, 60)),
             second={0},
         ),
         # cron(enqueue_timer_task, second={0}),

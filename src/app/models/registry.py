@@ -23,7 +23,6 @@ class SourceRegistry(Base):
     )
 
     # Optional
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     last_checked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None, index=True
     )
@@ -34,13 +33,20 @@ class SourceRegistry(Base):
     stale_after_hours: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     discovery_signature: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
     discovery_claim_token: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
-    discovery_claimed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=None
-    )
     discovery_claim_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None, index=True
     )
-    discovery_job_id: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
+    workflow_run_pending: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    workflow_run_pending_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, index=True
+    )
+    workflow_claim_token: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
+    workflow_claimed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    workflow_claim_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, index=True
+    )
 
     uuid: Mapped[uuid_pkg.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default_factory=uuid7, unique=True, init=False
@@ -52,5 +58,6 @@ class SourceRegistry(Base):
             "project_module", "source_identifier", name="uq_source_registry_composite"
         ),
         Index("idx_source_registry_enabled", "enabled"),
+        Index("idx_source_registry_project_pending", "project_module", "workflow_run_pending"),
     )
 
