@@ -230,6 +230,11 @@ async def handle_changed_metadata(
         checked_at=now,
         discovery_signature=new_sig,
     )
+    await source_registry_service.mark_source_pending_workflow_run(
+        db=db,
+        source_id=persisted_source["uuid"],
+        pending_at=now,
+    )
     logger.debug(
         "event=discover_batch_source_outcome "
         "project_module=%s source_identifier=%s outcome=has_metadata changed=%s "
