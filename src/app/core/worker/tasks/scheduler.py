@@ -7,6 +7,7 @@ from ...archive.discovery import discover_schedule
 from ...config import settings
 from ...db.database import local_session
 from ...projects import list_project_modules, load_project_module
+from .run_batch import workflow_run_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,56 @@ async def sample_background_task(ctx: dict[str, Any], name: str) -> str:
     _ = ctx
     await asyncio.sleep(5)
     return f"Task {name} is complete!"
+
+
+async def workflow_run_schedule_task(
+    ctx: dict[str, Any], project_module: str | None = None
+) -> dict[str, Any]:
+    logger.debug(
+        "event=workflow_run_schedule_task_started project_module=%s",
+        project_module or "all",
+    )
+    try:
+        async with local_session() as db:
+            redis = ctx.get("redis")
+            if redis is None:
+                raise RuntimeError("Redis not available on worker context")
+            result = await workflow_run_schedule(db=db, redis=redis, project_module=project_module)
+            if "ok" not in result:
+                result["ok"] = True
+            run_count = result.get("run_count", 0)
+            total_sources = result.get("total_sources", 0)
+            is_skipped = result.get("ok") and run_count == 0 and total_sources == 0
+            if is_skipped:
+                logger.info(
+                    "event=workflow_run_schedule_task project_module=%s skipped",
+                    project_module or "all",
+                )
+            else:
+                logger.info(
+                    "event=workflow_run_schedule_task_result "
+                    "project_module=%s scheduled_at=%s ok=%s run_count=%s total_sources=%s "
+                    "skipped_modules=%s",
+                    project_module or "all",
+                    result.get("scheduled_at"),
+                    result.get("ok"),
+                    run_count,
+                    total_sources,
+                    result.get("skipped_modules"),
+                )
+            return result
+    except Exception as exc:
+        logger.exception(
+            "event=workflow_run_schedule_task_error project_module=%s error=%s",
+            project_module,
+            exc,
+        )
+        return {
+            "ok": False,
+            "error": str(exc),
+            "project_module": project_module,
+            "scheduled_at": datetime.now(UTC).isoformat(),
+        }
 
 
 async def discover_schedule_task(
