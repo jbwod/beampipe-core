@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -22,6 +24,10 @@ class ProjectModuleContractStatus(BaseModel):
     )
     graph_path: str | None = Field(default=None, description="Local path to .graph file if set")
     graph_github_url: str | None = Field(default=None, description="GitHub raw URL to graph if set")
+    workflow_run_automation: dict[str, Any] | None = Field(
+        default=None,
+        description="Module WORKFLOW_RUN_AUTOMATION dict when present (workflow auto-scheduling policy)",
+    )
 
 
 class ProjectModuleContractListResponse(BaseModel):

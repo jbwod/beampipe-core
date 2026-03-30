@@ -75,6 +75,10 @@ class ProjectModuleService:
                 enrichment_keys = [k for k in enrichment_keys_raw if isinstance(k, str)]
             graph_path = getattr(module, "GRAPH_PATH", None)
             graph_github_url = getattr(module, "GRAPH_GITHUB_URL", None)
+            wf_auto = getattr(module, "WORKFLOW_RUN_AUTOMATION", None)
+            workflow_run_automation: dict[str, Any] | None = (
+                dict(wf_auto) if isinstance(wf_auto, dict) else None
+            )
             return {
                 "project_module": project_module,
                 "valid": True,
@@ -88,6 +92,7 @@ class ProjectModuleService:
                 "enrichment_keys": enrichment_keys,
                 "graph_path": graph_path,
                 "graph_github_url": graph_github_url,
+                "workflow_run_automation": workflow_run_automation,
             }
         except Exception as exc:
             return {
@@ -99,6 +104,7 @@ class ProjectModuleService:
                 "enrichment_keys": [],
                 "graph_path": None,
                 "graph_github_url": None,
+                "workflow_run_automation": None,
             }
 
     @staticmethod
