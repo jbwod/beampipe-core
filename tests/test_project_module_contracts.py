@@ -3,13 +3,13 @@ from types import ModuleType
 
 import pytest
 
+from app.core.utils import validate_prepared_metadata_records
 from src.app.core.projects import list_project_modules, load_project_module
 from src.app.core.projects.contracts import (
     extract_discover_bundle,
     get_discover_enrichment,
     validate_project_module_interface,
 )
-from app.core.utils import validate_prepared_metadata_records
 
 
 def test_validate_project_module_interface_accepts_valid_module():
@@ -28,7 +28,7 @@ def test_extract_discover_bundle():
 
 
 def test_validate_prepared_metadata_records():
-    with pytest.raises(ValueError, match="missing required 'sbid'"):
+    with pytest.raises(ValueError, match="non-null 'sbid'"):
         validate_prepared_metadata_records(
             [{"dataset_id": "d1"}],
             project_module="p",

@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from uuid import UUID
 
+import httpx
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -209,11 +210,53 @@ async def execute_run(
         )
 
         if do_submit:
+            graph_content: str | None = None
+            graph_fetch_error: str | None = None
             try:
                 graph_content = resolve_graph_content(project_module)
             except ValueError as e:
-                logger.warning("event=execute_run_no_graph project_module=%s error=%s", project_module, e)
+                # we still stage/manifest so the workflow can clear its pending sources.
+                logger.warning(
+                    "event=execute_run_no_graph project_module=%s error=%s",
+                    project_module,
+                    e,
+                )
                 graph_content = None
+            except (httpx.HTTPError, FileNotFoundError) as e:
+                # Graph fetch failures (e.g. 404 from GitHub) should not be retried by ARQ.
+                # immediately keep re-creating failing runs in a tight loop.
+                graph_fetch_error = str(e)
+                logger.warning(
+                    "event=execute_run_graph_fetch_error project_module=%s error=%s",
+                    project_module,
+                    graph_fetch_error,
+                    exc_info=True,
+                )
+
+            if graph_fetch_error:
+                source_identifiers = [
+                    str(spec.get("source_identifier"))
+                    for spec in sources
+                    if isinstance(spec, dict) and spec.get("source_identifier")
+                ]
+                await source_registry_service.clear_workflow_pending_for_sources(
+                    db=db,
+                    project_module=project_module,
+                    source_identifiers=source_identifiers,
+                    commit=False,
+                )
+                await run_ledger_service.update_run_status(
+                    db=db,
+                    run_id=run_id,
+                    status=RunStatus.FAILED,
+                    error=graph_fetch_error,
+                )
+                return {
+                    "run_id": str(run_id),
+                    "status": "failed",
+                    "error": graph_fetch_error,
+                    "manifest": manifest,
+                }
 
             if graph_content:
                 graph_json = json.loads(graph_content)

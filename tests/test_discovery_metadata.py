@@ -124,6 +124,7 @@ async def test_handle_changed_metadata_reconciles_snapshot(monkeypatch: pytest.M
     delete_mock = AsyncMock(return_value=2)
     upsert_mock = AsyncMock(return_value={})
     update_state_mock = AsyncMock(return_value=None)
+    mark_pending_mock = AsyncMock(return_value=None)
 
     monkeypatch.setattr(
         discovery_outcomes.archive_metadata_service,
@@ -135,6 +136,11 @@ async def test_handle_changed_metadata_reconciles_snapshot(monkeypatch: pytest.M
         discovery_outcomes.source_registry_service,
         "update_source_discovery_state",
         update_state_mock,
+    )
+    monkeypatch.setattr(
+        discovery_outcomes.source_registry_service,
+        "mark_source_pending_workflow_run",
+        mark_pending_mock,
     )
 
     changed = await discovery_outcomes.handle_changed_metadata(
@@ -163,6 +169,11 @@ async def test_handle_changed_metadata_reconciles_snapshot(monkeypatch: pytest.M
         source_identifier="HIPASSJ0000-00",
         sbid="111",
         metadata_json={"datasets": [{"dataset_id": "dataset-1", "sbid": "111"}], "discovery_flags": {"vizier": True}},
+    )
+    mark_pending_mock.assert_awaited_once_with(
+        db=ANY,
+        source_id="source-uuid",
+        pending_at="now",
     )
 
 
