@@ -40,7 +40,8 @@ async def view_sources(request: Request) -> HTMLResponse:
           style="display:none;"></andypf-json-viewer>
 
         <h2>Execution profiles</h2>
-        <p><button type="button" id="load-execution-profiles-btn">Load execute</button></p>
+        <p id="execution-profiles-status">Not loaded.</p>
+        <p><button type="button" id="load-execution-profiles-btn">Load execution profiles</button></p>
         <andypf-json-viewer id="execution-profiles-json-viewer" indent="2" expanded="1" theme="eighties"
           show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
           style="display:none;"></andypf-json-viewer>
@@ -126,9 +127,13 @@ async def view_sources(request: Request) -> HTMLResponse:
           async function loadExecutionProfiles() {
             const statusEl = document.getElementById('execution-profiles-status');
             const viewer = document.getElementById('execution-profiles-json-viewer');
+            if (!statusEl || !viewer) {
+              console.warn('Execution profiles UI elements missing (execution-profiles-status / viewer).');
+              return;
+            }
             viewer.style.display = 'none';
             if (!authToken) {
-              statusEl.textContent = 'skrrt';
+              statusEl.textContent = 'Log in first, then click Load execution profiles.';
               return;
             }
             statusEl.textContent = 'Loading execution profiles…';
@@ -138,7 +143,7 @@ async def view_sources(request: Request) -> HTMLResponse:
                 { headers: { 'Authorization': 'Bearer ' + authToken } }
               );
               if (!response.ok) {
-                statusEl.textContent = 'ya (' + response.status + ').';
+                statusEl.textContent = 'Failed to load execution profiles (HTTP ' + response.status + ').';
                 return;
               }
               const data = await response.json();
