@@ -86,7 +86,13 @@ class ProjectModuleService:
                 "error": None,
                 "exports": [
                     symbol
-                    for symbol in ["discover", "prepare_metadata", "stage", "build_manifest_sources", "REQUIRED_ADAPTERS"]
+                    for symbol in [
+                        "discover",
+                        "prepare_metadata",
+                        "stage",
+                        "build_manifest_sources",
+                        "REQUIRED_ADAPTERS",
+                    ]
                     if hasattr(module, symbol)
                 ],
                 "enrichment_keys": enrichment_keys,

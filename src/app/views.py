@@ -39,6 +39,12 @@ async def view_sources(request: Request) -> HTMLResponse:
           show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
           style="display:none;"></andypf-json-viewer>
 
+        <h2>Execution profiles</h2>
+        <p><button type="button" id="load-execution-profiles-btn">Load execute</button></p>
+        <andypf-json-viewer id="execution-profiles-json-viewer" indent="2" expanded="1" theme="eighties"
+          show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
+          style="display:none;"></andypf-json-viewer>
+
         <h2>Add Source</h2>
         <form id="add-source-form">
           <label>Project module:
@@ -106,6 +112,7 @@ async def view_sources(request: Request) -> HTMLResponse:
               authToken = data.access_token || null;
               if (authToken) {
                 statusEl.textContent = ' Logged in';
+                await loadExecutionProfiles();
               } else {
                 statusEl.textContent = ' Login failed (no token)';
               }
@@ -113,6 +120,36 @@ async def view_sources(request: Request) -> HTMLResponse:
               console.error('Login error', err);
               statusEl.textContent = ' Login error';
               authToken = null;
+            }
+          }
+
+          async function loadExecutionProfiles() {
+            const statusEl = document.getElementById('execution-profiles-status');
+            const viewer = document.getElementById('execution-profiles-json-viewer');
+            viewer.style.display = 'none';
+            if (!authToken) {
+              statusEl.textContent = 'skrrt';
+              return;
+            }
+            statusEl.textContent = 'Loading execution profiles…';
+            try {
+              const response = await fetch(
+                '/api/v1/execution-profiles?page=1&items_per_page=200',
+                { headers: { 'Authorization': 'Bearer ' + authToken } }
+              );
+              if (!response.ok) {
+                statusEl.textContent = 'ya (' + response.status + ').';
+                return;
+              }
+              const data = await response.json();
+              const total = data.total_count != null ? data.total_count : (data.data || []).length;
+              statusEl.textContent = 'Loaded ' + (data.data || []).length + ' profile(s)'
+                + (total != null ? ' (total ' + total + ')' : '') + '.';
+              viewer.data = data;
+              viewer.style.display = 'block';
+            } catch (err) {
+              console.error('Error loading execution profiles', err);
+              statusEl.textContent = 'Error loading execution profiles.';
             }
           }
 
@@ -304,6 +341,9 @@ async def view_sources(request: Request) -> HTMLResponse:
 
           document.getElementById('login-form').addEventListener('submit', login);
           document.getElementById('add-source-form').addEventListener('submit', addSource);
+          document.getElementById('load-execution-profiles-btn').addEventListener('click', function () {
+            loadExecutionProfiles();
+          });
           loadReadyStatus();
           loadTapStatus();
           setInterval(loadReadyStatus, 60000);
