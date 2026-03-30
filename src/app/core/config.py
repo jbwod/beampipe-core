@@ -160,6 +160,7 @@ class CORSSettings(BaseSettings):
 
 class RunLedgerSettings(BaseSettings):
     MAX_RETRIES: int = 3
+    WORKFLOW_AUTOMATION_SCHEDULER_NAME: str = "workflow_auto"
 
 
 class DiscoverySettings(BaseSettings):
