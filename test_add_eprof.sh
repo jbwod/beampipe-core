@@ -4,7 +4,7 @@ ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Str1ngst!}"
 
 TM_URL="${E2E_TM_URL:-http://dlg-tm.desk}"
-DIM_HOST_FOR_TM="${E2E_DIM_HOST_FOR_TM:-dlg-dim.desk}"
+DIM_HOST_FOR_TM="${E2E_DIM_HOST_FOR_TM:-dlg-dim}"
 DIM_PORT_FOR_TM="${E2E_DIM_PORT_FOR_TM:-8001}"
 DEPLOY_HOST="${E2E_DEPLOY_HOST:-dlg-dim.desk}"
 DEPLOY_PORT="${E2E_DEPLOY_PORT:-80}"
@@ -56,7 +56,7 @@ print(json.dumps(p))
 "
 )"
 
-echo "POST ${API_BASE}/api/v1/execution-profiles (name=${PROFILE_NAME}, project_module=${PROJECT_MODULE})" >&2
+echo "POST ${API_BASE}/api/v1/execution-profiles (name=${PROFILE_NAME}, project_module=${PROJECT_MODULE}, dim_host_for_tm=${DIM_HOST_FOR_TM}:${DIM_PORT_FOR_TM}, deploy=${DEPLOY_HOST}:${DEPLOY_PORT})" >&2
 
 resp="$(
   curl -sS -w '\n%{http_code}' -X POST "${API_BASE}/api/v1/execution-profiles" \

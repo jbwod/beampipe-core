@@ -74,7 +74,6 @@ def _discovery_eligibility_conditions(
         claim_available,
         or_(
             SourceRegistry.last_checked_at.is_(None),
-            ~metadata_exists,
             stale_by_time,
         ),
     ]
