@@ -1,0 +1,66 @@
+- pyenv activate dlg
+- cd /home/gayatri/daliuge/daliuge-engine/dlg/deploy
+- git pull 
+Example 1: 
+- python create_dlg_job.py  -a 1 -n 1 -s 1 -u -f setonix -L ~/EAGLE-graph-repo/examples/HelloWorld-Universe.graph -v 5 --remote --submit -U ganiruddha
+Example 2: 
+ python create_dlg_job.py  -a 1 -n 1 -s 1 -u -f setonix -L /home/gayatri/wallaby-hires/dlg-graphs-final/casda_download_setonix.graph -v 5 --remote --submit -U ganiruddha
+Output: 
+Creating remote session directory on setonix.pawsey.org.au: mkdir -p /scratch/pawsey0411/gayatri/dlg/workspace/casda_2024-10-18T14-42-50
+Copying PGT to: /scratch/pawsey0411/gayatri/dlg/workspace/casda_2024-10-18T14-42-50/casda_download_setonix.pgt.graph
+Creating SLURM script remotely: /scratch/pawsey0411/gayatri/dlg/workspace/casda_2024-10-18T14-42-50/jobsub.sh
+Submitting sbatch job: cd /scratch/pawsey0411/gayatri/dlg/workspace/casda_2024-10-18T14-42-50 && sbatch --parsable /scratch/pawsey0411/gayatri/dlg/workspace/casda_2024-10-18T14-42-50/jobsub.sh
+Job with ID 16867360
+submitted successfully.
+
+Location of the code: 
+/scratch/pawsey0411/ganiruddha/Setonix/imager_job_test.sh
+
+Code:
+#!/bin/bash -l  
+#SBATCH --clusters=setonix  
+#SBATCH --account="pawsey0411"  
+#SBATCH --mail-user="gayatri.aniruddha@uwa.edu.au"  
+#SBATCH --mail-type="FAIL"  
+#SBATCH --time=24:00:00  
+#SBATCH --ntasks=26 
+#SBATCH --ntasks-per-node=26
+#SBATCH --threads-per-core=1
+#SBATCH --job-name=DALiuGE-singularity-imager  
+#SBATCH --export=ALL  
+#SBATCH --output=imager.out 
+# Modules to be loaded
+module use /group/askap/modulefiles
+module load singularity/4.1.0-mpi
+
+# Command to run the imager 
+srun --export=ALL --ntasks 26 --ntasks-per-node 26 --job-name=imager singularity exec --bind $PWD:/askapbuffer,/scratch:/scratch /software/projects/pawsey0411/awicenec/singularity/askapsoft_1.17.5-mpich.sif imager -c imager_parset.in 
+
+Graph:
+GitHub: ICRAR/wallaby-hires (main): dlg-graphs-final/240909_pipeline_cimager_singularity.graph
+
+Script generated after Setonix deployment:
+#!/bin/bash --login
+
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=2
+#SBATCH --job-name=DALiuGE-240909_2024-09-30T15-52-59
+#SBATCH --time=00:30:00
+#SBATCH --error=err-%j.log
+
+export DLG_ROOT=/scratch/pawsey0411/gayatri/dlg
+source /software/projects/pawsey0411/venv/bin/activate
+
+srun -l python3 -m dlg.deploy.start_dlg_cluster --log_dir /scratch/pawsey0411/gayatri/dlg/workspace/240909_2024-09-30T15-52-59 --physical-graph "/scratch/pawsey0411/gayatri/dlg/workspace/240909_2024-09-30T15-52-59/240909_pipeline_cimager_singularity.pgt.graph"   --verbose-level 5  --max-threads 0 --app 0 --num_islands 1 --all_nics  --ssid 240909_2024-09-30T15-52-59
+
+
+
+# RYAN - Setonix setup commands
+
+module load python/3.11.6
+
+create dlg_env using python -m venv
+source dlg_env 
+
+install daliuge 
