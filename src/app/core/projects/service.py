@@ -7,9 +7,7 @@ from typing import Any
 
 import httpx
 
-from app.core.config import settings
-
-from . import list_project_modules, load_project_module
+from .plugins import list_project_modules, load_project_module
 
 logger = logging.getLogger(__name__)
 

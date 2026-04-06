@@ -4,6 +4,8 @@ import logging
 from importlib.metadata import entry_points
 
 from .base import AdapterRegistry, DiscoverAdapter, adapter_registry
+from .casda import stage_data as casda_stage_data
+from .casda import stage_data_pawsey as casda_stage_data_pawsey
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +58,6 @@ def query_adapter(name: str, adql: str, tap_url: str | None = None):
         raise ValueError(f"Adapter '{name}' not found. Available: {list_adapter_names()}")
     return adapter.query(adql, tap_url=tap_url)
 
-
-# Stage helpers from casda (no adapter protocol)
-from .casda import stage_data as casda_stage_data
-from .casda import stage_data_pawsey as casda_stage_data_pawsey
 
 __all__ = [
     "AdapterRegistry",

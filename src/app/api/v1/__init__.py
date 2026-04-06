@@ -24,3 +24,5 @@ router.include_router(runs_router)
 router.include_router(execution_profiles_router)
 router.include_router(sources_router)
 router.include_router(projects_router)
+
+__all__ = ["router"]
