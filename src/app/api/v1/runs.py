@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...api.dependencies import get_current_user
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import NotFoundException
+from ...core.exceptions.workflow_exceptions import WorkflowFailure
 from ...core.ledger.service import run_ledger_service
 from ...core.orchestration.service import execute_run as orchestration_execute_run
 from ...core.orchestration.service import prepare_run as orchestration_prepare_run
@@ -135,8 +136,13 @@ async def execute_run(
         return await orchestration_execute_run(
             db=db, run_id=run_id, do_stage=do_stage, do_submit=do_submit
         )
+    except WorkflowFailure as wf:
+        raise HTTPException(
+            status_code=422,
+            detail=wf.format_for_ledger(),
+        ) from wf
     except Exception as e:
         raise HTTPException(
             status_code=502,
             detail=f"Execute failed: {e}. Run {run_id} marked as failed. Check run status for details.",
-        )
+        ) from e

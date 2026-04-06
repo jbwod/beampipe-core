@@ -20,6 +20,16 @@ class RunStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class RunExecutionPhase(StrEnum):
+    """
+    STAGE_AND_MANIFEST: staging (if enabled) and manifest build not yet persisted.
+    SUBMIT: workflow_manifest is on the row; remainder is graph resolve + TM/DIM (or slurm).
+    """
+
+    STAGE_AND_MANIFEST = "stage_and_manifest"
+    SUBMIT = "submit"
+
+
 class BatchRunRecord(Base):
     __tablename__ = "batch_run_record"
 
@@ -37,6 +47,11 @@ class BatchRunRecord(Base):
         default=None,
     )
     workflow_manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    execution_phase: Mapped[RunExecutionPhase | None] = mapped_column(
+        SQLEnum(RunExecutionPhase, native_enum=False, length=32),
+        nullable=True,
+        default=None,
+    )
     scheduler_name: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
     scheduler_job_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True, default=None)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
