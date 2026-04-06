@@ -163,6 +163,29 @@ class RunLedgerSettings(BaseSettings):
     WORKFLOW_AUTOMATION_SCHEDULER_NAME: str = "workflow_auto"
 
 
+class RestateWorkflowSettings(BaseSettings):
+    WORKFLOW_ENGINE_EXECUTION: Literal["arq", "restate"] = "arq"
+    WORKFLOW_ENGINE_DISCOVERY: Literal["arq", "restate"] = "arq"
+
+    RESTATE_INGRESS_BASE_URL: str = ""
+
+    # ESTATE_EXECUTION_WORKFLOW_NAME: str = "ExecuteRunWorkflow"
+    # RESTATE_DISCOVERY_WORKFLOW_NAME: str = "DiscoveryBatchWorkflow"
+    # RESTATE_EXECUTION_WORKFLOW_HANDLER: str = "execute_run_workflow"
+    # RESTATE_DISCOVERY_WORKFLOW_HANDLER: str = "discovery_batch_workflow"
+
+    RESTATE_INVOKE_TIMEOUT_SECONDS: float = 30.0
+    # ctx.run_typed policies (https://docs.restate.dev/develop/python/durable-steps).
+    RESTATE_STEP_EXTERNAL_MAX_ATTEMPTS: int = 12
+    RESTATE_STEP_EXTERNAL_MAX_DURATION_MINUTES: int = 45
+    RESTATE_STEP_DB_MAX_ATTEMPTS: int = 10
+    RESTATE_STEP_DB_MAX_DURATION_MINUTES: int = 15
+    RESTATE_STEP_POLL_MAX_ATTEMPTS: int = 6
+    RESTATE_STEP_POLL_MAX_DURATION_MINUTES: int = 5
+    RESTATE_STEP_INITIAL_RETRY_SECONDS: float = 2.0
+    RESTATE_STEP_MAX_RETRY_INTERVAL_SECONDS: float = 120.0
+
+
 class DiscoverySettings(BaseSettings):
     DISCOVERY_BATCH_SIZE: int = 25
     DISCOVERY_BATCH_CONCURRENCY: int = 5

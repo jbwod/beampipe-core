@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..core.schemas import TimestampSchema, UUIDSchema
-from ..models.ledger import RunStatus
+from ..models.ledger import RunExecutionPhase, RunStatus
 
 
 # /Users/jblackwo/beampipe-core/docs/user-guide/database/schemas.md
@@ -45,6 +45,7 @@ class BatchRunRecordRead(TimestampSchema, BatchRunRecordBase, UUIDSchema):
 
     execution_profile_id: UUID | None = None
     status: RunStatus
+    execution_phase: RunExecutionPhase | None = None
     workflow_manifest: dict | None = None
     scheduler_name: str | None = None
     scheduler_job_id: str | None = None
@@ -74,6 +75,7 @@ class BatchRunRecordUpdateInternal(BatchRunRecordUpdate):
     updated_at: datetime
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    execution_phase: RunExecutionPhase | None = None
 
 
 class BatchRunRecordDelete(BaseModel):
