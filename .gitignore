@@ -145,6 +145,7 @@ src/.env
 
 .beampipe-wallaby/
 
+
 # Don't ignore files inside of script folder:
 !scripts/*
 
@@ -153,7 +154,8 @@ src/app/core/archive/adapters/test.py
 dlg/*
 
 wallaby-hires-beampipe/*
-
 scripts/calibration_files/*
 src/app/core/orchestration/dlg-engine_deploy
 src/app/core/orchestration/dev/*.py
+
+docs/*

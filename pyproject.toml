@@ -39,6 +39,7 @@ dependencies = [
     "scp>=0.14.0",
     "ruff>=0.11.13",
     "mypy>=1.16.0",
+    "restate-sdk>=0.16.0",
 ]
 
 [project.entry-points."beampipe.adapters"]
@@ -126,6 +127,7 @@ convention = "numpy"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 asyncio_mode = "auto"
 filterwarnings = [
     "ignore::PendingDeprecationWarning:starlette.formparsers",
