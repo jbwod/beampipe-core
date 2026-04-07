@@ -158,9 +158,10 @@ class CORSSettings(BaseSettings):
     CORS_HEADERS: list[str] = ["*"]
 
 
-class RunLedgerSettings(BaseSettings):
+class ExecutionLedgerSettings(BaseSettings):
     MAX_RETRIES: int = 3
     WORKFLOW_AUTOMATION_SCHEDULER_NAME: str = "workflow_auto"
+    WORKFLOW_EXECUTION_AUTOMATION_ENABLED: bool = True
 
 
 class RestateWorkflowSettings(BaseSettings):
@@ -169,9 +170,9 @@ class RestateWorkflowSettings(BaseSettings):
 
     RESTATE_INGRESS_BASE_URL: str = ""
 
-    ESTATE_EXECUTION_WORKFLOW_NAME: str = "ExecuteRunWorkflow"
+    RESTATE_EXECUTION_WORKFLOW_NAME: str = "ExecuteExecutionWorkflow"
     RESTATE_DISCOVERY_WORKFLOW_NAME: str = "DiscoveryBatchWorkflow"
-    RESTATE_EXECUTION_WORKFLOW_HANDLER: str = "execute_run_workflow"
+    RESTATE_EXECUTION_WORKFLOW_HANDLER: str = "execute_execution_workflow"
     RESTATE_DISCOVERY_WORKFLOW_HANDLER: str = "discovery_batch_workflow"
 
     RESTATE_INVOKE_TIMEOUT_SECONDS: float = 30.0
@@ -248,7 +249,7 @@ class Settings(
     CRUDAdminSettings,
     EnvironmentSettings,
     CORSSettings,
-    RunLedgerSettings,
+    ExecutionLedgerSettings,
     RestateWorkflowSettings,
     DiscoverySettings,
     ShapingSettings,

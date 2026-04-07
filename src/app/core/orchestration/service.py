@@ -9,21 +9,21 @@ import httpx
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...crud.crud_daliuge_execution_profile import crud_daliuge_execution_profile
-from ...models.daliuge import DaliugeExecutionProfile
-from ...models.ledger import RunExecutionPhase, RunStatus
-from ...schemas.daliuge import DaliugeExecutionProfileRead
+from ...crud.crud_daliuge_deployment_profile import crud_daliuge_deployment_profile
+from ...models.daliuge import DaliugeDeploymentProfile
+from ...models.ledger import ExecutionPhase, ExecutionStatus
+from ...schemas.daliuge import DaliugeDeploymentProfileRead
 from ..archive.service import archive_metadata_service
 from ..config import settings
 from ..exceptions.workflow_exceptions import (
     WorkflowErrorCode,
     WorkflowFailure,
-    wf_no_execution_profile,
-    wf_run_not_found,
+    wf_no_deployment_profile,
+    wf_execution_not_found,
     wf_staging_requires_casda,
     wf_unexpected,
 )
-from ..ledger.service import run_ledger_service
+from ..ledger.service import execution_ledger_service
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..registry.service import source_registry_service
 from ..utils.registry import validate_source_spec
@@ -34,9 +34,9 @@ from .staging import stage_sources_for_manifest
 logger = logging.getLogger(__name__)
 
 
-async def _record_execute_run_failure(
+async def _record_execute_execution_failure(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
     exc: Exception,
 ) -> None:
     """Persist FAILED before re-raising from :func:`execute_run`.
@@ -48,11 +48,11 @@ async def _record_execute_run_failure(
         if isinstance(exc, WorkflowFailure)
         else wf_unexpected(exc).format_for_ledger()
     )
-    logger.exception("event=execute_run_error run_id=%s error=%s", run_id, exc)
-    await run_ledger_service.update_run_status(
+    logger.exception("event=execute_execution_error execution_id=%s error=%s", execution_id, exc)
+    await execution_ledger_service.update_execution_status(
         db=db,
-        run_id=run_id,
-        status=RunStatus.FAILED,
+        execution_id=execution_id,
+        status=ExecutionStatus.FAILED,
         error=err_s,
     )
 
@@ -63,11 +63,11 @@ async def read_existing_workflow_manifest(
 ) -> dict:
     """Return persisted ``workflow_manifest`` for the run, or ``{}`` if absent.
     """
-    from ...crud.crud_run_record import crud_batch_run_records
-    from ...schemas.ledger import BatchRunRecordRead
+    from ...crud.crud_execution_record import crud_batch_execution_records
+    from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_run_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+    run = await crud_batch_execution_records.get(
+        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
     )
     if not run:
         return {}
@@ -75,7 +75,7 @@ async def read_existing_workflow_manifest(
     return existing if isinstance(existing, dict) else {}
 
 
-async def read_run_ledger_snapshot(
+async def read_execution_ledger_snapshot(
     db: AsyncSession,
     run_id: UUID,
 ) -> dict[str, Any]:
@@ -83,19 +83,20 @@ async def read_run_ledger_snapshot(
 
     Postgres remains the source of truth just for the journals and API correlation.
     """
-    from ...crud.crud_run_record import crud_batch_run_records
-    from ...schemas.ledger import BatchRunRecordRead
+    from ...crud.crud_execution_record import crud_batch_execution_records
+    from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_run_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+    run = await crud_batch_execution_records.get(
+        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
     )
     if not run:
-        raise wf_run_not_found(run_id)
+        raise wf_execution_not_found(run_id)
 
     phase = run.get("execution_phase")
     st = run.get("status")
     return {
-        "run_id": str(run_id),
+        "execution_id": str(run_id),
+        "project_module": run.get("project_module"),
         "status": str(st) if st is not None else None,
         "execution_phase": str(phase) if phase is not None else None,
         "scheduler_job_id": run.get("scheduler_job_id"),
@@ -105,7 +106,7 @@ async def read_run_ledger_snapshot(
     }
 
 
-async def begin_restate_execution_for_run(
+async def begin_restate_execution_for_execution(
     db: AsyncSession,
     run_id: UUID,
 ) -> dict[str, Any]:
@@ -114,39 +115,39 @@ async def begin_restate_execution_for_run(
     Matches the opening transition of :func:`execute_run` so ledger state matches
     whether we resume at stage/manifest or at submit (manifest already persisted).
     """
-    from ...crud.crud_run_record import crud_batch_run_records
-    from ...schemas.ledger import BatchRunRecordRead
+    from ...crud.crud_execution_record import crud_batch_execution_records
+    from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_run_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+    run = await crud_batch_execution_records.get(
+        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
     )
     if not run:
-        raise wf_run_not_found(run_id)
+        raise wf_execution_not_found(run_id)
 
     execution_phase = _coerce_execution_phase(run)
 
-    if execution_phase == RunExecutionPhase.SUBMIT:
-        await run_ledger_service.update_run_status(
-            db=db, run_id=run_id, status=RunStatus.RUNNING
+    if execution_phase == ExecutionPhase.SUBMIT:
+        await execution_ledger_service.update_execution_status(
+            db=db, execution_id=run_id, status=ExecutionStatus.RUNNING
         )
     else:
-        await run_ledger_service.update_run_status(
+        await execution_ledger_service.update_execution_status(
             db=db,
-            run_id=run_id,
-            status=RunStatus.RUNNING,
-            execution_phase=RunExecutionPhase.STAGE_AND_MANIFEST,
+            execution_id=run_id,
+            status=ExecutionStatus.RUNNING,
+            execution_phase=ExecutionPhase.STAGE_AND_MANIFEST,
         )
 
-    return await read_run_ledger_snapshot(db=db, run_id=run_id)
+    return await read_execution_ledger_snapshot(db=db, run_id=run_id)
 
 
-def _coerce_execution_phase(run: dict) -> RunExecutionPhase | None:
+def _coerce_execution_phase(run: dict) -> ExecutionPhase | None:
     raw = run.get("execution_phase")
     if raw is None:
         return None
-    if isinstance(raw, RunExecutionPhase):
+    if isinstance(raw, ExecutionPhase):
         return raw
-    return RunExecutionPhase(str(raw))
+    return ExecutionPhase(str(raw))
 
 
 def _profile_to_dict(profile: dict) -> dict:
@@ -165,18 +166,18 @@ def _profile_to_dict(profile: dict) -> dict:
     }
 
 
-async def _resolve_execution_profile(
+async def _resolve_deployment_profile(
     db: AsyncSession, run: dict
 ) -> dict:
-    """Resolve DALiuGE execution profile: run's profile_id > project default > global default."""
+    """Resolve DALiuGE deployment profile: run's profile_id > project default > global default."""
 
     async def _load_by_uuid(uid) -> dict | None:
-        p = await crud_daliuge_execution_profile.get(
-            db=db, uuid=uid, schema_to_select=DaliugeExecutionProfileRead
+        p = await crud_daliuge_deployment_profile.get(
+            db=db, uuid=uid, schema_to_select=DaliugeDeploymentProfileRead
         )
         return _profile_to_dict(p) if p else None
 
-    profile_id = run.get("execution_profile_id")
+    profile_id = run.get("deployment_profile_id")
     if profile_id:
         got = await _load_by_uuid(profile_id)
         if got:
@@ -185,10 +186,10 @@ async def _resolve_execution_profile(
     project_module = run.get("project_module")
     if project_module:
         result = await db.execute(
-            select(DaliugeExecutionProfile.uuid).where(
+            select(DaliugeDeploymentProfile.uuid).where(
                 and_(
-                    DaliugeExecutionProfile.project_module == project_module,
-                    DaliugeExecutionProfile.is_default.is_(True),
+                    DaliugeDeploymentProfile.project_module == project_module,
+                    DaliugeDeploymentProfile.is_default.is_(True),
                 )
             ).limit(1)
         )
@@ -199,10 +200,10 @@ async def _resolve_execution_profile(
                 return got
 
     result = await db.execute(
-        select(DaliugeExecutionProfile.uuid).where(
+        select(DaliugeDeploymentProfile.uuid).where(
             and_(
-                DaliugeExecutionProfile.project_module.is_(None),
-                DaliugeExecutionProfile.is_default.is_(True),
+                DaliugeDeploymentProfile.project_module.is_(None),
+                DaliugeDeploymentProfile.is_default.is_(True),
             )
         ).limit(1)
     )
@@ -212,10 +213,10 @@ async def _resolve_execution_profile(
         if got:
             return got
 
-    raise wf_no_execution_profile()
+    raise wf_no_deployment_profile()
 
 
-async def prepare_run(
+async def prepare_execution(
     db: AsyncSession,
     project_module: str,
     sources: list,
@@ -270,25 +271,25 @@ async def stage_sources_for_run(
     casda_username: str | None = None,
     do_stage: bool = True,
 ) -> dict[str, dict[str, str]]:
-    from ...crud.crud_run_record import crud_batch_run_records
-    from ...schemas.ledger import BatchRunRecordRead
+    from ...crud.crud_execution_record import crud_batch_execution_records
+    from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_run_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+    run = await crud_batch_execution_records.get(
+        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
     )
     if not run:
-        raise wf_run_not_found(run_id)
+        raise wf_execution_not_found(run_id)
 
     execution_phase = _coerce_execution_phase(run)
     existing_manifest = run.get("workflow_manifest")
-    if run.get("status") == RunStatus.COMPLETED and existing_manifest:
+    if run.get("status") == ExecutionStatus.COMPLETED and existing_manifest:
         return {
             "staged_urls_by_scan_id": {},
             "eval_urls_by_sbid": {},
             "checksum_urls_by_scan_id": {},
             "eval_checksum_urls_by_sbid": {},
         }
-    if execution_phase == RunExecutionPhase.SUBMIT and existing_manifest:
+    if execution_phase == ExecutionPhase.SUBMIT and existing_manifest:
         return {
             "staged_urls_by_scan_id": {},
             "eval_urls_by_sbid": {},
@@ -299,11 +300,11 @@ async def stage_sources_for_run(
     project_module = run["project_module"]
     sources = run.get("sources") or []
 
-    await run_ledger_service.update_run_status(
+    await execution_ledger_service.update_execution_status(
         db=db,
-        run_id=run_id,
-        status=RunStatus.RUNNING,
-        execution_phase=RunExecutionPhase.STAGE_AND_MANIFEST,
+        execution_id=run_id,
+        status=ExecutionStatus.RUNNING,
+        execution_phase=ExecutionPhase.STAGE_AND_MANIFEST,
     )
 
     casda_user = casda_username or settings.CASDA_USERNAME
@@ -344,20 +345,20 @@ async def build_manifest_for_run(
     eval_checksum_urls_by_sbid: dict[str, str] | None = None,
 ) -> dict:
     """Build the daliuge manifest for a run (replay-safe)."""
-    from ...crud.crud_run_record import crud_batch_run_records
-    from ...schemas.ledger import BatchRunRecordRead
+    from ...crud.crud_execution_record import crud_batch_execution_records
+    from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_run_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+    run = await crud_batch_execution_records.get(
+        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
     )
     if not run:
-        raise wf_run_not_found(run_id)
+        raise wf_execution_not_found(run_id)
 
     execution_phase = _coerce_execution_phase(run)
     existing_manifest = run.get("workflow_manifest")
-    if run.get("status") == RunStatus.COMPLETED and existing_manifest:
+    if run.get("status") == ExecutionStatus.COMPLETED and existing_manifest:
         return existing_manifest
-    if execution_phase == RunExecutionPhase.SUBMIT and existing_manifest:
+    if execution_phase == ExecutionPhase.SUBMIT and existing_manifest:
         return existing_manifest
 
     project_module = run["project_module"]
@@ -373,11 +374,11 @@ async def build_manifest_for_run(
         eval_checksum_urls_by_sbid=eval_checksum_urls_by_sbid or {},
     )
 
-    await run_ledger_service.update_run_status(
+    await execution_ledger_service.update_execution_status(
         db=db,
-        run_id=run_id,
+        execution_id=run_id,
         workflow_manifest=manifest,
-        execution_phase=RunExecutionPhase.SUBMIT,
+        execution_phase=ExecutionPhase.SUBMIT,
     )
     return manifest
 
@@ -402,12 +403,12 @@ async def _fail_run_after_dim_translate_error(
         source_identifiers=source_identifiers,
         commit=False,
     )
-    await run_ledger_service.update_run_status(
+    await execution_ledger_service.update_execution_status(
         db=db,
-        run_id=run_id,
-        status=RunStatus.FAILED,
+        execution_id=run_id,
+        status=ExecutionStatus.FAILED,
         error=error_message,
-        execution_phase=RunExecutionPhase.SUBMIT,
+        execution_phase=ExecutionPhase.SUBMIT,
     )
     return {"status": "terminal_failed", "session_id": session_id}
 
@@ -420,22 +421,22 @@ async def translate_dim_session_for_run(
 
     Restate-visible step: no DIM deploy.
     """
-    from ...crud.crud_run_record import crud_batch_run_records
-    from ...schemas.ledger import BatchRunRecordRead
+    from ...crud.crud_execution_record import crud_batch_execution_records
+    from ...schemas.ledger import BatchExecutionRecordRead
     from ..utils.daliuge import get_roots
     from .rest_client.translator_client import DaliugeTranslatorClient
 
-    run = await crud_batch_run_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+    run = await crud_batch_execution_records.get(
+        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
     )
     if not run:
-        raise wf_run_not_found(run_id)
+        raise wf_execution_not_found(run_id)
 
     project_module = run["project_module"]
     manifest = run.get("workflow_manifest")
     if not manifest:
         raise WorkflowFailure(
-            WorkflowErrorCode.EXEC_RUN_MANIFEST_STATE,
+            WorkflowErrorCode.EXECUTION_MANIFEST_STATE,
             f"Run {run_id} missing workflow_manifest; run staging and manifest build first",
         )
 
@@ -478,12 +479,12 @@ async def translate_dim_session_for_run(
             source_identifiers=source_identifiers,
             commit=False,
         )
-        await run_ledger_service.update_run_status(
+        await execution_ledger_service.update_execution_status(
             db=db,
-            run_id=run_id,
-            status=RunStatus.FAILED,
+            execution_id=run_id,
+            status=ExecutionStatus.FAILED,
             error=graph_fetch_error,
-            execution_phase=RunExecutionPhase.SUBMIT,
+            execution_phase=ExecutionPhase.SUBMIT,
         )
         return {"status": "terminal_failed", "session_id": session_id}
 
@@ -499,10 +500,10 @@ async def translate_dim_session_for_run(
             source_identifiers=source_identifiers,
             commit=False,
         )
-        await run_ledger_service.update_run_status(
+        await execution_ledger_service.update_execution_status(
             db=db,
-            run_id=run_id,
-            status=RunStatus.COMPLETED,
+            execution_id=run_id,
+            status=ExecutionStatus.COMPLETED,
             execution_phase=None,
         )
         return {"status": "terminal_completed", "session_id": session_id}
@@ -515,16 +516,16 @@ async def translate_dim_session_for_run(
     if graph_path:
         lg_name = Path(graph_path).name
 
-    profile = await _resolve_execution_profile(db, run)
+    profile = await _resolve_deployment_profile(db, run)
     deployment_backend = profile.get("deployment_backend")
     if deployment_backend == "slurm_remote":
 
-        await run_ledger_service.update_run_status(
+        await execution_ledger_service.update_execution_status(
             db=db,
-            run_id=run_id,
-            status=RunStatus.FAILED,
+            execution_id=run_id,
+            status=ExecutionStatus.FAILED,
             error="not yet implemented",
-            execution_phase=RunExecutionPhase.SUBMIT,
+            execution_phase=ExecutionPhase.SUBMIT,
         )
         return {"status": "terminal_failed", "session_id": session_id}
         # rest_dim: TM gen_pgt + gen_pg + DIM (requires tm_url, dim_*, deploy_*)
@@ -532,14 +533,14 @@ async def translate_dim_session_for_run(
     tm_url = profile.get("tm_url")
     if not tm_url:
         raise WorkflowFailure(
-            WorkflowErrorCode.EXEC_RUN_EXECUTION_PROFILE,
-            "rest_dim requires tm_url on the execution profile",
+            WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
+            "rest_dim requires tm_url on the deployment profile",
         )
     dim_host = profile.get("dim_host_for_tm")
     dim_port = profile.get("dim_port_for_tm")
     if dim_host is None or dim_port is None:
         raise WorkflowFailure(
-            WorkflowErrorCode.EXEC_RUN_EXECUTION_PROFILE,
+            WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
             "rest_dim requires dim_host_for_tm and dim_port_for_tm for gen_pg",
         )
 
@@ -603,8 +604,8 @@ async def translate_dim_session_for_run(
     deploy_port = profile.get("deploy_port")
     if deploy_host is None or deploy_port is None:
         raise WorkflowFailure(
-            WorkflowErrorCode.EXEC_RUN_EXECUTION_PROFILE,
-            "REST DIM deploy requires deploy_host and deploy_port on the execution profile",
+            WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
+            "REST DIM deploy requires deploy_host and deploy_port on the deployment profile",
         )
     dim_base = (
         f"http://{deploy_host}:{deploy_port}"
@@ -633,15 +634,15 @@ async def deploy_dim_session_payload_for_run(
     verify_ssl: bool,
 ) -> None:
     """Deploy physical graph to DIM and checkpoint ``scheduler_job_id`` (replay-safe)."""
-    from ...crud.crud_run_record import crud_batch_run_records
-    from ...schemas.ledger import BatchRunRecordRead
+    from ...crud.crud_execution_record import crud_batch_execution_records
+    from ...schemas.ledger import BatchExecutionRecordRead
     from .rest_client.deploy_client import DaliugeDeployClient
 
-    run = await crud_batch_run_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+    run = await crud_batch_execution_records.get(
+        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
     )
     if not run:
-        raise wf_run_not_found(run_id)
+        raise wf_execution_not_found(run_id)
     if run.get("scheduler_name") == "daliuge" and run.get("scheduler_job_id") == session_id:
         return
 
@@ -654,12 +655,12 @@ async def deploy_dim_session_payload_for_run(
     finally:
         deploy.close()
 
-    await run_ledger_service.update_run_status(
+    await execution_ledger_service.update_execution_status(
         db=db,
-        run_id=run_id,
+        execution_id=run_id,
         scheduler_name="daliuge",
         scheduler_job_id=session_id,
-        execution_phase=RunExecutionPhase.SUBMIT,
+        execution_phase=ExecutionPhase.SUBMIT,
     )
 
 
@@ -676,7 +677,7 @@ async def submit_dim_session_for_run(
     if tr["status"] == "ready":
         await deploy_dim_session_payload_for_run(
             db=db,
-            run_id=run_id,
+            execution_id=run_id,
             session_id=session_id,
             pg_spec=tr["pg_spec"],
             roots=tr["roots"],
@@ -698,37 +699,37 @@ async def poll_dim_session_for_run(
       - {"terminal": True, "status": "completed"} / {"terminal": True, "status": "failed"}
       - {"terminal": False} when still running
     """
-    from ...crud.crud_run_record import crud_batch_run_records
-    from ...schemas.ledger import BatchRunRecordRead
+    from ...crud.crud_execution_record import crud_batch_execution_records
+    from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_run_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+    run = await crud_batch_execution_records.get(
+        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
     )
     if not run:
-        raise wf_run_not_found(run_id)
+        raise wf_execution_not_found(run_id)
 
-    if run["status"] == RunStatus.COMPLETED:
+    if run["status"] == ExecutionStatus.COMPLETED:
         return {"terminal": True, "status": "completed"}
-    if run["status"] == RunStatus.FAILED:
+    if run["status"] == ExecutionStatus.FAILED:
         return {"terminal": True, "status": "failed", "error": run.get("last_error")}
 
     session_id = run.get("scheduler_job_id")
     project_module = run["project_module"]
     if not session_id:
         raise WorkflowFailure(
-            WorkflowErrorCode.EXEC_RUN_DIM_STATE,
+            WorkflowErrorCode.EXECUTION_DIM_STATE,
             f"Run {run_id} has no scheduler_job_id; call submit_dim_session_for_run first",
         )
 
-    profile = await _resolve_execution_profile(db, run)
+    profile = await _resolve_deployment_profile(db, run)
     deployment_backend = profile.get("deployment_backend")
     if deployment_backend != "rest_dim":
-        await run_ledger_service.update_run_status(
+        await execution_ledger_service.update_execution_status(
             db=db,
-            run_id=run_id,
-            status=RunStatus.FAILED,
+            execution_id=run_id,
+            status=ExecutionStatus.FAILED,
             error=f"durable DIM polling not implemented for backend={deployment_backend}",
-            execution_phase=RunExecutionPhase.SUBMIT,
+            execution_phase=ExecutionPhase.SUBMIT,
         )
         return {"terminal": True, "status": "failed", "error": f"backend={deployment_backend}"}
 
@@ -736,8 +737,8 @@ async def poll_dim_session_for_run(
     deploy_port = profile.get("deploy_port")
     if deploy_host is None or deploy_port is None:
         raise WorkflowFailure(
-            WorkflowErrorCode.EXEC_RUN_EXECUTION_PROFILE,
-            "REST DIM polling requires deploy_host and deploy_port on the execution profile",
+            WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
+            "REST DIM polling requires deploy_host and deploy_port on the deployment profile",
         )
     dim_base = (
         f"http://{deploy_host}:{deploy_port}"
@@ -775,75 +776,75 @@ async def poll_dim_session_for_run(
     )
 
     if finished:
-        await run_ledger_service.update_run_status(
+        await execution_ledger_service.update_execution_status(
             db=db,
-            run_id=run_id,
-            status=RunStatus.COMPLETED,
+            execution_id=run_id,
+            status=ExecutionStatus.COMPLETED,
             scheduler_name="daliuge",
             scheduler_job_id=str(session_id),
             execution_phase=None,
         )
         return {"terminal": True, "status": "completed"}
 
-    await run_ledger_service.update_run_status(
+    await execution_ledger_service.update_execution_status(
         db=db,
-        run_id=run_id,
-        status=RunStatus.FAILED,
+        execution_id=run_id,
+        status=ExecutionStatus.FAILED,
         error=str(status_payload),
         scheduler_name="daliuge",
         scheduler_job_id=str(session_id),
-        execution_phase=RunExecutionPhase.SUBMIT,
+        execution_phase=ExecutionPhase.SUBMIT,
     )
     return {"terminal": True, "status": "failed", "error": str(status_payload)}
 
 
-async def execute_run(
+async def execute_execution(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
     *,
     casda_username: str | None = None,
     do_stage: bool = True,
     do_submit: bool = True,
 ) -> dict:
-    """Execute a run.
-    1. Update run status to RUNNING (and execution checkpoint)
+    """Execute an execution.
+    1. Update execution status to RUNNING (and execution checkpoint)
     2. Stage data and build manifest unless ``execution_phase`` is already ``submit``
     3. Submit to DALiuGE (optional)
-    4. Update run status to COMPLETED or FAILED
+    4. Update execution status to COMPLETED or FAILED
 
     ``batch_run_record.execution_phase`` survives ARQ retries so staging/manifest are not
     repeated after the manifest row has been persisted. See docs/execution_run_phases.md.
     """
-    from ...crud.crud_run_record import crud_batch_run_records
-    from ...schemas.ledger import BatchRunRecordRead
+    from ...crud.crud_execution_record import crud_batch_execution_records
+    from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_run_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+    run = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
     if not run:
-        raise wf_run_not_found(run_id)
+        raise wf_execution_not_found(execution_id)
 
     project_module = run["project_module"]
     sources = run.get("sources") or []
     execution_phase = _coerce_execution_phase(run)
 
-    if execution_phase == RunExecutionPhase.SUBMIT:
-        await run_ledger_service.update_run_status(db=db, run_id=run_id, status=RunStatus.RUNNING)
+    if execution_phase == ExecutionPhase.SUBMIT:
+        await execution_ledger_service.update_execution_status(db=db, execution_id=execution_id, status=ExecutionStatus.RUNNING)
     else:
-        await run_ledger_service.update_run_status(
+        await execution_ledger_service.update_execution_status(
             db=db,
-            run_id=run_id,
-            status=RunStatus.RUNNING,
-            execution_phase=RunExecutionPhase.STAGE_AND_MANIFEST,
+            execution_id=execution_id,
+            status=ExecutionStatus.RUNNING,
+            execution_phase=ExecutionPhase.STAGE_AND_MANIFEST,
         )
 
     try:
-        if execution_phase == RunExecutionPhase.SUBMIT:
+        if execution_phase == ExecutionPhase.SUBMIT:
             manifest = run.get("workflow_manifest")
             if not manifest:
                 raise WorkflowFailure(
-                    WorkflowErrorCode.EXEC_RUN_MANIFEST_STATE,
-                    f"Run {run_id} has execution_phase submit but workflow_manifest is missing",
+                    WorkflowErrorCode.EXECUTION_MANIFEST_STATE,
+                    f"Execution {execution_id} has execution_phase submit but workflow_manifest is missing",
                 )
         else:
             casda_user = casda_username or settings.CASDA_USERNAME
@@ -852,13 +853,13 @@ async def execute_run(
 
             stage_out = await stage_sources_for_run(
                 db=db,
-                run_id=run_id,
+                run_id=execution_id,
                 casda_username=casda_username,
                 do_stage=do_stage,
             )
             manifest = await build_manifest_for_run(
                 db=db,
-                run_id=run_id,
+                run_id=execution_id,
                 staged_urls_by_scan_id=stage_out["staged_urls_by_scan_id"],
                 eval_urls_by_sbid=stage_out["eval_urls_by_sbid"],
                 checksum_urls_by_scan_id=stage_out["checksum_urls_by_scan_id"],
@@ -866,46 +867,46 @@ async def execute_run(
             )
 
         if do_submit:
-            await submit_dim_session_for_run(db=db, run_id=run_id)
-            run_after = await crud_batch_run_records.get(
-                db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+            await submit_dim_session_for_run(db=db, run_id=execution_id)
+            run_after = await crud_batch_execution_records.get(
+                db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
             )
             if not run_after:
                 raise WorkflowFailure(
-                    WorkflowErrorCode.EXEC_RUN_RUN_NOT_FOUND,
-                    f"Run {run_id} not found after DIM submit",
+                    WorkflowErrorCode.EXECUTION_NOT_FOUND,
+                    f"Execution {execution_id} not found after DIM submit",
                 )
             manifest = run_after.get("workflow_manifest") or manifest
             st = run_after.get("status")
-            if isinstance(st, RunStatus):
+            if isinstance(st, ExecutionStatus):
                 st_enum = st
             else:
-                st_enum = RunStatus(str(st)) if st else RunStatus.RUNNING
+                st_enum = ExecutionStatus(str(st)) if st else ExecutionStatus.RUNNING
 
-            if st_enum == RunStatus.FAILED:
+            if st_enum == ExecutionStatus.FAILED:
                 return {
-                    "run_id": str(run_id),
+                    "execution_id": str(execution_id),
                     "status": "failed",
                     "error": run_after.get("last_error") or "failed",
                     "manifest": manifest,
                 }
-            if st_enum == RunStatus.COMPLETED:
+            if st_enum == ExecutionStatus.COMPLETED:
                 return {
-                    "run_id": str(run_id),
+                    "execution_id": str(execution_id),
                     "status": "completed",
                     "manifest": manifest,
                 }
 
             sid = run_after.get("scheduler_job_id")
             if sid:
-                await run_ledger_service.update_run_status(
+                await execution_ledger_service.update_execution_status(
                     db=db,
-                    run_id=run_id,
-                    status=RunStatus.COMPLETED,
+                    execution_id=execution_id,
+                    status=ExecutionStatus.COMPLETED,
                     execution_phase=None,
                 )
                 return {
-                    "run_id": str(run_id),
+                    "execution_id": str(execution_id),
                     "status": "completed",
                     "scheduler_job_id": str(sid),
                     "manifest": manifest,
@@ -922,17 +923,17 @@ async def execute_run(
             source_identifiers=source_identifiers,
             commit=False,
         )
-        await run_ledger_service.update_run_status(
+        await execution_ledger_service.update_execution_status(
             db=db,
-            run_id=run_id,
-            status=RunStatus.COMPLETED,
+            execution_id=execution_id,
+            status=ExecutionStatus.COMPLETED,
             execution_phase=None,
         )
         return {
-            "run_id": str(run_id),
+            "execution_id": str(execution_id),
             "status": "completed",
             "manifest": manifest,
         }
     except Exception as e:
-        await _record_execute_run_failure(db, run_id, e)
+        await _record_execute_execution_failure(db, execution_id, e)
         raise

@@ -1,6 +1,6 @@
-"""Run ledger service.
+"""Execution ledger service.
 
-Provides run tracking for batch workflow submissions (multiple sources, datasets).
+Provides execution tracking for batch workflow submissions (multiple sources, datasets).
 """
 import logging
 from datetime import UTC, datetime
@@ -9,9 +9,9 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from ...crud.crud_run_record import crud_batch_run_records
-from ...models.ledger import RunExecutionPhase, RunStatus
-from ...schemas.ledger import BatchRunRecordCreateInternal, BatchRunRecordRead
+from ...crud.crud_execution_record import crud_batch_execution_records
+from ...models.ledger import ExecutionPhase, ExecutionStatus
+from ...schemas.ledger import BatchExecutionRecordCreateInternal, BatchExecutionRecordRead
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
 from ..utils.registry import validate_source_spec
 
@@ -20,30 +20,30 @@ logger = logging.getLogger(__name__)
 _EXECUTION_PHASE_UNSET: object = object()
 
 
-class RunLedgerService:
+class ExecutionLedgerService:
     @staticmethod
-    async def create_run(
+    async def create_execution(
         db: AsyncSession,
         project_module: str,
         sources: list,
         archive_name: str,
         *,
-        execution_profile_id: UUID | None = None,
+        deployment_profile_id: UUID | None = None,
         created_by_id: int | None = None,
     ) -> dict[str, Any]:
-        """Create a new batch run record.
+        """Create a new batch execution record.
 
         Validates all sources are registered and enabled.
 
         Args:
             db: Database session
             project_module: Project module identifier
-            sources: List of RunSourceSpec (source_identifier, optional sbids per source)
+            sources: List of ExecutionSourceSpec (source_identifier, optional sbids per source)
             archive_name: Archive name (e.g. casda)
-            created_by_id: User ID who triggered the run
+            created_by_id: User ID who triggered the execution
 
         Returns:
-            BatchRunRecord (newly created)
+            BatchExecutionRecord (newly created)
 
         Raises:
             BadRequestException: If any source is not registered or disabled
@@ -55,29 +55,29 @@ class RunLedgerService:
                 raise BadRequestException(err)
 
         try:
-            run_data = BatchRunRecordCreateInternal(
+            execution_data = BatchExecutionRecordCreateInternal(
                 project_module=project_module,
                 sources=sources,
                 archive_name=archive_name,
-                execution_profile_id=execution_profile_id,
+                deployment_profile_id=deployment_profile_id,
                 created_by_id=created_by_id,
-                status=RunStatus.PENDING,
+                status=ExecutionStatus.PENDING,
             )
-            run = await crud_batch_run_records.create(
-                db=db, object=run_data, schema_to_select=BatchRunRecordRead
+            execution = await crud_batch_execution_records.create(
+                db=db, object=execution_data, schema_to_select=BatchExecutionRecordRead
             )
-            run_uuid = run.get("uuid")
+            execution_uuid = execution.get("uuid")
             logger.info(
-                "event=ledger_run_created "
-                "run_uuid=%s project_module=%s source_count=%s",
-                run_uuid,
+                "event=ledger_execution_created "
+                "execution_uuid=%s project_module=%s source_count=%s",
+                execution_uuid,
                 project_module,
                 len(sources),
             )
-            return run
+            return execution
         except Exception as e:
             logger.exception(
-                "event=ledger_run_create_error "
+                "event=ledger_execution_create_error "
                 "project_module=%s sources=%s error=%s",
                 project_module,
                 sources,
@@ -86,61 +86,61 @@ class RunLedgerService:
             raise
 
     @staticmethod
-    def _validate_status_transition(current_status: RunStatus, new_status: RunStatus) -> bool:
+    def _validate_status_transition(current_status: ExecutionStatus, new_status: ExecutionStatus) -> bool:
         allowed_transitions = {
-            RunStatus.PENDING: [RunStatus.RUNNING, RunStatus.CANCELLED],
-            RunStatus.RUNNING: [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED],
-            RunStatus.COMPLETED: [],  # no more transitions allowed
-            # FAILED -> RUNNING: worker/ARQ retry picks up the same run after a transient error
-            RunStatus.FAILED: [RunStatus.RETRYING, RunStatus.CANCELLED, RunStatus.RUNNING],
-            RunStatus.RETRYING: [RunStatus.RUNNING, RunStatus.FAILED, RunStatus.CANCELLED],
-            RunStatus.CANCELLED: [],  # no more transitions allowed
+            ExecutionStatus.PENDING: [ExecutionStatus.RUNNING, ExecutionStatus.CANCELLED],
+            ExecutionStatus.RUNNING: [ExecutionStatus.COMPLETED, ExecutionStatus.FAILED, ExecutionStatus.CANCELLED],
+            ExecutionStatus.COMPLETED: [],  # no more transitions allowed
+            # FAILED -> RUNNING: worker/ARQ retry picks up the same execution after a transient error
+            ExecutionStatus.FAILED: [ExecutionStatus.RETRYING, ExecutionStatus.CANCELLED, ExecutionStatus.RUNNING],
+            ExecutionStatus.RETRYING: [ExecutionStatus.RUNNING, ExecutionStatus.FAILED, ExecutionStatus.CANCELLED],
+            ExecutionStatus.CANCELLED: [],  # no more transitions allowed
         }
         return new_status in allowed_transitions.get(current_status, [])
 
     @staticmethod
-    async def update_run_status(
+    async def update_execution_status(
         db: AsyncSession,
-        run_id: UUID,
-        status: RunStatus | None = None,
+        execution_id: UUID,
+        status: ExecutionStatus | None = None,
         scheduler_job_id: str | None = None,
         scheduler_name: str | None = None,
         workflow_manifest: dict | None = None,
         error: str | None = None,
-        execution_phase: RunExecutionPhase | None | object = _EXECUTION_PHASE_UNSET,
+        execution_phase: ExecutionPhase | None | object = _EXECUTION_PHASE_UNSET,
     ) -> dict[str, Any]:
-        """Update run status and related fields.
+        """Update execution status and related fields.
 
         Args:
             db: Database session
-            run_id: Run UUID
-            status: New status for the run
+            execution_id: Execution UUID
+            status: New status for the execution
             scheduler_job_id: ID from the HPC scheduler
             scheduler_name: Name of the scheduler
             workflow_manifest: JSON manifest of the workflow
-            error: Error message if the run failed
-            execution_phase: Checkpoint for execute_run retries; pass None to clear the column
+            error: Error message if the execution failed
+            execution_phase: Checkpoint for execute workflow retries; pass None to clear the column
 
         Returns:
-            Updated run record
+            Updated execution record
 
         Raises:
-            NotFoundException: If run not found
+            NotFoundException: If execution not found
             BadRequestException: If status transition is invalid
         """
-        run = await crud_batch_run_records.get(
-            db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+        execution = await crud_batch_execution_records.get(
+            db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
         )
-        if not run:
-            raise NotFoundException(f"Run {run_id} not found")
+        if not execution:
+            raise NotFoundException(f"Execution {execution_id} not found")
 
-        current_status_value = run.get("status")
-        started_at_value = run.get("started_at")
-        completed_at_value = run.get("completed_at")
+        current_status_value = execution.get("status")
+        started_at_value = execution.get("started_at")
+        completed_at_value = execution.get("completed_at")
 
         if status and status != current_status_value and current_status_value is not None:
-            current_status = RunStatus(str(current_status_value))
-            if not RunLedgerService._validate_status_transition(current_status, status):
+            current_status = ExecutionStatus(str(current_status_value))
+            if not ExecutionLedgerService._validate_status_transition(current_status, status):
                 raise BadRequestException(
                     f"Invalid status transition from {current_status.value} to {status.value}"
                 )
@@ -150,9 +150,9 @@ class RunLedgerService:
 
         if status:
             update_data["status"] = status
-            if status == RunStatus.RUNNING and not started_at_value:
+            if status == ExecutionStatus.RUNNING and not started_at_value:
                 update_data["started_at"] = now
-            elif status in [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED]:
+            elif status in [ExecutionStatus.COMPLETED, ExecutionStatus.FAILED, ExecutionStatus.CANCELLED]:
                 if not completed_at_value:
                     update_data["completed_at"] = now
 
@@ -170,23 +170,23 @@ class RunLedgerService:
         update_data["updated_at"] = now
 
         if not update_data:
-            return run
+            return execution
 
-        await crud_batch_run_records.update(db=db, object=update_data, uuid=run_id)
+        await crud_batch_execution_records.update(db=db, object=update_data, uuid=execution_id)
 
-        updated_run = await crud_batch_run_records.get(
-            db=db, uuid=run_id, schema_to_select=BatchRunRecordRead
+        updated_execution = await crud_batch_execution_records.get(
+            db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
         )
-        if not updated_run:
-            raise NotFoundException(f"Run {run_id} not found after update")
+        if not updated_execution:
+            raise NotFoundException(f"Execution {execution_id} not found after update")
 
         logger.info(
-            "event=ledger_run_updated run_id=%s status=%s scheduler_job_id=%s",
-            run_id,
+            "event=ledger_execution_updated execution_id=%s status=%s scheduler_job_id=%s",
+            execution_id,
             status,
             scheduler_job_id,
         )
-        return updated_run
+        return updated_execution
 
 
-run_ledger_service = RunLedgerService()
+execution_ledger_service = ExecutionLedgerService()
