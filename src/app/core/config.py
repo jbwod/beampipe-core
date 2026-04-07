@@ -169,10 +169,10 @@ class RestateWorkflowSettings(BaseSettings):
 
     RESTATE_INGRESS_BASE_URL: str = ""
 
-    # ESTATE_EXECUTION_WORKFLOW_NAME: str = "ExecuteRunWorkflow"
-    # RESTATE_DISCOVERY_WORKFLOW_NAME: str = "DiscoveryBatchWorkflow"
-    # RESTATE_EXECUTION_WORKFLOW_HANDLER: str = "execute_run_workflow"
-    # RESTATE_DISCOVERY_WORKFLOW_HANDLER: str = "discovery_batch_workflow"
+    ESTATE_EXECUTION_WORKFLOW_NAME: str = "ExecuteRunWorkflow"
+    RESTATE_DISCOVERY_WORKFLOW_NAME: str = "DiscoveryBatchWorkflow"
+    RESTATE_EXECUTION_WORKFLOW_HANDLER: str = "execute_run_workflow"
+    RESTATE_DISCOVERY_WORKFLOW_HANDLER: str = "discovery_batch_workflow"
 
     RESTATE_INVOKE_TIMEOUT_SECONDS: float = 30.0
     # ctx.run_typed policies (https://docs.restate.dev/develop/python/durable-steps).
@@ -187,7 +187,7 @@ class RestateWorkflowSettings(BaseSettings):
 
 
 class DiscoverySettings(BaseSettings):
-    DISCOVERY_BATCH_SIZE: int = 25
+    DISCOVERY_BATCH_SIZE: int = 50
     DISCOVERY_BATCH_CONCURRENCY: int = 5
     DISCOVERY_STALE_HOURS: int = 24
     DISCOVERY_SCHEDULE_MINUTES: int = 1
@@ -196,7 +196,6 @@ class DiscoverySettings(BaseSettings):
     DISCOVERY_CLAIM_TTL_MINUTES: int = 180
     DISCOVERY_MAX_FAILURES_BEFORE_BACKOFF_MULTIPLIER: int = 3
     DISCOVERY_MAX_SOURCES_PER_RUN: int = 2000
-    DISCOVERY_MAX_QUEUE_DEPTH: int | None = 200
     DISCOVERY_TAP_HEALTH_CHECK_ENABLED: bool = True
     DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS: float = 10.0
 

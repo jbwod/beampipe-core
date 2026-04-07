@@ -20,6 +20,7 @@ async def workflow_run_schedule(
     created_runs: list[str] = []
     enqueued_jobs: list[str] = []
     skipped_modules: list[str] = []
+    reason_counts: dict[str, int] = {}
     total_sources = 0
 
     for module_name in target_modules:
@@ -30,6 +31,7 @@ async def workflow_run_schedule(
             created_runs=created_runs,
             enqueued_jobs=enqueued_jobs,
             skipped_modules=skipped_modules,
+            reason_counts=reason_counts,
         )
 
     if settings.CASDA_USERNAME is None:
@@ -42,4 +44,5 @@ async def workflow_run_schedule(
         total_sources=total_sources,
         enqueued_jobs=enqueued_jobs,
         skipped_modules=skipped_modules,
+        reason_counts=reason_counts,
     )

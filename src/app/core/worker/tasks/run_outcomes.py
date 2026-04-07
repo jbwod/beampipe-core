@@ -9,6 +9,7 @@ def build_workflow_schedule_response(
     total_sources: int,
     enqueued_jobs: list[str],
     skipped_modules: list[str],
+    reason_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     return {
         "ok": True,
@@ -19,4 +20,5 @@ def build_workflow_schedule_response(
         "run_ids": created_runs,
         "job_ids": enqueued_jobs,
         "skipped_modules": skipped_modules,
+        "reason_counts": reason_counts or {},
     }
