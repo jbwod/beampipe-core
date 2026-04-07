@@ -19,8 +19,6 @@ from ...utils import (
 from .discovery_batch import (
     DiscoveryBatchStats,
     build_discovery_result,
-    discovery_stat_delta_from_stats,
-    discovery_stats_from_stat_delta,
     finalize_source_marks,
     persist_source_result,
     record_failed_result,
@@ -373,66 +371,6 @@ async def _finalize_discovery_batch(
     return result, claim_released
 
 
-async def run_discovery_persist_slice(
-    db: Any,
-    *,
-    project_module: str,
-    source_identifiers: list[str],
-    source_results: list[dict[str, Any]],
-    claim_token: str | None,
-) -> dict[str, Any]:
-    """Persist one chunk of tap results (no finalize / claim release). Returns stat delta."""
-    if len(source_results) != len(source_identifiers):
-        logger.warning(
-            "event=discover_persist_slice_count_mismatch project_module=%s "
-            "source_identifiers=%s tap_results=%s",
-            project_module,
-            len(source_identifiers),
-            len(source_results),
-        )
-    now = datetime.now(UTC)
-    stats = DiscoveryBatchStats()
-    await _apply_tap_results_to_stats(
-        db,
-        project_module=project_module,
-        claim_token=claim_token,
-        source_results=source_results,
-        now=now,
-        stats=stats,
-    )
-    logger.info(
-        "event=discover_persist_slice_done project_module=%s chunk_sources=%s",
-        project_module,
-        len(source_results),
-    )
-    return discovery_stat_delta_from_stats(stats)
-
-
-async def run_discovery_batch_finalize(
-    db: Any,
-    *,
-    project_module: str,
-    source_identifiers: list[str],
-    claim_token: str | None,
-    stats_merged: dict[str, Any],
-    job_started_at: float,
-    wall_started_at: float | None,
-) -> tuple[dict[str, Any], bool]:
-    """Finalize marks, release discovery claim, and build the API result."""
-    stats = discovery_stats_from_stat_delta(stats_merged)
-    now = datetime.now(UTC)
-    return await _finalize_discovery_batch(
-        db,
-        project_module=project_module,
-        source_identifiers=source_identifiers,
-        claim_token=claim_token,
-        stats=stats,
-        now=now,
-        job_started_at=job_started_at,
-        wall_started_at=wall_started_at,
-    )
-
-
 async def run_discovery_persist_phase(
     db: Any,
     *,
@@ -446,25 +384,14 @@ async def run_discovery_persist_phase(
     """Apply all tap results, then finalize (ARQ / single-step Restate path)."""
     now = datetime.now(UTC)
     stats = DiscoveryBatchStats()
-    slice_size = max(1, int(getattr(settings, "DISCOVERY_PERSIST_APPLY_SLICE_SIZE", 128)))
-    total = len(source_results)
-    if total > slice_size:
-        logger.info(
-            "event=discover_persist_apply_slicing project_module=%s total_results=%s slice_size=%s",
-            project_module,
-            total,
-            slice_size,
-        )
-    for offset in range(0, total, slice_size):
-        chunk = source_results[offset : offset + slice_size]
-        await _apply_tap_results_to_stats(
-            db,
-            project_module=project_module,
-            claim_token=claim_token,
-            source_results=chunk,
-            now=now,
-            stats=stats,
-        )
+    await _apply_tap_results_to_stats(
+        db,
+        project_module=project_module,
+        claim_token=claim_token,
+        source_results=source_results,
+        now=now,
+        stats=stats,
+    )
     return await _finalize_discovery_batch(
         db,
         project_module=project_module,

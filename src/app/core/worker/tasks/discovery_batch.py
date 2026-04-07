@@ -1,6 +1,7 @@
 """Batch-level helpers for the discovery worker task: stats, marking, persistence, result shape."""
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -43,7 +44,6 @@ class DiscoveryBatchStats:
     failed_source_identifiers: list[str] = field(default_factory=list)
     total_datasets: int = 0
     total_sbids: int = 0
-
 
 def record_failed_result(
     stats: DiscoveryBatchStats,

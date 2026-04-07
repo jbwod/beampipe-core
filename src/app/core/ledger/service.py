@@ -10,12 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from ...crud.crud_run_record import crud_batch_run_records
-from ...models.ledger import RunStatus
+from ...models.ledger import RunExecutionPhase, RunStatus
 from ...schemas.ledger import BatchRunRecordCreateInternal, BatchRunRecordRead
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
 from ..utils.registry import validate_source_spec
 
 logger = logging.getLogger(__name__)
+
+_EXECUTION_PHASE_UNSET: object = object()
 
 
 class RunLedgerService:
@@ -89,7 +91,8 @@ class RunLedgerService:
             RunStatus.PENDING: [RunStatus.RUNNING, RunStatus.CANCELLED],
             RunStatus.RUNNING: [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED],
             RunStatus.COMPLETED: [],  # no more transitions allowed
-            RunStatus.FAILED: [RunStatus.RETRYING, RunStatus.CANCELLED],
+            # FAILED -> RUNNING: worker/ARQ retry picks up the same run after a transient error
+            RunStatus.FAILED: [RunStatus.RETRYING, RunStatus.CANCELLED, RunStatus.RUNNING],
             RunStatus.RETRYING: [RunStatus.RUNNING, RunStatus.FAILED, RunStatus.CANCELLED],
             RunStatus.CANCELLED: [],  # no more transitions allowed
         }
@@ -104,6 +107,7 @@ class RunLedgerService:
         scheduler_name: str | None = None,
         workflow_manifest: dict | None = None,
         error: str | None = None,
+        execution_phase: RunExecutionPhase | None | object = _EXECUTION_PHASE_UNSET,
     ) -> dict[str, Any]:
         """Update run status and related fields.
 
@@ -115,6 +119,7 @@ class RunLedgerService:
             scheduler_name: Name of the scheduler
             workflow_manifest: JSON manifest of the workflow
             error: Error message if the run failed
+            execution_phase: Checkpoint for execute_run retries; pass None to clear the column
 
         Returns:
             Updated run record
@@ -159,6 +164,8 @@ class RunLedgerService:
             update_data["workflow_manifest"] = workflow_manifest
         if error is not None:
             update_data["last_error"] = error
+        if execution_phase is not _EXECUTION_PHASE_UNSET:
+            update_data["execution_phase"] = execution_phase
 
         update_data["updated_at"] = now
 

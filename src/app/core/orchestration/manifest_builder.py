@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..archive.service import archive_metadata_service
+from ..exceptions.workflow_exceptions import WorkflowErrorCode, WorkflowFailure
 from ..projects import load_project_module
 
 logger = logging.getLogger(__name__)
@@ -52,8 +53,9 @@ async def build_manifest(
 
     build_fn = getattr(module, "manifest", None)
     if not callable(build_fn):
-        raise ValueError(
-            f"Project module '{project_module}' must implement manifest"
+        raise WorkflowFailure(
+            WorkflowErrorCode.EXEC_RUN_PROJECT_MODULE_CONTRACT,
+            f"Project module '{project_module}' must implement a callable manifest",
         )
     sources = build_fn(
         metadata_by_source,
