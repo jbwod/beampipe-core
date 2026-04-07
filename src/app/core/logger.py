@@ -10,7 +10,7 @@ LOG_FILE_PATH = os.path.join(LOG_DIR, "app.log")
 
 LOGGING_FORMAT = (
     "%(asctime)s - %(name)s - %(levelname)s - "
-    "run_id=%(run_id)s arq_job_id=%(arq_job_id)s job_try=%(job_try)s - %(message)s"
+    "execution_id=%(execution_id)s arq_job_id=%(arq_job_id)s job_try=%(job_try)s - %(message)s"
 )
 
 _VERBOSITY_TO_LEVEL = {

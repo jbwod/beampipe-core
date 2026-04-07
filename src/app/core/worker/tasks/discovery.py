@@ -37,7 +37,7 @@ async def discover_batch(
 
     with bind_execution_log_context_from_arq(
         ctx=ctx,
-        run_id=discovery_id,
+        execution_id=discovery_id,
     ) as (arq_job_id, job_try):
         if (
             settings.WORKFLOW_ENGINE_DISCOVERY == "restate"

@@ -10,20 +10,20 @@ from ...restate_invoke import invoke_restate_workflow
 logger = logging.getLogger(__name__)
 
 
-async def execute_run_job(
+async def execute_execution_job(
     ctx: Any,
-    run_id: str,
+    execution_id: str,
     *,
     do_stage: bool = True,
     do_submit: bool = True,
 ) -> dict[str, Any]:
-    run_uuid = UUID(str(run_id))
+    execution_uuid = UUID(str(execution_id))
     with bind_execution_log_context_from_arq(
         ctx=ctx,
-        run_id=str(run_uuid),
+        execution_id=str(execution_uuid),
     ) as (arq_job_id, job_try):
         logger.info(
-            "event=execute_run_job_start do_stage=%s do_submit=%s",
+            "event=execute_execution_job_start do_stage=%s do_submit=%s",
             do_stage,
             do_submit,
         )
@@ -33,17 +33,20 @@ async def execute_run_job(
         ):
             out = await invoke_restate_workflow(
                 workflow_name=settings.RESTATE_EXECUTION_WORKFLOW_NAME,
-                workflow_id=str(run_uuid),
+                workflow_id=str(execution_uuid),
                 handler_name=settings.RESTATE_EXECUTION_WORKFLOW_HANDLER,
                 payload={"do_stage": do_stage, "do_submit": do_submit},
                 arq_job_id=arq_job_id,
                 job_try=job_try,
             )
-            return {"ok": True, "run_id": str(run_uuid), "restate": out}
-        from ...orchestration.service import execute_run as orchestration_execute_run
+            return {"ok": True, "execution_id": str(execution_uuid), "restate": out}
+        from ...orchestration.service import execute_execution as orchestration_execute_execution
 
         async with local_session() as db:
-            result = await orchestration_execute_run(
-                db=db, run_id=run_uuid, do_stage=do_stage, do_submit=do_submit
+            result = await orchestration_execute_execution(
+                db=db,
+                execution_id=execution_uuid,
+                do_stage=do_stage,
+                do_submit=do_submit,
             )
-            return {"ok": True, "run_id": str(run_uuid), "result": result}
+            return {"ok": True, "execution_id": str(execution_uuid), "result": result}

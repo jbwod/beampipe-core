@@ -31,7 +31,7 @@ async def hello_world_workflow(
     if not isinstance(raw, dict):
         _ingress_terminal(
             WorkflowFailure(
-                WorkflowErrorCode.EXEC_RUN_INVALID_PAYLOAD,
+                WorkflowErrorCode.EXECUTION_INVALID_PAYLOAD,
                 "HelloWorldWorkflow payload must be a JSON object or omitted",
             )
         )
@@ -40,7 +40,7 @@ async def hello_world_workflow(
     except ValidationError as e:
         _ingress_terminal(
             WorkflowFailure(
-                WorkflowErrorCode.EXEC_RUN_INVALID_PAYLOAD,
+                WorkflowErrorCode.EXECUTION_INVALID_PAYLOAD,
                 f"Invalid hello_world workflow payload: {e}",
                 cause=e,
             )

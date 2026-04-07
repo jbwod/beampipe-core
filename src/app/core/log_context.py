@@ -1,4 +1,4 @@
-"""Correlation IDs for logging (run_id, ARQ job id, job try) via contextvars.
+"""Correlation IDs for logging (execution_id, ARQ job id, job try) via contextvars.
 """
 import logging
 from collections.abc import Generator
@@ -8,7 +8,7 @@ from typing import Any
 
 _ABSENT = "-"
 
-_run_id_var: ContextVar[str | None] = ContextVar("execution_run_id", default=None)
+_execution_id_var: ContextVar[str | None] = ContextVar("execution_id", default=None)
 _arq_job_id_var: ContextVar[str | None] = ContextVar("execution_arq_job_id", default=None)
 _job_try_var: ContextVar[int | None] = ContextVar("execution_job_try", default=None)
 
@@ -26,10 +26,10 @@ def _fmt_try(value: int | None) -> str:
 
 
 class ExecutionLogContextFilter(logging.Filter):
-    """Inject run_id, arq_job_id, job_try on each LogRecord from contextvars."""
+    """Inject execution_id, arq_job_id, job_try on each LogRecord from contextvars."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.run_id = _fmt_str(_run_id_var.get())
+        record.execution_id = _fmt_str(_execution_id_var.get())
         record.arq_job_id = _fmt_str(_arq_job_id_var.get())
         record.job_try = _fmt_try(_job_try_var.get())
         return True
@@ -55,18 +55,18 @@ def parse_arq_job_context(ctx: Any) -> tuple[str | None, int | None]:
 @contextmanager
 def bind_execution_log_context(
     *,
-    run_id: str | None = None,
+    execution_id: str | None = None,
     arq_job_id: str | None = None,
     job_try: int | None = None,
 ) -> Generator[None, None, None]:
     """Bind correlation fields for the current sync/async call stack (one Task)."""
-    t1: Token[str | None] = _run_id_var.set(run_id)
+    t1: Token[str | None] = _execution_id_var.set(execution_id)
     t2: Token[str | None] = _arq_job_id_var.set(arq_job_id)
     t3: Token[int | None] = _job_try_var.set(job_try)
     try:
         yield
     finally:
-        _run_id_var.reset(t1)
+        _execution_id_var.reset(t1)
         _arq_job_id_var.reset(t2)
         _job_try_var.reset(t3)
 
@@ -75,11 +75,11 @@ def bind_execution_log_context(
 def bind_execution_log_context_from_arq(
     *,
     ctx: Any,
-    run_id: str | None = None,
+    execution_id: str | None = None,
 ) -> Generator[tuple[str | None, int | None], None, None]:
     arq_job_id, job_try = parse_arq_job_context(ctx)
     with bind_execution_log_context(
-        run_id=run_id,
+        execution_id=execution_id,
         arq_job_id=arq_job_id,
         job_try=job_try,
     ):
