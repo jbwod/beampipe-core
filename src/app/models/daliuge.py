@@ -9,10 +9,10 @@ from uuid6 import uuid7
 from ..core.db.database import Base
 
 
-class DaliugeExecutionProfile(Base):
-    """DALiuGE execution profile: partitioning, URLs, ports for graph translation and deploy."""
+class DaliugeDeploymentProfile(Base):
+    """DALiuGE deployment profile: partitioning, URLs, ports for graph translation and deploy."""
 
-    __tablename__ = "daliuge_execution_profile"
+    __tablename__ = "daliuge_deployment_profile"
 
     # Identity (required first for dataclass field order)
     uuid: Mapped[uuid_pkg.UUID] = mapped_column(

@@ -18,7 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import settings
 from ..registry.service import source_registry_service
 from ..shaping.policy import (
-    discovery_queue_max_depth,
+    can_admit_by_in_flight,
+    discovery_admission_budget,
+    estimate_discovery_in_flight_batches,
+    shaping_queue_max_depth,
     shaping_enqueue_pace,
 )
 from .tap_health import all_taps_reachable, get_tap_health, unreachable_taps
@@ -59,8 +62,9 @@ async def discover_schedule(
     scheduled_at = datetime.now(UTC).isoformat()
     target_module = project_module or "all"
     max_sources_per_run = settings.DISCOVERY_MAX_SOURCES_PER_RUN
-    max_queue_depth = discovery_queue_max_depth(settings)
+    max_queue_depth = shaping_queue_max_depth(settings)
     max_discovery_jobs_per_tick = settings.SHAPING_DISCOVERY_MAX_JOBS_PER_TICK
+    max_in_flight_batches = settings.SHAPING_DISCOVERY_MAX_IN_FLIGHT_BATCHES
 
     def _error_result(error: str) -> dict[str, Any]:
         return {
@@ -76,6 +80,10 @@ async def discover_schedule(
             "max_sources_per_run": max_sources_per_run,
             "queue_depth": None,
             "skipped_due_to_queue_full": False,
+            "skipped_due_to_max_discovery_jobs_per_tick": False,
+            "admitted_by_rate": 0,
+            "blocked_by_rate": False,
+            "blocked_by_in_flight": False,
         }
 
     if not redis:
@@ -88,6 +96,9 @@ async def discover_schedule(
         stale_after_hours if stale_after_hours is not None else settings.DISCOVERY_STALE_HOURS
     )
     queue_depth: int | None = None
+    blocked_by_rate = False
+    blocked_by_in_flight = False
+    admitted_by_rate = 0
 
     if max_queue_depth is not None:
         try:
@@ -130,7 +141,42 @@ async def discover_schedule(
                     "max_sources_per_run": max_sources_per_run,
                     "queue_depth": queue_depth,
                     "skipped_due_to_queue_full": True,
+                    "skipped_due_to_max_discovery_jobs_per_tick": False,
+                    "admitted_by_rate": 0,
+                    "blocked_by_rate": False,
+                    "blocked_by_in_flight": False,
                 }
+
+    requested_sources = max(0, int(max_sources_per_run))
+    admitted_by_rate = await discovery_admission_budget(
+        redis,
+        desired_sources=requested_sources,
+    )
+    if admitted_by_rate <= 0:
+        blocked_by_rate = True
+        logger.info(
+            "event=discover_schedule_rate_limited project_module=%s requested_sources=%s admitted_sources=%s",
+            target_module,
+            requested_sources,
+            admitted_by_rate,
+        )
+        return {
+            "ok": True,
+            "scheduled_at": scheduled_at,
+            "project_module": target_module,
+            "total_sources": 0,
+            "total_jobs": 0,
+            "job_ids": [],
+            "enqueue_failures": 0,
+            "failed_batches": [],
+            "max_sources_per_run": max_sources_per_run,
+            "queue_depth": queue_depth,
+            "skipped_due_to_queue_full": False,
+            "skipped_due_to_max_discovery_jobs_per_tick": False,
+            "admitted_by_rate": 0,
+            "blocked_by_rate": True,
+            "blocked_by_in_flight": False,
+        }
 
     # skip scheduling when a TAP endpoint is unreachable to avoid endless retries
     if settings.DISCOVERY_TAP_HEALTH_CHECK_ENABLED:
@@ -165,6 +211,10 @@ async def discover_schedule(
                     "skipped_due_to_queue_full": False,
                     "skipped_due_to_tap_unreachable": True,
                     "tap_unreachable": unreachable,
+                    "skipped_due_to_max_discovery_jobs_per_tick": False,
+                    "admitted_by_rate": admitted_by_rate,
+                    "blocked_by_rate": blocked_by_rate,
+                    "blocked_by_in_flight": blocked_by_in_flight,
                 }
         except Exception as exc:
             logger.warning(
@@ -188,7 +238,7 @@ async def discover_schedule(
     enqueue_failures = 0
     failed_batches: list[dict[str, Any]] = []
     skipped_due_to_queue_full = False
-    remaining_sources = max_sources_per_run
+    remaining_sources = admitted_by_rate
     discovery_jobs_this_tick = 0
 
     while remaining_sources > 0:
@@ -223,6 +273,26 @@ async def discover_schedule(
                     )
                     skipped_due_to_queue_full = True
                     break
+
+        if max_in_flight_batches is not None:
+            in_flight_batches = await estimate_discovery_in_flight_batches(
+                db,
+                redis,
+                queue_name=settings.WORKER_QUEUE_NAME,
+            )
+            if not can_admit_by_in_flight(
+                current=in_flight_batches,
+                max_in_flight=max_in_flight_batches,
+            ):
+                blocked_by_in_flight = True
+                logger.warning(
+                    "event=discover_schedule_in_flight_cap "
+                    "project_module=%s in_flight_batches=%s max_in_flight_batches=%s action=stop",
+                    target_module,
+                    in_flight_batches,
+                    max_in_flight_batches,
+                )
+                break
 
         claim_token = None
         batch_limit = min(batch_size, remaining_sources)
@@ -363,6 +433,9 @@ async def discover_schedule(
                         "queue_depth": queue_depth,
                         "skipped_due_to_queue_full": skipped_due_to_queue_full,
                         "skipped_due_to_max_discovery_jobs_per_tick": True,
+                        "admitted_by_rate": admitted_by_rate,
+                        "blocked_by_rate": blocked_by_rate,
+                        "blocked_by_in_flight": blocked_by_in_flight,
                     }
                 continue
 
@@ -408,6 +481,10 @@ async def discover_schedule(
                 "max_sources_per_run": max_sources_per_run,
                 "queue_depth": queue_depth,
                 "skipped_due_to_queue_full": skipped_due_to_queue_full,
+                "skipped_due_to_max_discovery_jobs_per_tick": False,
+                "admitted_by_rate": admitted_by_rate,
+                "blocked_by_rate": blocked_by_rate,
+                "blocked_by_in_flight": blocked_by_in_flight,
             }
 
     if queue_depth is None:
@@ -416,7 +493,13 @@ async def discover_schedule(
         except Exception:
             pass
 
-    if total_sources == 0 and enqueue_failures == 0 and not skipped_due_to_queue_full:
+    if (
+        total_sources == 0
+        and enqueue_failures == 0
+        and not skipped_due_to_queue_full
+        and not blocked_by_rate
+        and not blocked_by_in_flight
+    ):
         logger.info(
             "event=discover_schedule_skipped project_module=%s reason=no_stale_sources",
             target_module,
@@ -433,12 +516,17 @@ async def discover_schedule(
             "max_sources_per_run": max_sources_per_run,
             "queue_depth": queue_depth,
             "skipped_due_to_queue_full": False,
+            "skipped_due_to_max_discovery_jobs_per_tick": False,
+            "admitted_by_rate": admitted_by_rate,
+            "blocked_by_rate": blocked_by_rate,
+            "blocked_by_in_flight": blocked_by_in_flight,
         }
 
     logger.info(
         "event=discover_schedule_completed "
         "project_module=%s scheduled_at=%s total_sources=%s total_jobs=%s "
-        "enqueue_failures=%s queue_depth=%s skipped_due_to_queue_full=%s",
+        "enqueue_failures=%s queue_depth=%s skipped_due_to_queue_full=%s "
+        "admitted_by_rate=%s blocked_by_rate=%s blocked_by_in_flight=%s",
         target_module,
         scheduled_at,
         total_sources,
@@ -446,6 +534,9 @@ async def discover_schedule(
         enqueue_failures,
         queue_depth,
         skipped_due_to_queue_full,
+        admitted_by_rate,
+        blocked_by_rate,
+        blocked_by_in_flight,
     )
 
     return {
@@ -461,4 +552,7 @@ async def discover_schedule(
         "queue_depth": queue_depth,
         "skipped_due_to_queue_full": skipped_due_to_queue_full,
         "skipped_due_to_max_discovery_jobs_per_tick": False,
+        "admitted_by_rate": admitted_by_rate,
+        "blocked_by_rate": blocked_by_rate,
+        "blocked_by_in_flight": blocked_by_in_flight,
     }

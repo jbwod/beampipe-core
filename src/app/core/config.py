@@ -200,6 +200,29 @@ class DiscoverySettings(BaseSettings):
     DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS: float = 10.0
 
 
+class ShapingSettings(BaseSettings):
+    # Hybrid Shaper
+    SHAPING_ARQ_QUEUE_MAX_DEPTH: int | None = 200
+
+    # Discovery admission (token bucket)
+    SHAPING_DISCOVERY_RATE_PER_MIN: int = 200
+    SHAPING_DISCOVERY_BURST: int = 400
+    # Discovery in-flight guard
+    SHAPING_DISCOVERY_MAX_IN_FLIGHT_BATCHES: int | None = 4
+
+    # Execute admission (token bucket)
+    SHAPING_EXECUTE_RATE_PER_MIN: int = 20
+    SHAPING_EXECUTE_BURST: int = 40
+    # Execute in-flight guard
+    SHAPING_EXECUTE_MAX_IN_FLIGHT_RUNS: int | None = 2
+
+    # Sleep after each successful enqueue_job
+    SHAPING_ENQUEUE_PACING_MS: float = 0.0
+
+    # Cap discover_batch
+    SHAPING_DISCOVERY_MAX_JOBS_PER_TICK: int | None = None
+
+
 class ArchiveSettings(BaseSettings):
     ARCHIVE_METADATA_VALIDATE_JSON: bool = False
 
@@ -228,6 +251,7 @@ class Settings(
     RunLedgerSettings,
     RestateWorkflowSettings,
     DiscoverySettings,
+    ShapingSettings,
     ArchiveSettings,
     CasdaSettings,
 ):

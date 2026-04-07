@@ -9,16 +9,16 @@ class WorkflowErrorCode(StrEnum):
     DISCOVERY_EMPTY_SOURCE_LIST = "DISCOVERY_EMPTY_SOURCE_LIST"
     DISCOVERY_ADAPTER_NOT_REGISTERED = "DISCOVERY_ADAPTER_NOT_REGISTERED"
 
-    EXEC_RUN_INVALID_PAYLOAD = "EXEC_RUN_INVALID_PAYLOAD"
-    EXEC_RUN_INVALID_WORKFLOW_KEY = "EXEC_RUN_INVALID_WORKFLOW_KEY"
-    EXEC_RUN_RUN_NOT_FOUND = "EXEC_RUN_RUN_NOT_FOUND"
-    EXEC_RUN_STAGING_PRECONDITION = "EXEC_RUN_STAGING_PRECONDITION"
-    EXEC_RUN_MANIFEST_STATE = "EXEC_RUN_MANIFEST_STATE"
-    EXEC_RUN_PROJECT_MODULE_CONTRACT = "EXEC_RUN_PROJECT_MODULE_CONTRACT"
-    EXEC_RUN_NO_EXECUTION_PROFILE = "EXEC_RUN_NO_EXECUTION_PROFILE"
-    EXEC_RUN_EXECUTION_PROFILE = "EXEC_RUN_EXECUTION_PROFILE"
-    EXEC_RUN_DIM_STATE = "EXEC_RUN_DIM_STATE"
-    EXEC_RUN_UNEXPECTED = "EXEC_RUN_UNEXPECTED"
+    EXECUTION_INVALID_PAYLOAD = "EXECUTION_INVALID_PAYLOAD"
+    EXECUTION_INVALID_WORKFLOW_KEY = "EXECUTION_INVALID_WORKFLOW_KEY"
+    EXECUTION_NOT_FOUND = "EXECUTION_NOT_FOUND"
+    EXECUTION_STAGING_PRECONDITION = "EXECUTION_STAGING_PRECONDITION"
+    EXECUTION_MANIFEST_STATE = "EXECUTION_MANIFEST_STATE"
+    EXECUTION_PROJECT_MODULE_CONTRACT = "EXECUTION_PROJECT_MODULE_CONTRACT"
+    EXECUTION_NO_DEPLOYMENT_PROFILE = "EXECUTION_NO_DEPLOYMENT_PROFILE"
+    EXECUTION_DEPLOYMENT_PROFILE = "EXECUTION_DEPLOYMENT_PROFILE"
+    EXECUTION_DIM_STATE = "EXECUTION_DIM_STATE"
+    EXECUTION_UNEXPECTED = "EXECUTION_UNEXPECTED"
     # more
 
 
@@ -49,30 +49,30 @@ class WorkflowFailure(Exception):
         return f"[{self.code.value}] {self.detail}"
 
 
-def wf_run_not_found(run_id: UUID) -> WorkflowFailure:
+def wf_execution_not_found(execution_id: UUID) -> WorkflowFailure:
     return WorkflowFailure(
-        WorkflowErrorCode.EXEC_RUN_RUN_NOT_FOUND,
-        f"Run {run_id} not found",
+        WorkflowErrorCode.EXECUTION_NOT_FOUND,
+        f"Execution {execution_id} not found",
     )
 
 
 def wf_staging_requires_casda() -> WorkflowFailure:
     return WorkflowFailure(
-        WorkflowErrorCode.EXEC_RUN_STAGING_PRECONDITION,
+        WorkflowErrorCode.EXECUTION_STAGING_PRECONDITION,
         "CASDA_USERNAME required for staging",
     )
 
 
-def wf_no_execution_profile() -> WorkflowFailure:
+def wf_no_deployment_profile() -> WorkflowFailure:
     return WorkflowFailure(
-        WorkflowErrorCode.EXEC_RUN_NO_EXECUTION_PROFILE,
-        "No DALiuGE execution profile found. Create a profile via POST /api/v1/execution-profiles "
+        WorkflowErrorCode.EXECUTION_NO_DEPLOYMENT_PROFILE,
+        "No DALiuGE deployment profile found. Create a profile via POST /api/v1/deployment-profiles "
     )
 
 
 def wf_unexpected(exc: BaseException) -> WorkflowFailure:
     return WorkflowFailure(
-        WorkflowErrorCode.EXEC_RUN_UNEXPECTED,
+        WorkflowErrorCode.EXECUTION_UNEXPECTED,
         f"{type(exc).__name__}: {exc}",
         cause=exc if exc is not None else None,
     )

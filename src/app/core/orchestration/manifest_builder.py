@@ -54,7 +54,7 @@ async def build_manifest(
     build_fn = getattr(module, "manifest", None)
     if not callable(build_fn):
         raise WorkflowFailure(
-            WorkflowErrorCode.EXEC_RUN_PROJECT_MODULE_CONTRACT,
+            WorkflowErrorCode.EXECUTION_PROJECT_MODULE_CONTRACT,
             f"Project module '{project_module}' must implement a callable manifest",
         )
     sources = build_fn(

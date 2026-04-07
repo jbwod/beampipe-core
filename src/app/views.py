@@ -39,10 +39,10 @@ async def view_sources(request: Request) -> HTMLResponse:
           show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
           style="display:none;"></andypf-json-viewer>
 
-        <h2>Execution profiles</h2>
-        <p id="execution-profiles-status">Not loaded.</p>
-        <p><button type="button" id="load-execution-profiles-btn">Load execution profiles</button></p>
-        <andypf-json-viewer id="execution-profiles-json-viewer" indent="2" expanded="1" theme="eighties"
+        <h2>Deployment profiles</h2>
+        <p id="deployment-profiles-status">Not loaded.</p>
+        <p><button type="button" id="load-deployment-profiles-btn">Load deployment profiles</button></p>
+        <andypf-json-viewer id="deployment-profiles-json-viewer" indent="2" expanded="1" theme="eighties"
           show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
           style="display:none;"></andypf-json-viewer>
 
@@ -113,7 +113,7 @@ async def view_sources(request: Request) -> HTMLResponse:
               authToken = data.access_token || null;
               if (authToken) {
                 statusEl.textContent = ' Logged in';
-                await loadExecutionProfiles();
+                await loadDeploymentProfiles();
               } else {
                 statusEl.textContent = ' Login failed (no token)';
               }
@@ -124,26 +124,26 @@ async def view_sources(request: Request) -> HTMLResponse:
             }
           }
 
-          async function loadExecutionProfiles() {
-            const statusEl = document.getElementById('execution-profiles-status');
-            const viewer = document.getElementById('execution-profiles-json-viewer');
+          async function loadDeploymentProfiles() {
+            const statusEl = document.getElementById('deployment-profiles-status');
+            const viewer = document.getElementById('deployment-profiles-json-viewer');
             if (!statusEl || !viewer) {
-              console.warn('Execution profiles UI elements missing (execution-profiles-status / viewer).');
+              console.warn('Deployment profiles UI elements missing (deployment-profiles-status / viewer).');
               return;
             }
             viewer.style.display = 'none';
             if (!authToken) {
-              statusEl.textContent = 'Log in first, then click Load execution profiles.';
+              statusEl.textContent = 'Log in first, then click Load deployment profiles.';
               return;
             }
-            statusEl.textContent = 'Loading execution profiles…';
+            statusEl.textContent = 'Loading deployment profiles…';
             try {
               const response = await fetch(
-                '/api/v1/execution-profiles?page=1&items_per_page=200',
+                '/api/v1/deployment-profiles?page=1&items_per_page=200',
                 { headers: { 'Authorization': 'Bearer ' + authToken } }
               );
               if (!response.ok) {
-                statusEl.textContent = 'Failed to load execution profiles (HTTP ' + response.status + ').';
+                statusEl.textContent = 'Failed to load deployment profiles (HTTP ' + response.status + ').';
                 return;
               }
               const data = await response.json();
@@ -153,8 +153,8 @@ async def view_sources(request: Request) -> HTMLResponse:
               viewer.data = data;
               viewer.style.display = 'block';
             } catch (err) {
-              console.error('Error loading execution profiles', err);
-              statusEl.textContent = 'Error loading execution profiles.';
+              console.error('Error loading deployment profiles', err);
+              statusEl.textContent = 'Error loading deployment profiles.';
             }
           }
 
@@ -346,8 +346,8 @@ async def view_sources(request: Request) -> HTMLResponse:
 
           document.getElementById('login-form').addEventListener('submit', login);
           document.getElementById('add-source-form').addEventListener('submit', addSource);
-          document.getElementById('load-execution-profiles-btn').addEventListener('click', function () {
-            loadExecutionProfiles();
+          document.getElementById('load-deployment-profiles-btn').addEventListener('click', function () {
+            loadDeploymentProfiles();
           });
           loadReadyStatus();
           loadTapStatus();

@@ -111,7 +111,7 @@ def validate_deployment_config_dict(
     return parse_deployment_config(backend, raw)
 
 
-EXECUTION_PROFILE_STATE_KEYS: frozenset[str] = frozenset({
+DEPLOYMENT_PROFILE_STATE_KEYS: frozenset[str] = frozenset({
     "name",
     "description",
     "project_module",
@@ -130,17 +130,17 @@ EXECUTION_PROFILE_STATE_KEYS: frozenset[str] = frozenset({
 })
 
 
-def merge_execution_profile_state(
+def merge_deployment_profile_state(
     current: dict[str, Any], patch: dict[str, Any]
 ) -> dict[str, Any]:
-    merged = {k: current[k] for k in EXECUTION_PROFILE_STATE_KEYS if k in current}
+    merged = {k: current[k] for k in DEPLOYMENT_PROFILE_STATE_KEYS if k in current}
     for k, v in patch.items():
-        if k in EXECUTION_PROFILE_STATE_KEYS:
+        if k in DEPLOYMENT_PROFILE_STATE_KEYS:
             merged[k] = v
     return merged
 
 
-def build_execution_profile_create_dict(merged: dict[str, Any]) -> dict[str, Any]:
+def build_deployment_profile_create_dict(merged: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": merged["name"],
         "description": merged.get("description"),
@@ -161,7 +161,7 @@ def build_execution_profile_create_dict(merged: dict[str, Any]) -> dict[str, Any
 
 
 # validation
-# def check_execution_profile_consistency(
+# def check_deployment_profile_consistency(
 #     deployment_backend: DeploymentBackend,
 #     deployment_config: dict[str, Any] | None,
 #     tm_url: str | None,
@@ -189,7 +189,7 @@ def build_execution_profile_create_dict(merged: dict[str, Any]) -> dict[str, Any
 #         SlurmRemoteDeploymentConfig.model_validate(dc)
 
 
-class DaliugeExecutionProfileFields(BaseModel):
+class DaliugeDeploymentProfileFields(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=50)]
     description: str | None = Field(default=None, max_length=255)
     project_module: str | None = Field(default=None, max_length=50)
@@ -235,13 +235,13 @@ class DaliugeExecutionProfileFields(BaseModel):
     verify_ssl: bool = Field(default=False)
 
 
-class DaliugeExecutionProfileCreate(DaliugeExecutionProfileFields):
+class DaliugeDeploymentProfileCreate(DaliugeDeploymentProfileFields):
     model_config = ConfigDict(extra="forbid")
 
 # validation
     @model_validator(mode="after")
     def validate_deployment(self) -> Self:
-        # check_execution_profile_consistency(
+        # check_deployment_profile_consistency(
         #     self.deployment_backend,
         #     self.deployment_config,
         #     self.tm_url,
@@ -259,7 +259,7 @@ class DaliugeExecutionProfileCreate(DaliugeExecutionProfileFields):
         return self
 
 
-class DaliugeExecutionProfileUpdate(BaseModel):
+class DaliugeDeploymentProfileUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=50)
@@ -284,12 +284,12 @@ class DaliugeExecutionProfileUpdate(BaseModel):
     verify_ssl: bool | None = None
 
 
-class DaliugeExecutionProfileRead(TimestampSchema, DaliugeExecutionProfileFields, UUIDSchema):
+class DaliugeDeploymentProfileRead(TimestampSchema, DaliugeDeploymentProfileFields, UUIDSchema):
     model_config = ConfigDict(from_attributes=True)
 
     project_module: str | None = None
     is_default: bool = False
 
 
-class DaliugeExecutionProfileDelete(BaseModel):
+class DaliugeDeploymentProfileDelete(BaseModel):
     model_config = ConfigDict(extra="forbid")
