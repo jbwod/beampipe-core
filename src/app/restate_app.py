@@ -21,6 +21,8 @@ from .restate_workflows.hello import HelloWorldWorkflow
 # Root ASGI app served by `uvicorn app.restate_app:app ...`
 app = restate.app(
     [
-        HelloWorldWorkflow
+        ExecuteRunWorkflow,
+        DiscoveryBatchWorkflow,
+        HelloWorldWorkflow,
     ]
 )

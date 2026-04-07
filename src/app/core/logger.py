@@ -3,10 +3,15 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
+from .log_context import ExecutionLogContextFilter
+
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
 LOG_FILE_PATH = os.path.join(LOG_DIR, "app.log")
 
-LOGGING_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+LOGGING_FORMAT = (
+    "%(asctime)s - %(name)s - %(levelname)s - "
+    "run_id=%(run_id)s arq_job_id=%(arq_job_id)s job_try=%(job_try)s - %(message)s"
+)
 
 _VERBOSITY_TO_LEVEL = {
     "full": logging.DEBUG,
@@ -62,3 +67,8 @@ if not has_stream_handler:
     stream_handler.setLevel(LOGGING_LEVEL)
     stream_handler.setFormatter(logging.Formatter(LOGGING_FORMAT))
     root_logger.addHandler(stream_handler)
+
+_exec_ctx_filter = ExecutionLogContextFilter()
+for _handler in root_logger.handlers:
+    _handler.addFilter(_exec_ctx_filter)
+    _handler.setFormatter(logging.Formatter(LOGGING_FORMAT))

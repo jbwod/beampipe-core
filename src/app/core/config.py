@@ -195,9 +195,7 @@ class DiscoverySettings(BaseSettings):
     DISCOVERY_RETRY_COOLDOWN_MINUTES: int = 60
     DISCOVERY_CLAIM_TTL_MINUTES: int = 180
     DISCOVERY_MAX_FAILURES_BEFORE_BACKOFF_MULTIPLIER: int = 3
-    DISCOVERY_MAX_SOURCES_PER_RUN: int = 500
-
-    # skip when queue is full
+    DISCOVERY_MAX_SOURCES_PER_RUN: int = 2000
     DISCOVERY_MAX_QUEUE_DEPTH: int | None = 200
     DISCOVERY_TAP_HEALTH_CHECK_ENABLED: bool = True
     DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS: float = 10.0
@@ -229,6 +227,7 @@ class Settings(
     EnvironmentSettings,
     CORSSettings,
     RunLedgerSettings,
+    RestateWorkflowSettings,
     DiscoverySettings,
     ArchiveSettings,
     CasdaSettings,
