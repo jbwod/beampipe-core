@@ -1,5 +1,4 @@
 """Simple loader."""
-from __future__ import annotations
 
 from app.core.projects import debug_print_modules, load_project_module
 
