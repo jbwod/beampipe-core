@@ -44,29 +44,29 @@ def _require_uuid_workflow_key(execution_id: str) -> None:
 async def _execution_ack_started(execution_id: str) -> dict[str, Any]:
     async with local_session() as db:
         return await orchestration_service.begin_restate_execution_for_execution(
-            db=db, run_id=UUID(execution_id)
+            db=db, execution_id=UUID(execution_id)
         )
 
 
 async def _execution_read_snapshot(execution_id: str) -> dict[str, Any]:
     async with local_session() as db:
         return await orchestration_service.read_execution_ledger_snapshot(
-            db=db, run_id=UUID(execution_id)
+            db=db, execution_id=UUID(execution_id)
         )
 
 
 async def _execution_read_existing_manifest(execution_id: str) -> dict[str, Any]:
     async with local_session() as db:
         return await orchestration_service.read_existing_workflow_manifest(
-            db=db, run_id=UUID(execution_id)
+            db=db, execution_id=UUID(execution_id)
         )
 
 
 async def _execution_stage_sources(execution_id: str, do_stage: bool) -> dict[str, Any]:
     async with local_session() as db:
-        return await orchestration_service.stage_sources_for_run(
+        return await orchestration_service.stage_sources_for_execution(
             db=db,
-            run_id=UUID(execution_id),
+            execution_id=UUID(execution_id),
             do_stage=do_stage,
         )
 
@@ -74,9 +74,9 @@ async def _execution_stage_sources(execution_id: str, do_stage: bool) -> dict[st
 async def _execution_build_manifest(execution_id: str, stage_out: dict[str, Any]) -> dict[str, Any]:
     stage_out = stage_out if isinstance(stage_out, dict) else {}
     async with local_session() as db:
-        return await orchestration_service.build_manifest_for_run(
+        return await orchestration_service.build_manifest_for_execution(
             db=db,
-            run_id=UUID(execution_id),
+            execution_id=UUID(execution_id),
             staged_urls_by_scan_id=stage_out.get("staged_urls_by_scan_id") or {},
             eval_urls_by_sbid=stage_out.get("eval_urls_by_sbid") or {},
             checksum_urls_by_scan_id=stage_out.get("checksum_urls_by_scan_id") or {},
@@ -86,8 +86,8 @@ async def _execution_build_manifest(execution_id: str, stage_out: dict[str, Any]
 
 async def _execution_translate_dim(execution_id: str) -> dict[str, Any]:
     async with local_session() as db:
-        return await orchestration_service.translate_dim_session_for_run(
-            db=db, run_id=UUID(execution_id)
+        return await orchestration_service.translate_dim_session_for_execution(
+            db=db, execution_id=UUID(execution_id)
         )
 
 
@@ -100,9 +100,9 @@ async def _execution_deploy_dim(
     verify_ssl: bool,
 ) -> dict[str, Any]:
     async with local_session() as db:
-        await orchestration_service.deploy_dim_session_payload_for_run(
+        await orchestration_service.deploy_dim_session_payload_for_execution(
             db=db,
-            run_id=UUID(execution_id),
+            execution_id=UUID(execution_id),
             session_id=session_id,
             pg_spec=list(pg_spec),
             roots=list(roots),
@@ -114,8 +114,8 @@ async def _execution_deploy_dim(
 
 async def _execution_poll_dim(execution_id: str) -> dict[str, Any]:
     async with local_session() as db:
-        return await orchestration_service.poll_dim_session_for_run(
-            db=db, run_id=UUID(execution_id)
+        return await orchestration_service.poll_dim_session_for_execution(
+            db=db, execution_id=UUID(execution_id)
         )
 
 

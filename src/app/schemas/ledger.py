@@ -33,7 +33,7 @@ class BatchExecutionRecordCreate(BatchExecutionRecordBase):
     model_config = ConfigDict(extra="forbid")
 
     deployment_profile_id: UUID | None = Field(default=None, description="DALiuGE deployment profile to use")
-    created_by_id: int | None = Field(default=None, description="User ID who triggered the run")
+    created_by_id: int | None = Field(default=None, description="User ID who triggered the execution")
 
 
 class BatchExecutionRecordCreateInternal(BatchExecutionRecordCreate):
@@ -68,7 +68,7 @@ class BatchExecutionRecordUpdate(BaseModel):
     workflow_manifest: dict | None = Field(default=None, description="Workflow manifest JSON")
     scheduler_name: str | None = Field(default=None, max_length=50, description="Name of scheduler")
     scheduler_job_id: str | None = Field(default=None, max_length=100, description="Scheduler job ID")
-    last_error: str | None = Field(default=None, description="Error message if run failed")
+    last_error: str | None = Field(default=None, description="Error message if execution failed")
 
 
 class BatchExecutionRecordUpdateInternal(BatchExecutionRecordUpdate):
@@ -80,7 +80,7 @@ class BatchExecutionRecordUpdateInternal(BatchExecutionRecordUpdate):
 
 class BatchExecutionRecordDelete(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    is_deleted: bool = Field(default=True, description="Soft delete flag for the run record")
+    is_deleted: bool = Field(default=True, description="Soft delete flag for the execution record")
     deleted_at: datetime | None = Field(default=None, description="Timestamp when the record was deleted")
 
 

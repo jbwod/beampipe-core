@@ -9,7 +9,7 @@ DIM_PORT_FOR_TM="${E2E_DIM_PORT_FOR_TM:-8001}"
 DEPLOY_HOST="${E2E_DEPLOY_HOST:-dlg-dim.desk}"
 DEPLOY_PORT="${E2E_DEPLOY_PORT:-80}"
 
-PROFILE_NAME="${E2E_EXECUTION_PROFILE_NAME:-test-staging-e2e-rest-dim}"
+PROFILE_NAME="${E2E_DEPLOYMENT_PROFILE_NAME:-test-staging-e2e-rest-dim}"
 PROJECT_MODULE="${E2E_PROJECT_MODULE:-wallaby_hires}"
 VERIFY_SSL="${E2E_VERIFY_SSL:-false}"
 
@@ -56,10 +56,10 @@ print(json.dumps(p))
 "
 )"
 
-echo "POST ${API_BASE}/api/v1/execution-profiles (name=${PROFILE_NAME}, project_module=${PROJECT_MODULE}, dim_host_for_tm=${DIM_HOST_FOR_TM}:${DIM_PORT_FOR_TM}, deploy=${DEPLOY_HOST}:${DEPLOY_PORT})" >&2
+echo "POST ${API_BASE}/api/v1/deployment-profiles (name=${PROFILE_NAME}, project_module=${PROJECT_MODULE}, dim_host_for_tm=${DIM_HOST_FOR_TM}:${DIM_PORT_FOR_TM}, deploy=${DEPLOY_HOST}:${DEPLOY_PORT})" >&2
 
 resp="$(
-  curl -sS -w '\n%{http_code}' -X POST "${API_BASE}/api/v1/execution-profiles" \
+  curl -sS -w '\n%{http_code}' -X POST "${API_BASE}/api/v1/deployment-profiles" \
     -H "Authorization: Bearer ${token}" \
     -H 'Content-Type: application/json' \
     -d "${body}"

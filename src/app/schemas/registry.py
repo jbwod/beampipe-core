@@ -58,7 +58,7 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
     )
     workflow_run_pending_at: datetime | None = Field(
         default=None,
-        description="Timestamp when source was marked pending for workflow run.",
+        description="Timestamp when source was marked pending for workflow execution.",
     )
 
     @field_serializer("last_checked_at")

@@ -39,9 +39,9 @@ async def _record_execute_execution_failure(
     execution_id: UUID,
     exc: Exception,
 ) -> None:
-    """Persist FAILED before re-raising from :func:`execute_run`.
+    """Persist FAILED before re-raising from :func:`execute_execution`.
 
-    ``execute_run`` runs inside Restate ``run_typed`` with the safe terminal states
+    ``execute_execution`` runs inside Restate ``run_typed`` with the safe terminal states.
     """
     err_s = (
         exc.format_for_ledger()
@@ -59,86 +59,86 @@ async def _record_execute_execution_failure(
 
 async def read_existing_workflow_manifest(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
 ) -> dict:
-    """Return persisted ``workflow_manifest`` for the run, or ``{}`` if absent.
+    """Return persisted ``workflow_manifest`` for the execution, or ``{}`` if absent.
     """
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_execution_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
-    if not run:
+    if not execution:
         return {}
-    existing = run.get("workflow_manifest")
+    existing = execution.get("workflow_manifest")
     return existing if isinstance(existing, dict) else {}
 
 
 async def read_execution_ledger_snapshot(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
 ) -> dict[str, Any]:
-    """Return a small view of the run row for Restate / operators.
+    """Return a small view of the execution row for Restate/operators.
 
     Postgres remains the source of truth just for the journals and API correlation.
     """
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_execution_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
-    if not run:
-        raise wf_execution_not_found(run_id)
+    if not execution:
+        raise wf_execution_not_found(execution_id)
 
-    phase = run.get("execution_phase")
-    st = run.get("status")
+    phase = execution.get("execution_phase")
+    st = execution.get("status")
     return {
-        "execution_id": str(run_id),
-        "project_module": run.get("project_module"),
+        "execution_id": str(execution_id),
+        "project_module": execution.get("project_module"),
         "status": str(st) if st is not None else None,
         "execution_phase": str(phase) if phase is not None else None,
-        "scheduler_job_id": run.get("scheduler_job_id"),
-        "scheduler_name": run.get("scheduler_name"),
-        "has_manifest": bool(run.get("workflow_manifest")),
-        "last_error": run.get("last_error"),
+        "scheduler_job_id": execution.get("scheduler_job_id"),
+        "scheduler_name": execution.get("scheduler_name"),
+        "has_manifest": bool(execution.get("workflow_manifest")),
+        "last_error": execution.get("last_error"),
     }
 
 
 async def begin_restate_execution_for_execution(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
 ) -> dict[str, Any]:
-    """Mark the run RUNNING and align ``execution_phase`` for a Restate-driven execute.
+    """Mark the execution RUNNING and align ``execution_phase`` for Restate execute.
 
-    Matches the opening transition of :func:`execute_run` so ledger state matches
+    Matches the opening transition of :func:`execute_execution` so ledger state matches
     whether we resume at stage/manifest or at submit (manifest already persisted).
     """
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_execution_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
-    if not run:
-        raise wf_execution_not_found(run_id)
+    if not execution:
+        raise wf_execution_not_found(execution_id)
 
-    execution_phase = _coerce_execution_phase(run)
+    execution_phase = _coerce_execution_phase(execution)
 
     if execution_phase == ExecutionPhase.SUBMIT:
         await execution_ledger_service.update_execution_status(
-            db=db, execution_id=run_id, status=ExecutionStatus.RUNNING
+            db=db, execution_id=execution_id, status=ExecutionStatus.RUNNING
         )
     else:
         await execution_ledger_service.update_execution_status(
             db=db,
-            execution_id=run_id,
+            execution_id=execution_id,
             status=ExecutionStatus.RUNNING,
             execution_phase=ExecutionPhase.STAGE_AND_MANIFEST,
         )
 
-    return await read_execution_ledger_snapshot(db=db, run_id=run_id)
+    return await read_execution_ledger_snapshot(db=db, execution_id=execution_id)
 
 
 def _coerce_execution_phase(run: dict) -> ExecutionPhase | None:
@@ -264,9 +264,9 @@ async def prepare_execution(
     }
 
 
-async def stage_sources_for_run(
+async def stage_sources_for_execution(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
     *,
     casda_username: str | None = None,
     do_stage: bool = True,
@@ -274,15 +274,15 @@ async def stage_sources_for_run(
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_execution_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
-    if not run:
-        raise wf_execution_not_found(run_id)
+    if not execution:
+        raise wf_execution_not_found(execution_id)
 
-    execution_phase = _coerce_execution_phase(run)
-    existing_manifest = run.get("workflow_manifest")
-    if run.get("status") == ExecutionStatus.COMPLETED and existing_manifest:
+    execution_phase = _coerce_execution_phase(execution)
+    existing_manifest = execution.get("workflow_manifest")
+    if execution.get("status") == ExecutionStatus.COMPLETED and existing_manifest:
         return {
             "staged_urls_by_scan_id": {},
             "eval_urls_by_sbid": {},
@@ -297,12 +297,12 @@ async def stage_sources_for_run(
             "eval_checksum_urls_by_sbid": {},
         }
 
-    project_module = run["project_module"]
-    sources = run.get("sources") or []
+    project_module = execution["project_module"]
+    sources = execution.get("sources") or []
 
     await execution_ledger_service.update_execution_status(
         db=db,
-        execution_id=run_id,
+        execution_id=execution_id,
         status=ExecutionStatus.RUNNING,
         execution_phase=ExecutionPhase.STAGE_AND_MANIFEST,
     )
@@ -335,34 +335,34 @@ async def stage_sources_for_run(
     }
 
 
-async def build_manifest_for_run(
+async def build_manifest_for_execution(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
     *,
     staged_urls_by_scan_id: dict[str, str] | None = None,
     eval_urls_by_sbid: dict[str, str] | None = None,
     checksum_urls_by_scan_id: dict[str, str] | None = None,
     eval_checksum_urls_by_sbid: dict[str, str] | None = None,
 ) -> dict:
-    """Build the daliuge manifest for a run (replay-safe)."""
+    """Build the daliuge manifest for an execution (replay-safe)."""
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_execution_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
-    if not run:
-        raise wf_execution_not_found(run_id)
+    if not execution:
+        raise wf_execution_not_found(execution_id)
 
-    execution_phase = _coerce_execution_phase(run)
-    existing_manifest = run.get("workflow_manifest")
-    if run.get("status") == ExecutionStatus.COMPLETED and existing_manifest:
+    execution_phase = _coerce_execution_phase(execution)
+    existing_manifest = execution.get("workflow_manifest")
+    if execution.get("status") == ExecutionStatus.COMPLETED and existing_manifest:
         return existing_manifest
     if execution_phase == ExecutionPhase.SUBMIT and existing_manifest:
         return existing_manifest
 
-    project_module = run["project_module"]
-    sources = run.get("sources") or []
+    project_module = execution["project_module"]
+    sources = execution.get("sources") or []
 
     manifest = await build_manifest(
         db=db,
@@ -376,25 +376,25 @@ async def build_manifest_for_run(
 
     await execution_ledger_service.update_execution_status(
         db=db,
-        execution_id=run_id,
+        execution_id=execution_id,
         workflow_manifest=manifest,
         execution_phase=ExecutionPhase.SUBMIT,
     )
     return manifest
 
 
-async def _fail_run_after_dim_translate_error(
+async def _fail_execution_after_dim_translate_error(
     db: AsyncSession,
-    run: dict,
-    run_id: UUID,
+    execution: dict,
+    execution_id: UUID,
     project_module: str,
     error_message: str,
     session_id: str,
 ) -> dict[str, Any]:
-    """Mark run failed during TM fails; same registry cleanup as other submit-phase failures."""
+    """Mark execution failed during TM errors and clear pending sources."""
     source_identifiers = [
         str(spec.get("source_identifier"))
-        for spec in (run.get("sources") or [])
+        for spec in (execution.get("sources") or [])
         if isinstance(spec, dict) and spec.get("source_identifier")
     ]
     await source_registry_service.clear_workflow_pending_for_sources(
@@ -405,7 +405,7 @@ async def _fail_run_after_dim_translate_error(
     )
     await execution_ledger_service.update_execution_status(
         db=db,
-        execution_id=run_id,
+        execution_id=execution_id,
         status=ExecutionStatus.FAILED,
         error=error_message,
         execution_phase=ExecutionPhase.SUBMIT,
@@ -413,9 +413,9 @@ async def _fail_run_after_dim_translate_error(
     return {"status": "terminal_failed", "session_id": session_id}
 
 
-async def translate_dim_session_for_run(
+async def translate_dim_session_for_execution(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
 ) -> dict[str, Any]:
     """Resolve graph, translate LG | PG via TM, return deploy inputs or a terminal outcome.
 
@@ -426,22 +426,22 @@ async def translate_dim_session_for_run(
     from ..utils.daliuge import get_roots
     from .rest_client.translator_client import DaliugeTranslatorClient
 
-    run = await crud_batch_execution_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
-    if not run:
-        raise wf_execution_not_found(run_id)
+    if not execution:
+        raise wf_execution_not_found(execution_id)
 
-    project_module = run["project_module"]
-    manifest = run.get("workflow_manifest")
+    project_module = execution["project_module"]
+    manifest = execution.get("workflow_manifest")
     if not manifest:
         raise WorkflowFailure(
             WorkflowErrorCode.EXECUTION_MANIFEST_STATE,
-            f"Run {run_id} missing workflow_manifest; run staging and manifest build first",
+            f"Execution {execution_id} missing workflow_manifest; run staging and manifest build first",
         )
 
-    session_id = f"BeampipeRun_{run_id}"
-    if run.get("scheduler_name") == "daliuge" and run.get("scheduler_job_id") == session_id:
+    session_id = f"BeampipeExecution_{execution_id}"
+    if execution.get("scheduler_name") == "daliuge" and execution.get("scheduler_job_id") == session_id:
         return {"status": "noop", "session_id": session_id}
 
     graph_content: str | None = None
@@ -451,7 +451,7 @@ async def translate_dim_session_for_run(
     except ValueError as e:
         # we still stage/manifest so the workflow can clear its pending sources.
         logger.warning(
-            "event=execute_run_no_graph project_module=%s error=%s",
+            "event=execute_execution_no_graph project_module=%s error=%s",
             project_module,
             e,
         )
@@ -461,7 +461,7 @@ async def translate_dim_session_for_run(
           # immediately keep re-creating failing runs in a tight loop.
         graph_fetch_error = str(e)
         logger.warning(
-            "event=execute_run_graph_fetch_error project_module=%s error=%s",
+            "event=execute_execution_graph_fetch_error project_module=%s error=%s",
             project_module,
             graph_fetch_error,
             exc_info=True,
@@ -470,7 +470,7 @@ async def translate_dim_session_for_run(
     if graph_fetch_error:
         source_identifiers = [
             str(spec.get("source_identifier"))
-            for spec in (run.get("sources") or [])
+            for spec in (execution.get("sources") or [])
             if isinstance(spec, dict) and spec.get("source_identifier")
         ]
         await source_registry_service.clear_workflow_pending_for_sources(
@@ -481,7 +481,7 @@ async def translate_dim_session_for_run(
         )
         await execution_ledger_service.update_execution_status(
             db=db,
-            execution_id=run_id,
+            execution_id=execution_id,
             status=ExecutionStatus.FAILED,
             error=graph_fetch_error,
             execution_phase=ExecutionPhase.SUBMIT,
@@ -491,7 +491,7 @@ async def translate_dim_session_for_run(
     if not graph_content:
         source_identifiers = [
             str(spec.get("source_identifier"))
-            for spec in (run.get("sources") or [])
+            for spec in (execution.get("sources") or [])
             if isinstance(spec, dict) and spec.get("source_identifier")
         ]
         await source_registry_service.clear_workflow_pending_for_sources(
@@ -502,7 +502,7 @@ async def translate_dim_session_for_run(
         )
         await execution_ledger_service.update_execution_status(
             db=db,
-            execution_id=run_id,
+            execution_id=execution_id,
             status=ExecutionStatus.COMPLETED,
             execution_phase=None,
         )
@@ -516,13 +516,13 @@ async def translate_dim_session_for_run(
     if graph_path:
         lg_name = Path(graph_path).name
 
-    profile = await _resolve_deployment_profile(db, run)
+    profile = await _resolve_deployment_profile(db, execution)
     deployment_backend = profile.get("deployment_backend")
     if deployment_backend == "slurm_remote":
 
         await execution_ledger_service.update_execution_status(
             db=db,
-            execution_id=run_id,
+            execution_id=execution_id,
             status=ExecutionStatus.FAILED,
             error="not yet implemented",
             execution_phase=ExecutionPhase.SUBMIT,
@@ -569,16 +569,16 @@ async def translate_dim_session_for_run(
                 if body:
                     err_detail = f"{err_detail} response_body={body}"
             logger.warning(
-                "event=translate_dim_tm_error run_id=%s project_module=%s error=%s",
-                run_id,
+                "event=translate_dim_tm_error execution_id=%s project_module=%s error=%s",
+                execution_id,
                 project_module,
                 err_detail,
                 exc_info=True,
             )
-            return await _fail_run_after_dim_translate_error(
+            return await _fail_execution_after_dim_translate_error(
                 db=db,
-                run=run,
-                run_id=run_id,
+                execution=execution,
+                execution_id=execution_id,
                 project_module=project_module,
                 error_message=err_detail,
                 session_id=session_id,
@@ -587,10 +587,10 @@ async def translate_dim_session_for_run(
         translator.close()
 
     if not isinstance(pg_spec, list) or len(pg_spec) == 0:
-        return await _fail_run_after_dim_translate_error(
+        return await _fail_execution_after_dim_translate_error(
             db=db,
-            run=run,
-            run_id=run_id,
+            execution=execution,
+            execution_id=execution_id,
             project_module=project_module,
             error_message="Empty physical graph from translator",
             session_id=session_id,
@@ -623,9 +623,9 @@ async def translate_dim_session_for_run(
     }
 
 
-async def deploy_dim_session_payload_for_run(
+async def deploy_dim_session_payload_for_execution(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
     *,
     session_id: str,
     pg_spec: list[Any],
@@ -638,12 +638,12 @@ async def deploy_dim_session_payload_for_run(
     from ...schemas.ledger import BatchExecutionRecordRead
     from .rest_client.deploy_client import DaliugeDeployClient
 
-    run = await crud_batch_execution_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
-    if not run:
-        raise wf_execution_not_found(run_id)
-    if run.get("scheduler_name") == "daliuge" and run.get("scheduler_job_id") == session_id:
+    if not execution:
+        raise wf_execution_not_found(execution_id)
+    if execution.get("scheduler_name") == "daliuge" and execution.get("scheduler_job_id") == session_id:
         return
 
     deploy = DaliugeDeployClient(
@@ -657,27 +657,27 @@ async def deploy_dim_session_payload_for_run(
 
     await execution_ledger_service.update_execution_status(
         db=db,
-        execution_id=run_id,
+        execution_id=execution_id,
         scheduler_name="daliuge",
         scheduler_job_id=session_id,
         execution_phase=ExecutionPhase.SUBMIT,
     )
 
 
-async def submit_dim_session_for_run(
+async def submit_dim_session_for_execution(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
 ) -> str:
-    """Submit the run to DIM (rest_dim): translate + deploy in one call.
+    """Submit the execution to DIM (rest_dim): translate + deploy in one call.
 
-    Replay-safe: if the run already has ``scheduler_job_id`` == session id, it no-ops.
+    Replay-safe: if the execution already has ``scheduler_job_id`` == session id, it no-ops.
     """
-    tr = await translate_dim_session_for_run(db=db, run_id=run_id)
+    tr = await translate_dim_session_for_execution(db=db, execution_id=execution_id)
     session_id = str(tr["session_id"])
     if tr["status"] == "ready":
-        await deploy_dim_session_payload_for_run(
+        await deploy_dim_session_payload_for_execution(
             db=db,
-            execution_id=run_id,
+            execution_id=execution_id,
             session_id=session_id,
             pg_spec=tr["pg_spec"],
             roots=tr["roots"],
@@ -687,13 +687,13 @@ async def submit_dim_session_for_run(
     return session_id
 
 
-async def poll_dim_session_for_run(
+async def poll_dim_session_for_execution(
     db: AsyncSession,
-    run_id: UUID,
+    execution_id: UUID,
     *,
     poll_timeout_seconds: float = 10.0,
 ) -> dict[str, Any]:
-    """Poll DIM session and update run status when terminal.
+    """Poll DIM session and update execution status when terminal.
 
     Returns:
       - {"terminal": True, "status": "completed"} / {"terminal": True, "status": "failed"}
@@ -702,31 +702,31 @@ async def poll_dim_session_for_run(
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_execution_records.get(
-        db=db, uuid=run_id, schema_to_select=BatchExecutionRecordRead
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
-    if not run:
-        raise wf_execution_not_found(run_id)
+    if not execution:
+        raise wf_execution_not_found(execution_id)
 
-    if run["status"] == ExecutionStatus.COMPLETED:
+    if execution["status"] == ExecutionStatus.COMPLETED:
         return {"terminal": True, "status": "completed"}
-    if run["status"] == ExecutionStatus.FAILED:
-        return {"terminal": True, "status": "failed", "error": run.get("last_error")}
+    if execution["status"] == ExecutionStatus.FAILED:
+        return {"terminal": True, "status": "failed", "error": execution.get("last_error")}
 
-    session_id = run.get("scheduler_job_id")
-    project_module = run["project_module"]
+    session_id = execution.get("scheduler_job_id")
+    project_module = execution["project_module"]
     if not session_id:
         raise WorkflowFailure(
             WorkflowErrorCode.EXECUTION_DIM_STATE,
-            f"Run {run_id} has no scheduler_job_id; call submit_dim_session_for_run first",
+            f"Execution {execution_id} has no scheduler_job_id; call submit_dim_session_for_execution first",
         )
 
-    profile = await _resolve_deployment_profile(db, run)
+    profile = await _resolve_deployment_profile(db, execution)
     deployment_backend = profile.get("deployment_backend")
     if deployment_backend != "rest_dim":
         await execution_ledger_service.update_execution_status(
             db=db,
-            execution_id=run_id,
+            execution_id=execution_id,
             status=ExecutionStatus.FAILED,
             error=f"durable DIM polling not implemented for backend={deployment_backend}",
             execution_phase=ExecutionPhase.SUBMIT,
@@ -765,7 +765,7 @@ async def poll_dim_session_for_run(
     # Terminal: update ledger and clear registry pending sources.
     source_identifiers = [
         str(spec.get("source_identifier"))
-        for spec in (run.get("sources") or [])
+        for spec in (execution.get("sources") or [])
         if isinstance(spec, dict) and spec.get("source_identifier")
     ]
     await source_registry_service.clear_workflow_pending_for_sources(
@@ -778,7 +778,7 @@ async def poll_dim_session_for_run(
     if finished:
         await execution_ledger_service.update_execution_status(
             db=db,
-            execution_id=run_id,
+            execution_id=execution_id,
             status=ExecutionStatus.COMPLETED,
             scheduler_name="daliuge",
             scheduler_job_id=str(session_id),
@@ -788,7 +788,7 @@ async def poll_dim_session_for_run(
 
     await execution_ledger_service.update_execution_status(
         db=db,
-        execution_id=run_id,
+        execution_id=execution_id,
         status=ExecutionStatus.FAILED,
         error=str(status_payload),
         scheduler_name="daliuge",
@@ -812,21 +812,21 @@ async def execute_execution(
     3. Submit to DALiuGE (optional)
     4. Update execution status to COMPLETED or FAILED
 
-    ``batch_run_record.execution_phase`` survives ARQ retries so staging/manifest are not
+    ``batch_execution_record.execution_phase`` survives ARQ retries so staging/manifest are not
     repeated after the manifest row has been persisted. See docs/execution_run_phases.md.
     """
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
 
-    run = await crud_batch_execution_records.get(
+    execution = await crud_batch_execution_records.get(
         db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )
-    if not run:
+    if not execution:
         raise wf_execution_not_found(execution_id)
 
-    project_module = run["project_module"]
-    sources = run.get("sources") or []
-    execution_phase = _coerce_execution_phase(run)
+    project_module = execution["project_module"]
+    sources = execution.get("sources") or []
+    execution_phase = _coerce_execution_phase(execution)
 
     if execution_phase == ExecutionPhase.SUBMIT:
         await execution_ledger_service.update_execution_status(db=db, execution_id=execution_id, status=ExecutionStatus.RUNNING)
@@ -840,7 +840,7 @@ async def execute_execution(
 
     try:
         if execution_phase == ExecutionPhase.SUBMIT:
-            manifest = run.get("workflow_manifest")
+            manifest = execution.get("workflow_manifest")
             if not manifest:
                 raise WorkflowFailure(
                     WorkflowErrorCode.EXECUTION_MANIFEST_STATE,
@@ -851,15 +851,15 @@ async def execute_execution(
             if do_stage and not casda_user:
                 raise wf_staging_requires_casda()
 
-            stage_out = await stage_sources_for_run(
+            stage_out = await stage_sources_for_execution(
                 db=db,
-                run_id=execution_id,
+                execution_id=execution_id,
                 casda_username=casda_username,
                 do_stage=do_stage,
             )
-            manifest = await build_manifest_for_run(
+            manifest = await build_manifest_for_execution(
                 db=db,
-                run_id=execution_id,
+                execution_id=execution_id,
                 staged_urls_by_scan_id=stage_out["staged_urls_by_scan_id"],
                 eval_urls_by_sbid=stage_out["eval_urls_by_sbid"],
                 checksum_urls_by_scan_id=stage_out["checksum_urls_by_scan_id"],
@@ -867,17 +867,17 @@ async def execute_execution(
             )
 
         if do_submit:
-            await submit_dim_session_for_run(db=db, run_id=execution_id)
-            run_after = await crud_batch_execution_records.get(
+            await submit_dim_session_for_execution(db=db, execution_id=execution_id)
+            execution_after = await crud_batch_execution_records.get(
                 db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
             )
-            if not run_after:
+            if not execution_after:
                 raise WorkflowFailure(
                     WorkflowErrorCode.EXECUTION_NOT_FOUND,
                     f"Execution {execution_id} not found after DIM submit",
                 )
-            manifest = run_after.get("workflow_manifest") or manifest
-            st = run_after.get("status")
+            manifest = execution_after.get("workflow_manifest") or manifest
+            st = execution_after.get("status")
             if isinstance(st, ExecutionStatus):
                 st_enum = st
             else:
@@ -887,7 +887,7 @@ async def execute_execution(
                 return {
                     "execution_id": str(execution_id),
                     "status": "failed",
-                    "error": run_after.get("last_error") or "failed",
+                    "error": execution_after.get("last_error") or "failed",
                     "manifest": manifest,
                 }
             if st_enum == ExecutionStatus.COMPLETED:
@@ -897,7 +897,7 @@ async def execute_execution(
                     "manifest": manifest,
                 }
 
-            sid = run_after.get("scheduler_job_id")
+            sid = execution_after.get("scheduler_job_id")
             if sid:
                 await execution_ledger_service.update_execution_status(
                     db=db,
