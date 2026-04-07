@@ -9,7 +9,7 @@ import asyncio
 import logging
 import re
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 from arq.connections import ArqRedis
@@ -17,12 +17,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..registry.service import source_registry_service
+from ..shaping.policy import (
+    discovery_queue_max_depth,
+    shaping_enqueue_pace,
+)
 from .tap_health import all_taps_reachable, get_tap_health, unreachable_taps
 
 logger = logging.getLogger(__name__)
 
 
-def extract_filename_from_url(url: str) -> Optional[str]:
+def extract_filename_from_url(url: str) -> str | None:
     """Extract filename from a URL (handles query parameters)."""
     decoded_url = unquote(url)
     parsed = urlparse(decoded_url)
@@ -55,7 +59,8 @@ async def discover_schedule(
     scheduled_at = datetime.now(UTC).isoformat()
     target_module = project_module or "all"
     max_sources_per_run = settings.DISCOVERY_MAX_SOURCES_PER_RUN
-    max_queue_depth = settings.DISCOVERY_MAX_QUEUE_DEPTH
+    max_queue_depth = discovery_queue_max_depth(settings)
+    max_discovery_jobs_per_tick = settings.SHAPING_DISCOVERY_MAX_JOBS_PER_TICK
 
     def _error_result(error: str) -> dict[str, Any]:
         return {
@@ -184,6 +189,7 @@ async def discover_schedule(
     failed_batches: list[dict[str, Any]] = []
     skipped_due_to_queue_full = False
     remaining_sources = max_sources_per_run
+    discovery_jobs_this_tick = 0
 
     while remaining_sources > 0:
         if max_queue_depth is not None:
@@ -304,6 +310,60 @@ async def discover_schedule(
                 job_ids.append(job.job_id)
                 total_sources += len(batch)
                 remaining_sources -= len(batch)
+                discovery_jobs_this_tick += 1
+                await shaping_enqueue_pace()
+                if (
+                    max_discovery_jobs_per_tick is not None
+                    and discovery_jobs_this_tick >= max_discovery_jobs_per_tick
+                ):
+                    logger.warning(
+                        "event=discover_schedule_max_jobs_per_tick "
+                        "project_module=%s jobs_this_tick=%s max=%s action=stop",
+                        target_module,
+                        discovery_jobs_this_tick,
+                        max_discovery_jobs_per_tick,
+                    )
+                    for ridx in range(index + 1, len(pending_batches)):
+                        release_module, release_batch = pending_batches[ridx]
+                        try:
+                            await source_registry_service.release_discovery_claim(
+                                db=db,
+                                project_module=release_module,
+                                source_identifiers=release_batch,
+                                claim_token=claim_token,
+                                commit=False,
+                            )
+                            await db.commit()
+                        except Exception as exc:
+                            await db.rollback()
+                            logger.warning(
+                                "event=discover_schedule_release_claim_error "
+                                "project_module=%s batch_size=%s claim_token=%s error=%s",
+                                release_module,
+                                len(release_batch),
+                                claim_token,
+                                exc,
+                                exc_info=True,
+                            )
+                    if queue_depth is None:
+                        try:
+                            queue_depth = await redis.zcard(settings.WORKER_QUEUE_NAME)
+                        except Exception:
+                            pass
+                    return {
+                        "ok": True,
+                        "scheduled_at": scheduled_at,
+                        "project_module": target_module,
+                        "total_sources": total_sources,
+                        "total_jobs": len(job_ids),
+                        "job_ids": job_ids,
+                        "enqueue_failures": enqueue_failures,
+                        "failed_batches": failed_batches,
+                        "max_sources_per_run": max_sources_per_run,
+                        "queue_depth": queue_depth,
+                        "skipped_due_to_queue_full": skipped_due_to_queue_full,
+                        "skipped_due_to_max_discovery_jobs_per_tick": True,
+                    }
                 continue
 
             enqueue_failures += 1
@@ -400,4 +460,5 @@ async def discover_schedule(
         "max_sources_per_run": max_sources_per_run,
         "queue_depth": queue_depth,
         "skipped_due_to_queue_full": skipped_due_to_queue_full,
+        "skipped_due_to_max_discovery_jobs_per_tick": False,
     }

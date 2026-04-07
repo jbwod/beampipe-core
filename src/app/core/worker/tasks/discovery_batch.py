@@ -3,9 +3,10 @@
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from ...archive.adapters import get_adapter
+from ...exceptions.workflow_exceptions import WorkflowErrorCode, WorkflowFailure
 from ...registry.service import source_registry_service
 
 logger = logging.getLogger(__name__)
@@ -20,8 +21,9 @@ def resolve_module_adapters(module: Any) -> dict[str, Any] | None:
     for adapter_name in required_adapters:
         adapter = get_adapter(adapter_name)
         if adapter is None:
-            raise ValueError(
-                f"Required adapter '{adapter_name}' is not registered for module '{module.__name__}'"
+            raise WorkflowFailure(
+                WorkflowErrorCode.DISCOVERY_ADAPTER_NOT_REGISTERED,
+                f"Required adapter '{adapter_name}' is not registered for module '{module.__name__}'",
             )
         adapters[adapter_name] = adapter
     return adapters
