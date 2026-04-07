@@ -4,7 +4,7 @@ CASDA adapter services.
 import logging
 import re
 from collections.abc import Iterator
-from typing import Any, Optional
+from typing import Any
 
 import requests
 from astropy.table import Table
@@ -37,11 +37,11 @@ class CasdaDiscoverAdapter:
     def tap_url(self) -> str:
         return self._tap_url
 
-    def query(self, query_str: str, tap_url: Optional[str] = None) -> Table:
+    def query(self, query_str: str, tap_url: str | None = None) -> Table:
         return query(query_str, tap_url=tap_url or self._tap_url)
 
 
-def query(query: str, tap_url: Optional[str] = None) -> Table:
+def query(query: str, tap_url: str | None = None) -> Table:
     """Run a TAP query against CASDA (or an overridden TAP URL)."""
     tap_endpoint = tap_url or CASDA_TAP_URL
     logger.debug("event=casda_tap_query query=%s", query)
@@ -220,7 +220,7 @@ def _parse_eval_job_results(xml_text: str) -> tuple[dict[str, str], dict[str, st
     return eval_url_by_filename, eval_checksum_url_by_filename
 
 
-def _extract_scan_id(obs_publisher_did: str) -> Optional[str]:
+def _extract_scan_id(obs_publisher_did: str) -> str | None:
     match = re.search(r"scan-(\d+)-", obs_publisher_did)
     if match:
         return match.group(1)

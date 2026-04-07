@@ -3,8 +3,6 @@ Vizier adapter services.
 """
 
 import logging
-from typing import Optional
-
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 
@@ -32,11 +30,11 @@ class VizierDiscoverAdapter:
     def tap_url(self) -> str:
         return self._tap_url
 
-    def query(self, query_str: str, tap_url: Optional[str] = None) -> Table:
+    def query(self, query_str: str, tap_url: str | None = None) -> Table:
         return query(query_str, tap_url=tap_url or self._tap_url)
 
 
-def query(query: str, tap_url: Optional[str] = None) -> Table:
+def query(query: str, tap_url: str | None = None) -> Table:
     """Run a TAP query against Vizier (or an overridden TAP URL)."""
     tap_endpoint = tap_url or VIZIER_TAP_URL
     logger.debug("event=vizier_tap_query query=%s", query[:200] + "..." if len(query) > 200 else query)

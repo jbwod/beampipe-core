@@ -1,7 +1,5 @@
 import logging
 import os
-from typing import Optional
-
 import keyring
 from astroquery.casda import Casda
 
@@ -9,10 +7,10 @@ logger = logging.getLogger(__name__)
 
 CASDA_KEYRING_SERVICE = "astroquery:casda.csiro.au"
 
-_casda_password: Optional[str] = None
+_casda_password: str | None = None
 
 
-def _get_casda_password() -> Optional[str]:
+def _get_casda_password() -> str | None:
     p = os.environ.get("CASDA_PASSWORD")
     if p:
         return p
