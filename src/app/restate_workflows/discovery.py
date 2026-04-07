@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ..core.db.database import local_session
 from ..core.exceptions.workflow_exceptions import WorkflowErrorCode, WorkflowFailure
+from ..core.log_context import bind_execution_log_context
 from ..core.worker.tasks.discovery_phases import (
     parse_discovery_batch_request,
     run_discovery_persist_phase,
@@ -27,6 +28,8 @@ class DiscoveryBatchWorkflowInput(BaseModel):
     project_module: str
     source_identifiers: list[str]
     claim_token: str | None = None
+    arq_job_id: str | None = None
+    arq_job_try: int | None = None
 
 
 async def _discovery_tap_batch(req: dict[str, Any]) -> dict[str, Any]:
@@ -130,54 +133,59 @@ async def discovery_batch_workflow(
             )
         )
 
-    await _run_step(
-        ctx,
-        "discovery.meta",
-        _run_opts_database(),
-        lambda discovery_id, project_module, sources, claim_token: {
-            "discovery_id": discovery_id,
-            "project_module": project_module,
-            "sources": _sources_preview(sources),
-            "claim_token": claim_token,
-        },
-        discovery_id=discovery_id,
-        project_module=body.project_module,
-        sources=body.source_identifiers,
-        claim_token=body.claim_token,
-    )
+    with bind_execution_log_context(
+        run_id=str(discovery_id),
+        arq_job_id=body.arq_job_id,
+        job_try=body.arq_job_try,
+    ):
+        await _run_step(
+            ctx,
+            "discovery.meta",
+            _run_opts_database(),
+            lambda discovery_id, project_module, sources, claim_token: {
+                "discovery_id": discovery_id,
+                "project_module": project_module,
+                "sources": _sources_preview(sources),
+                "claim_token": claim_token,
+            },
+            discovery_id=discovery_id,
+            project_module=body.project_module,
+            sources=body.source_identifiers,
+            claim_token=body.claim_token,
+        )
 
-    project_module = body.project_module
-    source_identifiers = body.source_identifiers
-    claim_token = body.claim_token
+        project_module = body.project_module
+        source_identifiers = body.source_identifiers
+        claim_token = body.claim_token
 
-    tap_payload_base = {
-        "project_module": project_module,
-        "claim_token": claim_token,
-    }
-    tap_out = await _run_step(
-        ctx,
-        "discovery.tap",
-        _run_opts_external_io(),
-        _discovery_tap_batch,
-        req={**tap_payload_base, "source_identifiers": source_identifiers},
-    )
-    await _run_step(
-        ctx,
-        "discovery.tap_summary",
-        _run_opts_database(),
-        lambda tap_results: _summarize_tap_results(tap_results),
-        tap_results=tap_out["tap_results"],
-    )
-    return await _run_step(
-        ctx,
-        "discovery.persist",
-        _run_opts_database(),
-        _discovery_persist_batch,
-        req={
+        tap_payload_base = {
             "project_module": project_module,
-            "source_identifiers": source_identifiers,
             "claim_token": claim_token,
-            "tap_results": tap_out["tap_results"],
-            "wall_started_at": tap_out["wall_started_at"],
-        },
-    )
+        }
+        tap_out = await _run_step(
+            ctx,
+            "discovery.tap",
+            _run_opts_external_io(),
+            _discovery_tap_batch,
+            req={**tap_payload_base, "source_identifiers": source_identifiers},
+        )
+        await _run_step(
+            ctx,
+            "discovery.tap_summary",
+            _run_opts_database(),
+            lambda tap_results: _summarize_tap_results(tap_results),
+            tap_results=tap_out["tap_results"],
+        )
+        return await _run_step(
+            ctx,
+            "discovery.persist",
+            _run_opts_database(),
+            _discovery_persist_batch,
+            req={
+                "project_module": project_module,
+                "source_identifiers": source_identifiers,
+                "claim_token": claim_token,
+                "tap_results": tap_out["tap_results"],
+                "wall_started_at": tap_out["wall_started_at"],
+            },
+        )
