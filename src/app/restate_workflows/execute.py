@@ -16,10 +16,10 @@ from ..core.projects import resolve_workflow_execute_step_overrides
 from .options import _run_opts_database, _run_opts_external_io, _run_opts_poll
 from .runtime import _ingress_terminal, _run_step
 
-ExecuteExecutionWorkflow = restate.Workflow("ExecuteExecutionWorkflow")
+ExecutionBatchWorkflow = restate.Workflow("ExecutionBatchWorkflow")
 
 
-class ExecuteExecutionWorkflowInput(BaseModel):
+class ExecutionBatchWorkflowInput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     do_stage: bool = True
@@ -132,7 +132,7 @@ async def _execute_execution_no_submit_step(execution_id: str, do_stage: bool) -
 async def _execute_execution_workflow_body(
     ctx: restate.WorkflowContext,
     execution_id: str,
-    exec_req: ExecuteExecutionWorkflowInput,
+    exec_req: ExecutionBatchWorkflowInput,
 ) -> dict[str, Any]:
     do_stage = exec_req.do_stage
     do_submit = exec_req.do_submit
@@ -265,7 +265,7 @@ async def _execute_execution_workflow_body(
         await ctx.sleep(delta=timedelta(seconds=settings.RESTATE_DIM_POLL_INTERVAL_SECONDS))
 
 
-@ExecuteExecutionWorkflow.main()
+@ExecutionBatchWorkflow.main()
 async def execute_execution_workflow(
     ctx: restate.WorkflowContext,
     req: dict[str, Any] | None = None,
@@ -278,11 +278,11 @@ async def execute_execution_workflow(
         _ingress_terminal(
             WorkflowFailure(
                 WorkflowErrorCode.EXECUTION_INVALID_PAYLOAD,
-                "ExecuteExecutionWorkflow payload must be a JSON object or omitted",
+                "ExecutionBatchWorkflow payload must be a JSON object or omitted",
             )
         )
     try:
-        exec_req = ExecuteExecutionWorkflowInput.model_validate(raw)
+        exec_req = ExecutionBatchWorkflowInput.model_validate(raw)
     except ValidationError as e:
         _ingress_terminal(
             WorkflowFailure(

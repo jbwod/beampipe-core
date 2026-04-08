@@ -161,7 +161,7 @@ class CORSSettings(BaseSettings):
 class ExecutionLedgerSettings(BaseSettings):
     MAX_RETRIES: int = 3
     WORKFLOW_AUTOMATION_SCHEDULER_NAME: str = "workflow_auto"
-    WORKFLOW_EXECUTION_AUTOMATION_ENABLED: bool = True
+    WORKFLOW_EXECUTION_AUTOMATION_ENABLED: bool = False
 
 
 class RestateWorkflowSettings(BaseSettings):
@@ -170,7 +170,7 @@ class RestateWorkflowSettings(BaseSettings):
 
     RESTATE_INGRESS_BASE_URL: str = ""
 
-    RESTATE_EXECUTION_WORKFLOW_NAME: str = "ExecuteExecutionWorkflow"
+    RESTATE_EXECUTION_WORKFLOW_NAME: str = "ExecutionBatchWorkflow"
     RESTATE_DISCOVERY_WORKFLOW_NAME: str = "DiscoveryBatchWorkflow"
     RESTATE_EXECUTION_WORKFLOW_HANDLER: str = "execute_execution_workflow"
     RESTATE_DISCOVERY_WORKFLOW_HANDLER: str = "discovery_batch_workflow"
@@ -205,15 +205,25 @@ class ShapingSettings(BaseSettings):
     # Hybrid Shaper
     SHAPING_ARQ_QUEUE_MAX_DEPTH: int | None = 200
 
+    # Admission strategy per workflow family.
+    SHAPING_DISCOVERY_ALGO: Literal["token", "leaky"] = "token"
+    SHAPING_EXECUTION_ALGO: Literal["token", "leaky"] = "leaky"
+
     # Discovery admission (token bucket)
     SHAPING_DISCOVERY_RATE_PER_MIN: int = 200
     SHAPING_DISCOVERY_BURST: int = 400
+    # Discovery admission (leaky bucket policing; used when SHAPING_DISCOVERY_ALGO=leaky)
+    SHAPING_DISCOVERY_LEAK_RATE_PER_MIN: int = 200
+    SHAPING_DISCOVERY_LEAK_CAPACITY: int = 400
     # Discovery in-flight guard
     SHAPING_DISCOVERY_MAX_IN_FLIGHT_BATCHES: int | None = 4
 
     # Execute admission (token bucket)
     SHAPING_EXECUTE_RATE_PER_MIN: int = 20
     SHAPING_EXECUTE_BURST: int = 40
+    # Execute admission (leaky bucket policing; used when SHAPING_EXECUTION_ALGO=leaky)
+    SHAPING_EXECUTE_LEAK_RATE_PER_MIN: int = 2
+    SHAPING_EXECUTE_LEAK_CAPACITY: int = 2
     # Execute in-flight guard
     SHAPING_EXECUTE_MAX_IN_FLIGHT_RUNS: int | None = 2
 
