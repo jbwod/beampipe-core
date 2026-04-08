@@ -12,6 +12,7 @@ from ...core.exceptions.http_exceptions import NotFoundException
 from ...core.ledger.service import execution_ledger_service
 from ...core.orchestration.service import prepare_execution as orchestration_prepare_execution
 from ...core.utils import queue
+from ...crud.crud_daliuge_deployment_profile import crud_daliuge_deployment_profile
 from ...crud.crud_execution_record import crud_batch_execution_records
 from ...models.ledger import ExecutionStatus
 from ...schemas.ledger import (
@@ -72,12 +73,24 @@ async def create_execution(
     current_user: Annotated[dict, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
+    deployment_profile_id: UUID | None = None
+    if execution_data.deployment_profile_name:
+        profile = await crud_daliuge_deployment_profile.get(
+            db=db,
+            name=execution_data.deployment_profile_name,
+        )
+        if profile is None:
+            raise NotFoundException(
+                f"Deployment profile {execution_data.deployment_profile_name} not found"
+            )
+        deployment_profile_id = profile.get("uuid")
+
     return await execution_ledger_service.create_execution(
         db=db,
         project_module=execution_data.project_module,
         sources=[s.model_dump() for s in execution_data.sources],
         archive_name=execution_data.archive_name,
-        deployment_profile_id=execution_data.deployment_profile_id,
+        deployment_profile_id=deployment_profile_id,
         created_by_id=current_user.get("id"),
     )
 
