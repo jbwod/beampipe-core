@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from ..utils.positive_policy import positive_float_optional, positive_int_optional
 from .plugins import list_project_modules, load_project_module
 
 logger = logging.getLogger(__name__)
@@ -85,26 +86,18 @@ def _resolve_workflow_step_overrides_from_policy(
         int_map[f"{family}_poll_max_duration_minutes"] = "poll_max_duration_minutes"
 
     for in_key, out_key in int_map.items():
-        if in_key in policy:
-            try:
-                val = int(policy.get(in_key))
-            except (TypeError, ValueError):
-                val = None
-            if val is not None and val > 0:
-                out[out_key] = val
+        v = positive_int_optional(policy, in_key)
+        if v is not None:
+            out[out_key] = v
 
     float_map = {
         f"{family}_initial_retry_seconds": "initial_retry_seconds",
         f"{family}_max_retry_interval_seconds": "max_retry_interval_seconds",
     }
     for in_key, out_key in float_map.items():
-        if in_key in policy:
-            try:
-                val = float(policy.get(in_key))
-            except (TypeError, ValueError):
-                val = None
-            if val is not None and val > 0:
-                out[out_key] = val
+        v = positive_float_optional(policy, in_key)
+        if v is not None:
+            out[out_key] = v
 
     return out
 
