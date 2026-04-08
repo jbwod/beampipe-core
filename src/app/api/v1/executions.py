@@ -6,12 +6,12 @@ from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_user
+from ...core.config import settings
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import NotFoundException
-from ...core.exceptions.workflow_exceptions import WorkflowFailure
 from ...core.ledger.service import execution_ledger_service
-from ...core.orchestration.service import execute_execution as orchestration_execute_execution
 from ...core.orchestration.service import prepare_execution as orchestration_prepare_execution
+from ...core.utils import queue
 from ...crud.crud_execution_record import crud_batch_execution_records
 from ...models.ledger import ExecutionStatus
 from ...schemas.ledger import (
@@ -115,7 +115,7 @@ async def update_execution(
     )
 
 
-@router.post("/{execution_id}/execute")
+@router.post("/{execution_id}/execute", status_code=202)
 async def execute_execution(
     request: Request,
     execution_id: UUID,
@@ -124,20 +124,29 @@ async def execute_execution(
     do_stage: bool = True,
     do_submit: bool = True,
 ) -> dict[str, Any]:
-    try:
-        return await orchestration_execute_execution(
-            db=db,
-            execution_id=execution_id,
-            do_stage=do_stage,
-            do_submit=do_submit,
-        )
-    except WorkflowFailure as wf:
-        raise HTTPException(
-            status_code=422,
-            detail=wf.format_for_ledger(),
-        ) from wf
-    except Exception as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Execute failed: {e}. Execution {execution_id} marked as failed. Check execution status for details.",
-        ) from e
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
+    )
+    if execution is None:
+        raise NotFoundException(f"Execution {execution_id} not found")
+
+    if queue.pool is None:
+        raise HTTPException(status_code=503, detail="Queue is not available")
+
+    job = await queue.pool.enqueue_job(
+        "execute_execution_job",
+        str(execution_id),
+        do_stage=do_stage,
+        do_submit=do_submit,
+        _queue_name=settings.WORKER_QUEUE_NAME,
+    )
+    if job is None:
+        raise HTTPException(status_code=500, detail="Failed to enqueue execution job")
+
+    return {
+        "status": "accepted",
+        "execution_id": str(execution_id),
+        "job_id": job.job_id,
+        "do_stage": do_stage,
+        "do_submit": do_submit,
+    }

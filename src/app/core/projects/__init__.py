@@ -16,8 +16,11 @@ so thinking perhaps an entry point?
 
 from .plugins import list_project_modules, load_project_module
 from .service import (
+    get_workflow_execution_automation_policy,
     get_graph_github_url,
     get_graph_path,
+    resolve_workflow_discovery_step_overrides,
+    resolve_workflow_execute_step_overrides,
     resolve_graph_content,
 )
 
@@ -35,7 +38,10 @@ __all__ = [
     "debug_print_modules",
     "get_graph_github_url",
     "get_graph_path",
+    "get_workflow_execution_automation_policy",
     "list_project_modules",
     "load_project_module",
+    "resolve_workflow_discovery_step_overrides",
+    "resolve_workflow_execute_step_overrides",
     "resolve_graph_content",
 ]

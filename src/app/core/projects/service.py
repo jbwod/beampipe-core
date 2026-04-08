@@ -60,6 +60,69 @@ def resolve_graph_content(project_module: str) -> str:
     raise last_error or RuntimeError("Graph fetch failed")
 
 
+def get_workflow_execution_automation_policy(project_module: str) -> dict[str, Any]:
+    module = load_project_module(project_module)
+    raw = getattr(module, "WORKFLOW_EXECUTION_AUTOMATION", None)
+    if not isinstance(raw, dict):
+        return {}
+    return dict(raw)
+
+
+def _resolve_workflow_step_overrides_from_policy(
+    policy: dict[str, Any],
+    *,
+    family: str,
+) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    int_map = {
+        f"{family}_max_attempts_external": "external_max_attempts",
+        f"{family}_max_duration_minutes_external": "external_max_duration_minutes",
+        f"{family}_max_attempts_db": "db_max_attempts",
+        f"{family}_max_duration_minutes_db": "db_max_duration_minutes",
+    }
+    if family == "execution":
+        int_map[f"{family}_max_polls"] = "poll_max_attempts"
+        int_map[f"{family}_poll_max_duration_minutes"] = "poll_max_duration_minutes"
+
+    for in_key, out_key in int_map.items():
+        if in_key in policy:
+            try:
+                val = int(policy.get(in_key))
+            except (TypeError, ValueError):
+                val = None
+            if val is not None and val > 0:
+                out[out_key] = val
+
+    float_map = {
+        f"{family}_initial_retry_seconds": "initial_retry_seconds",
+        f"{family}_max_retry_interval_seconds": "max_retry_interval_seconds",
+    }
+    for in_key, out_key in float_map.items():
+        if in_key in policy:
+            try:
+                val = float(policy.get(in_key))
+            except (TypeError, ValueError):
+                val = None
+            if val is not None and val > 0:
+                out[out_key] = val
+
+    return out
+
+
+def resolve_workflow_execute_step_overrides(project_module: str | None) -> dict[str, Any]:
+    if not project_module:
+        return {}
+    policy = get_workflow_execution_automation_policy(project_module)
+    return _resolve_workflow_step_overrides_from_policy(policy, family="execution")
+
+
+def resolve_workflow_discovery_step_overrides(project_module: str | None) -> dict[str, Any]:
+    if not project_module:
+        return {}
+    policy = get_workflow_execution_automation_policy(project_module)
+    return _resolve_workflow_step_overrides_from_policy(policy, family="discovery")
+
+
 class ProjectModuleService:
     @staticmethod
     def get_contract_status(project_module: str) -> dict[str, Any]:
@@ -73,8 +136,8 @@ class ProjectModuleService:
                 enrichment_keys = [k for k in enrichment_keys_raw if isinstance(k, str)]
             graph_path = getattr(module, "GRAPH_PATH", None)
             graph_github_url = getattr(module, "GRAPH_GITHUB_URL", None)
-            wf_auto = getattr(module, "WORKFLOW_RUN_AUTOMATION", None)
-            workflow_run_automation: dict[str, Any] | None = (
+            wf_auto = getattr(module, "WORKFLOW_EXECUTION_AUTOMATION", None)
+            workflow_execution_automation: dict[str, Any] | None = (
                 dict(wf_auto) if isinstance(wf_auto, dict) else None
             )
             return {
@@ -96,7 +159,7 @@ class ProjectModuleService:
                 "enrichment_keys": enrichment_keys,
                 "graph_path": graph_path,
                 "graph_github_url": graph_github_url,
-                "workflow_run_automation": workflow_run_automation,
+                "workflow_execution_automation": workflow_execution_automation,
             }
         except Exception as exc:
             return {
@@ -108,7 +171,7 @@ class ProjectModuleService:
                 "enrichment_keys": [],
                 "graph_path": None,
                 "graph_github_url": None,
-                "workflow_run_automation": None,
+                "workflow_execution_automation": None,
             }
 
     @staticmethod

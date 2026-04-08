@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from ..core.db.database import local_session
 from ..core.exceptions.workflow_exceptions import WorkflowErrorCode, WorkflowFailure
 from ..core.log_context import bind_execution_log_context
+from ..core.projects import resolve_workflow_discovery_step_overrides
 from ..core.worker.tasks.discovery_phases import (
     parse_discovery_batch_request,
     run_discovery_persist_phase,
@@ -134,14 +135,15 @@ async def discovery_batch_workflow(
         )
 
     with bind_execution_log_context(
-        run_id=str(discovery_id),
+        execution_id=str(discovery_id),
         arq_job_id=body.arq_job_id,
         job_try=body.arq_job_try,
     ):
+        run_policy_overrides = resolve_workflow_discovery_step_overrides(body.project_module)
         await _run_step(
             ctx,
             "discovery.meta",
-            _run_opts_database(),
+            _run_opts_database(run_policy_overrides),
             lambda discovery_id, project_module, sources, claim_token: {
                 "discovery_id": discovery_id,
                 "project_module": project_module,
@@ -165,21 +167,21 @@ async def discovery_batch_workflow(
         tap_out = await _run_step(
             ctx,
             "discovery.tap",
-            _run_opts_external_io(),
+            _run_opts_external_io(run_policy_overrides),
             _discovery_tap_batch,
             req={**tap_payload_base, "source_identifiers": source_identifiers},
         )
         await _run_step(
             ctx,
             "discovery.tap_summary",
-            _run_opts_database(),
+            _run_opts_database(run_policy_overrides),
             lambda tap_results: _summarize_tap_results(tap_results),
             tap_results=tap_out["tap_results"],
         )
         return await _run_step(
             ctx,
             "discovery.persist",
-            _run_opts_database(),
+            _run_opts_database(run_policy_overrides),
             _discovery_persist_batch,
             req={
                 "project_module": project_module,
