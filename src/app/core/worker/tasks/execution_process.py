@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, select
 
+from ....crud.crud_daliuge_deployment_profile import crud_daliuge_deployment_profile
 from ....models.ledger import BatchExecutionRecord, ExecutionStatus
 from ...config import settings
 from ...ledger.service import execution_ledger_service
@@ -54,8 +55,9 @@ def workflow_execution_policy_for_module(project_module: str) -> dict[str, Any]:
         "max_wait_minutes": int(raw_policy.get("max_wait_minutes", defaults["max_wait_minutes"])),
         "claim_ttl_minutes": int(raw_policy.get("claim_ttl_minutes", defaults["claim_ttl_minutes"])),
     }
-    if "deployment_profile_id" in raw_policy and raw_policy["deployment_profile_id"]:
-        policy["deployment_profile_id"] = str(raw_policy["deployment_profile_id"])
+    name_raw = raw_policy.get("deployment_profile_name")
+    if isinstance(name_raw, str) and name_raw.strip():
+        policy["deployment_profile_name"] = name_raw.strip()
 
     def _pos_int(key: str) -> int | None:
         if key not in raw_policy:
@@ -101,6 +103,21 @@ def workflow_execution_policy_for_module(project_module: str) -> dict[str, Any]:
         if val is not None:
             policy[key] = val
     return policy
+
+
+async def _resolve_deployment_profile_uuid_for_policy(
+    db: Any, policy: dict[str, Any]
+) -> tuple[UUID | None, bool]:
+    name = policy.get("deployment_profile_name")
+    if not (isinstance(name, str) and name.strip()):
+        return None, False
+    profile = await crud_daliuge_deployment_profile.get(
+        db=db,
+        name=name.strip(),
+    )
+    if profile is None or profile.get("uuid") is None:
+        return None, True
+    return UUID(str(profile["uuid"])), False
 
 
 async def has_active_auto_execution(db: Any, project_module: str) -> bool:
@@ -232,61 +249,66 @@ async def process_workflow_module_for_execution_schedule(
     created_for_module = 0
     sources_scheduled = 0
     try:
-        for chunk in chunked(pending_sources, chunk_size):
-            if created_for_module >= max_executions_for_module:
-                break
-            allowed, qdepth = await arq_queue_depth_allows_enqueue(
-                redis,
-                queue_name=settings.WORKER_QUEUE_NAME,
-                max_depth=shaping_queue_max_depth(settings),
-            )
-            if not allowed:
-                _bump("queue_full")
-                logger.warning(
-                    "event=workflow_execution_schedule_queue_full project_module=%s queue=%s queue_depth=%s max_queue_depth=%s action=stop_enqueue",
-                    module_name,
-                    settings.WORKER_QUEUE_NAME,
-                    qdepth,
-                    shaping_queue_max_depth(settings),
-                )
-                break
-            execution = await execution_ledger_service.create_execution(
-                db=db,
-                project_module=module_name,
-                sources=[{"source_identifier": src} for src in chunk],
-                archive_name=policy["archive_name"],
-                deployment_profile_id=(
-                    UUID(policy["deployment_profile_id"])
-                    if policy.get("deployment_profile_id")
-                    else None
-                ),
-                created_by_id=None,
-            )
-            execution_uuid = str(execution["uuid"])
-            await execution_ledger_service.update_execution_status(
-                db=db,
-                execution_id=execution["uuid"],
-                scheduler_name=settings.WORKFLOW_AUTOMATION_SCHEDULER_NAME,
-            )
-            job = await redis.enqueue_job(
-                "execute_execution_job",
-                execution_uuid,
-                _queue_name=settings.WORKER_QUEUE_NAME,
-            )
-            job_id = job.job_id if job else None
-            logger.info(
-                "event=workflow_execution_batch project_module=%s source_count=%s execution_uuid=%s job_id=%s",
+        dep_uuid, dep_resolve_failed = await _resolve_deployment_profile_uuid_for_policy(db, policy)
+        if dep_resolve_failed:
+            _bump("deployment_profile_not_found")
+            logger.error(
+                "event=workflow_execution_schedule_missing_deployment_profile project_module=%s deployment_profile_name=%s",
                 module_name,
-                len(chunk),
-                execution_uuid,
-                job_id,
+                policy.get("deployment_profile_name"),
             )
-            created_executions.append(execution_uuid)
-            if job_id:
-                enqueued_jobs.append(job_id)
-            sources_scheduled += len(chunk)
-            created_for_module += 1
-            await shaping_enqueue_pace()
+        else:
+            for chunk in chunked(pending_sources, chunk_size):
+                if created_for_module >= max_executions_for_module:
+                    break
+                allowed, qdepth = await arq_queue_depth_allows_enqueue(
+                    redis,
+                    queue_name=settings.WORKER_QUEUE_NAME,
+                    max_depth=shaping_queue_max_depth(settings),
+                )
+                if not allowed:
+                    _bump("queue_full")
+                    logger.warning(
+                        "event=workflow_execution_schedule_queue_full project_module=%s queue=%s queue_depth=%s max_queue_depth=%s action=stop_enqueue",
+                        module_name,
+                        settings.WORKER_QUEUE_NAME,
+                        qdepth,
+                        shaping_queue_max_depth(settings),
+                    )
+                    break
+                execution = await execution_ledger_service.create_execution(
+                    db=db,
+                    project_module=module_name,
+                    sources=[{"source_identifier": src} for src in chunk],
+                    archive_name=policy["archive_name"],
+                    deployment_profile_id=dep_uuid,
+                    created_by_id=None,
+                )
+                execution_uuid = str(execution["uuid"])
+                await execution_ledger_service.update_execution_status(
+                    db=db,
+                    execution_id=execution["uuid"],
+                    scheduler_name=settings.WORKFLOW_AUTOMATION_SCHEDULER_NAME,
+                )
+                job = await redis.enqueue_job(
+                    "execute_execution_job",
+                    execution_uuid,
+                    _queue_name=settings.WORKER_QUEUE_NAME,
+                )
+                job_id = job.job_id if job else None
+                logger.info(
+                    "event=workflow_execution_batch project_module=%s source_count=%s execution_uuid=%s job_id=%s",
+                    module_name,
+                    len(chunk),
+                    execution_uuid,
+                    job_id,
+                )
+                created_executions.append(execution_uuid)
+                if job_id:
+                    enqueued_jobs.append(job_id)
+                sources_scheduled += len(chunk)
+                created_for_module += 1
+                await shaping_enqueue_pace()
     finally:
         await source_registry_service.release_workflow_claim(
             db=db,

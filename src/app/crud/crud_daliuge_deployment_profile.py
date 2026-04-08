@@ -2,18 +2,18 @@ from fastcrud import FastCRUD
 
 from ..models.daliuge import DaliugeDeploymentProfile
 from ..schemas.daliuge import (
-    DaliugeDeploymentProfileCreate,
+    DaliugeDeploymentProfileDbCreate,
     DaliugeDeploymentProfileDelete,
-    DaliugeDeploymentProfileRead,
+    DaliugeDeploymentProfileStored,
     DaliugeDeploymentProfileUpdate,
 )
 
 CRUDDaliugeDeploymentProfile = FastCRUD[
     DaliugeDeploymentProfile,
-    DaliugeDeploymentProfileCreate,
+    DaliugeDeploymentProfileDbCreate,
     DaliugeDeploymentProfileDelete,
     DaliugeDeploymentProfileUpdate,
     DaliugeDeploymentProfileUpdate,
-    DaliugeDeploymentProfileRead,
+    DaliugeDeploymentProfileStored,
 ]
 crud_daliuge_deployment_profile = CRUDDaliugeDeploymentProfile(DaliugeDeploymentProfile)

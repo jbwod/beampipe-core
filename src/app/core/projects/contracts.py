@@ -9,6 +9,8 @@ class DiscoverBundle(TypedDict, total=False):
 # MANIFEST_SCHEMA
 # GRAPH_PATH
 # GRAPH_GITHUB_URL
+# WORKFLOW_EXECUTION_AUTOMATION [Optional]: may include ``deployment_profile_name`` (str) for the
+# daliuge deployment profile row name.
 
 class ProjectDiscoveryModule(Protocol):
     REQUIRED_ADAPTERS: list[str]

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...crud.crud_daliuge_deployment_profile import crud_daliuge_deployment_profile
 from ...models.daliuge import DaliugeDeploymentProfile
 from ...models.ledger import ExecutionPhase, ExecutionStatus
-from ...schemas.daliuge import DaliugeDeploymentProfileRead
+from ...schemas.daliuge import DaliugeDeploymentProfileStored
 from ..archive.service import archive_metadata_service
 from ..config import settings
 from ..exceptions.workflow_exceptions import (
@@ -151,18 +151,21 @@ def _coerce_execution_phase(run: dict) -> ExecutionPhase | None:
 
 
 def _profile_to_dict(profile: dict) -> dict:
+    translation = dict(profile.get("translation") or {})
+    deployment = dict(profile.get("deployment") or {})
+    backend = str(deployment.get("kind") or "rest_dim")
     return {
-        "algo": profile["algo"],
-        "num_par": profile["num_par"],
-        "num_islands": profile["num_islands"],
-        "tm_url": profile.get("tm_url"),
-        "dim_host_for_tm": profile.get("dim_host_for_tm"),
-        "dim_port_for_tm": profile.get("dim_port_for_tm"),
-        "deploy_host": profile.get("deploy_host"),
-        "deploy_port": profile.get("deploy_port"),
-        "verify_ssl": profile["verify_ssl"],
-        "deployment_backend": profile.get("deployment_backend"),
-        "deployment_config": profile.get("deployment_config"),
+        "algo": translation.get("algo", "metis"),
+        "num_par": translation.get("num_par", 1),
+        "num_islands": translation.get("num_islands", 0),
+        "tm_url": translation.get("tm_url"),
+        "dim_host_for_tm": deployment.get("dim_host_for_tm"),
+        "dim_port_for_tm": deployment.get("dim_port_for_tm"),
+        "deploy_host": deployment.get("deploy_host"),
+        "deploy_port": deployment.get("deploy_port"),
+        "verify_ssl": bool(deployment.get("verify_ssl", False)),
+        "deployment_backend": backend,
+        "deployment_config": deployment,
     }
 
 
@@ -173,7 +176,7 @@ async def _resolve_deployment_profile(
 
     async def _load_by_uuid(uid) -> dict | None:
         p = await crud_daliuge_deployment_profile.get(
-            db=db, uuid=uid, schema_to_select=DaliugeDeploymentProfileRead
+            db=db, uuid=uid, schema_to_select=DaliugeDeploymentProfileStored
         )
         return _profile_to_dict(p) if p else None
 

@@ -21,8 +21,8 @@ class DaliugeDeploymentProfile(Base):
     description: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
     project_module: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True, default=None)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    translation: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    deployment: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    translation: Mapped[dict] = mapped_column(JSONB, nullable=False, default_factory=dict)
+    deployment: Mapped[dict] = mapped_column(JSONB, nullable=False, default_factory=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default_factory=lambda: datetime.now(UTC), nullable=False
     )

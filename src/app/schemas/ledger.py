@@ -32,7 +32,12 @@ class BatchExecutionRecordBase(BaseModel):
 class BatchExecutionRecordCreate(BatchExecutionRecordBase):
     model_config = ConfigDict(extra="forbid")
 
-    deployment_profile_id: UUID | None = Field(default=None, description="DALiuGE deployment profile to use")
+    deployment_profile_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=50,
+        description="DALiuGE deployment profile name to resolve at create time",
+    )
     created_by_id: int | None = Field(default=None, description="User ID who triggered the execution")
 
 
