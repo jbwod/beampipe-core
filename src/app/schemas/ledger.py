@@ -41,7 +41,16 @@ class BatchExecutionRecordCreate(BatchExecutionRecordBase):
     created_by_id: int | None = Field(default=None, description="User ID who triggered the execution")
 
 
-class BatchExecutionRecordCreateInternal(BatchExecutionRecordCreate):
+class BatchExecutionRecordCreateInternal(BatchExecutionRecordBase):
+    """(resolved UUID + status)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    deployment_profile_id: UUID | None = Field(
+        default=None,
+        description="DALiuGE deployment profile row UUID",
+    )
+    created_by_id: int | None = Field(default=None, description="User ID who triggered the execution")
     status: ExecutionStatus = Field(default=ExecutionStatus.PENDING, description="Initial execution status")
 
 
