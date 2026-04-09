@@ -6,11 +6,13 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from ...crud.crud_execution_record import crud_batch_execution_records
-from ...models.ledger import ExecutionPhase, ExecutionStatus
+from ...models.ledger import BatchExecutionRecord, ExecutionPhase, ExecutionStatus
+from ..config import settings
 from ...schemas.ledger import BatchExecutionRecordCreateInternal, BatchExecutionRecordRead
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
 from ..utils.registry import validate_source_spec
@@ -21,6 +23,29 @@ _EXECUTION_PHASE_UNSET: object = object()
 
 
 class ExecutionLedgerService:
+    @staticmethod
+    async def count_in_flight_auto_executions_for_module(
+        db: AsyncSession,
+        project_module: str,
+    ) -> int:
+        """Count PENDING/RUNNING/RETRYING executions for this module under the automation scheduler."""
+        result = await db.execute(
+            select(func.count(BatchExecutionRecord.uuid)).where(
+                and_(
+                    BatchExecutionRecord.project_module == project_module,
+                    BatchExecutionRecord.scheduler_name == settings.WORKFLOW_AUTOMATION_SCHEDULER_NAME,
+                    BatchExecutionRecord.status.in_(
+                        [
+                            ExecutionStatus.PENDING,
+                            ExecutionStatus.RUNNING,
+                            ExecutionStatus.RETRYING,
+                        ]
+                    ),
+                )
+            )
+        )
+        return int(result.scalar() or 0)
+
     @staticmethod
     async def create_execution(
         db: AsyncSession,

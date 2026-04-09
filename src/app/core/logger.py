@@ -34,6 +34,14 @@ def _get_logging_level() -> int:
 
 LOGGING_LEVEL = _get_logging_level()
 
+_exec_ctx_filter = ExecutionLogContextFilter()
+
+
+def _attach_exec_context(handler: logging.Handler) -> None:
+    handler.addFilter(_exec_ctx_filter)
+    handler.setFormatter(logging.Formatter(LOGGING_FORMAT))
+
+
 root_logger = logging.getLogger("")
 if not root_logger.handlers:
     logging.basicConfig(
@@ -41,6 +49,8 @@ if not root_logger.handlers:
         format=LOGGING_FORMAT,
         stream=sys.stdout,
     )
+for _h in root_logger.handlers:
+    _attach_exec_context(_h)
 # going to use dozzle or loki or something to ingest the logs properly
 
 _logger = logging.getLogger(__name__)
@@ -51,7 +61,7 @@ try:
 
     file_handler = RotatingFileHandler(LOG_FILE_PATH, maxBytes=10485760, backupCount=5)
     file_handler.setLevel(LOGGING_LEVEL)
-    file_handler.setFormatter(logging.Formatter(LOGGING_FORMAT))
+    _attach_exec_context(file_handler)
     root_logger.addHandler(file_handler)
 except (PermissionError, OSError) as e:
     _logger.warning("event=logger_file_handler_failed error=%s", str(e))
@@ -65,10 +75,5 @@ has_stream_handler = any(
 if not has_stream_handler:
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setLevel(LOGGING_LEVEL)
-    stream_handler.setFormatter(logging.Formatter(LOGGING_FORMAT))
+    _attach_exec_context(stream_handler)
     root_logger.addHandler(stream_handler)
-
-_exec_ctx_filter = ExecutionLogContextFilter()
-for _handler in root_logger.handlers:
-    _handler.addFilter(_exec_ctx_filter)
-    _handler.setFormatter(logging.Formatter(LOGGING_FORMAT))

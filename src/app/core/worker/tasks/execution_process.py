@@ -3,12 +3,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, select
-
 from ....crud.crud_daliuge_deployment_profile import crud_daliuge_deployment_profile
-from ....models.ledger import BatchExecutionRecord, ExecutionStatus
 from ...config import settings
 from ...ledger.service import execution_ledger_service
+from ...positive_policy import positive_float_optional, positive_int_optional
 from ...projects import get_workflow_execution_automation_policy
 from ...registry.service import source_registry_service
 from ...shaping.policy import (
@@ -34,8 +32,8 @@ def workflow_execution_policy_for_module(project_module: str) -> dict[str, Any]:
         "enabled": False,
         "archive_name": "casda",
         "max_sources_per_execution": 20,
-        "max_sources_per_tick": 500,
-        "max_executions_per_tick": 20,
+        "tick_execution_source_limit": 500,
+        "tick_execution_run_limit": 20,
         "min_sources_to_trigger": 1,
         "max_wait_minutes": 24 * 60,
         "claim_ttl_minutes": 180,
@@ -47,8 +45,12 @@ def workflow_execution_policy_for_module(project_module: str) -> dict[str, Any]:
         "enabled": bool(raw_policy.get("enabled", defaults["enabled"])),
         "archive_name": str(raw_policy.get("archive_name", defaults["archive_name"])),
         "max_sources_per_execution": int(raw_policy.get("max_sources_per_execution", defaults["max_sources_per_execution"])),
-        "max_sources_per_tick": int(raw_policy.get("max_sources_per_tick", defaults["max_sources_per_tick"])),
-        "max_executions_per_tick": int(raw_policy.get("max_executions_per_tick", defaults["max_executions_per_tick"])),
+        "tick_execution_source_limit": int(
+            raw_policy.get("tick_execution_source_limit", defaults["tick_execution_source_limit"])
+        ),
+        "tick_execution_run_limit": int(
+            raw_policy.get("tick_execution_run_limit", defaults["tick_execution_run_limit"])
+        ),
         "min_sources_to_trigger": int(
             raw_policy.get("min_sources_to_trigger", defaults["min_sources_to_trigger"])
         ),
@@ -59,25 +61,8 @@ def workflow_execution_policy_for_module(project_module: str) -> dict[str, Any]:
     if isinstance(name_raw, str) and name_raw.strip():
         policy["deployment_profile_name"] = name_raw.strip()
 
-    def _pos_int(key: str) -> int | None:
-        if key not in raw_policy:
-            return None
-        try:
-            val = int(raw_policy[key])
-        except (TypeError, ValueError):
-            return None
-        return val if val > 0 else None
-
-    def _pos_float(key: str) -> float | None:
-        if key not in raw_policy:
-            return None
-        try:
-            val = float(raw_policy[key])
-        except (TypeError, ValueError):
-            return None
-        return val if val > 0 else None
-
     for key in (
+        "concurrent_execution_run_limit",
         "execution_max_attempts_external",
         "execution_max_duration_minutes_external",
         "execution_max_attempts_db",
@@ -89,7 +74,7 @@ def workflow_execution_policy_for_module(project_module: str) -> dict[str, Any]:
         "discovery_max_attempts_db",
         "discovery_max_duration_minutes_db",
     ):
-        val = _pos_int(key)
+        val = positive_int_optional(raw_policy, key)
         if val is not None:
             policy[key] = val
 
@@ -99,7 +84,7 @@ def workflow_execution_policy_for_module(project_module: str) -> dict[str, Any]:
         "discovery_initial_retry_seconds",
         "discovery_max_retry_interval_seconds",
     ):
-        val = _pos_float(key)
+        val = positive_float_optional(raw_policy, key)
         if val is not None:
             policy[key] = val
     return policy
@@ -120,23 +105,6 @@ async def _resolve_deployment_profile_uuid_for_policy(
     return UUID(str(profile["uuid"])), False
 
 
-async def has_active_auto_execution(db: Any, project_module: str) -> bool:
-    result = await db.execute(
-        select(BatchExecutionRecord.uuid)
-        .where(
-            and_(
-                BatchExecutionRecord.project_module == project_module,
-                BatchExecutionRecord.scheduler_name == settings.WORKFLOW_AUTOMATION_SCHEDULER_NAME,
-                BatchExecutionRecord.status.in_(
-                    [ExecutionStatus.PENDING, ExecutionStatus.RUNNING, ExecutionStatus.RETRYING]
-                ),
-            )
-        )
-        .limit(1)
-    )
-    return result.scalar_one_or_none() is not None
-
-
 async def process_workflow_module_for_execution_schedule(
     db: Any,
     redis: Any,
@@ -148,6 +116,16 @@ async def process_workflow_module_for_execution_schedule(
     reason_counts: dict[str, int] | None = None,
 ) -> int:
     """Plan and enqueue. Returns number of sources scheduled."""
+    # Gate sequence (source pending -> execution enqueue):
+    # 1) Project policy enabled.
+    # 2) Tick limits (runs/sources) from module policy.
+    # 3) Project concurrent cap (optional).
+    # 4) Pending threshold/time trigger.
+    # 5) Global concurrent cap.
+    # 6) Global rate admission (token/leaky).
+    # 7) Shared queue depth guard.
+    # 8) Enqueue pacing.
+    # Global shaping settings are hard rails that can only reduce admission.
 
     def _bump(reason: str) -> None:
         if reason_counts is not None:
@@ -160,17 +138,40 @@ async def process_workflow_module_for_execution_schedule(
         skipped_modules.append(module_name)
         return 0
 
-    if await has_active_auto_execution(db=db, project_module=module_name):
-        _bump("active_execution_gate")
-        logger.info(
-            "event=workflow_execution_schedule_skip_active_execution project_module=%s",
-            module_name,
+    requested_sources_tick = max(1, int(policy["tick_execution_source_limit"]))
+    requested_runs_tick = max(1, int(policy["tick_execution_run_limit"]))
+    max_sources_for_module = requested_sources_tick
+    max_executions_for_module = requested_runs_tick
+    runs_after_project_concurrency = max_executions_for_module
+    runs_after_global_concurrency = max_executions_for_module
+    runs_after_rate = 0
+    project_in_flight_cap = policy.get("concurrent_execution_run_limit")
+    if project_in_flight_cap is not None:
+        project_in_flight_runs = await execution_ledger_service.count_in_flight_auto_executions_for_module(
+            db=db,
+            project_module=module_name,
         )
-        skipped_modules.append(module_name)
-        return 0
-
-    max_sources_for_module = max(1, int(policy["max_sources_per_tick"]))
-    max_executions_for_module = max(1, int(policy["max_executions_per_tick"]))
+        if not can_admit_by_in_flight(
+            current=project_in_flight_runs,
+            max_in_flight=int(project_in_flight_cap),
+        ):
+            _bump("project_in_flight_cap")
+            logger.warning(
+                "event=workflow_execution_schedule_project_in_flight_cap project_module=%s "
+                "project_in_flight=%s project_max_in_flight=%s",
+                module_name,
+                project_in_flight_runs,
+                project_in_flight_cap,
+            )
+            skipped_modules.append(module_name)
+            return 0
+        remaining_project_slots = max(0, int(project_in_flight_cap) - int(project_in_flight_runs))
+        if remaining_project_slots <= 0:
+            _bump("project_in_flight_cap")
+            skipped_modules.append(module_name)
+            return 0
+        max_executions_for_module = min(max_executions_for_module, remaining_project_slots)
+    runs_after_project_concurrency = max_executions_for_module
     pending_stats = await source_registry_service.get_workflow_pending_stats(
         db=db,
         project_module=module_name,
@@ -196,13 +197,14 @@ async def process_workflow_module_for_execution_schedule(
         )
         return 0
 
-    in_flight_cap = settings.SHAPING_EXECUTE_MAX_IN_FLIGHT_RUNS
+    in_flight_cap = settings.SHAPING_EXECUTION_MAX_IN_FLIGHT_RUNS
     if in_flight_cap is not None:
         in_flight_runs = await count_execute_in_flight_runs(db=db)
         if not can_admit_by_in_flight(current=in_flight_runs, max_in_flight=in_flight_cap):
             _bump("in_flight_cap")
             logger.warning(
-                "event=workflow_execution_schedule_in_flight_cap project_module=%s in_flight_executions=%s max_in_flight_executions=%s",
+                "event=workflow_execution_schedule_in_flight_cap "
+                "project_module=%s in_flight_executions=%s max_concurrent_executions=%s",
                 module_name,
                 in_flight_runs,
                 in_flight_cap,
@@ -213,17 +215,32 @@ async def process_workflow_module_for_execution_schedule(
             _bump("in_flight_cap")
             return 0
         max_executions_for_module = min(max_executions_for_module, remaining_slots)
+    runs_after_global_concurrency = max_executions_for_module
 
     admitted_executions = await execute_admission_budget(
         redis, desired_runs=max_executions_for_module
     )
+    runs_after_rate = min(max_executions_for_module, admitted_executions)
     if admitted_executions <= 0:
         _bump("rate_limited")
         logger.info(
             "event=workflow_execution_schedule_rate_limited project_module=%s requested_executions=%s admitted_executions=%s",
             module_name,
-            int(policy["max_executions_per_tick"]),
+            int(policy["tick_execution_run_limit"]),
             admitted_executions,
+        )
+        logger.info(
+            "event=workflow_execution_gate_funnel project_module=%s requested_runs_tick=%s "
+            "runs_after_project_concurrency=%s runs_after_global_concurrency=%s runs_after_rate=%s "
+            "enqueued_runs=%s requested_sources_tick=%s admitted_sources=%s",
+            module_name,
+            requested_runs_tick,
+            runs_after_project_concurrency,
+            runs_after_global_concurrency,
+            runs_after_rate,
+            0,
+            requested_sources_tick,
+            0,
         )
         return 0
     max_executions_for_module = min(max_executions_for_module, admitted_executions)
@@ -319,4 +336,17 @@ async def process_workflow_module_for_execution_schedule(
         )
         await db.commit()
 
+    logger.info(
+        "event=workflow_execution_gate_funnel project_module=%s requested_runs_tick=%s "
+        "runs_after_project_concurrency=%s runs_after_global_concurrency=%s runs_after_rate=%s "
+        "enqueued_runs=%s requested_sources_tick=%s admitted_sources=%s",
+        module_name,
+        requested_runs_tick,
+        runs_after_project_concurrency,
+        runs_after_global_concurrency,
+        runs_after_rate,
+        created_for_module,
+        requested_sources_tick,
+        sources_scheduled,
+    )
     return sources_scheduled
