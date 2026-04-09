@@ -1,0 +1,82 @@
+info:
+  name: Delete Deployment Profile
+  type: http
+  seq: 3
+  tags:
+    - deployment-profiles
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/deployment-profiles/:profile_id"
+  params:
+    - name: profile_id
+      value: ""
+      type: path
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/login
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 204 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/deployment-profiles/:profile_id"
+      method: DELETE
+      params:
+        - name: profile_id
+          value: ""
+          type: path
+    response:
+      status: 204
+      statusText: No Content
+      body:
+        type: text
+        data: ""
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/deployment-profiles/:profile_id"
+      method: DELETE
+      params:
+        - name: profile_id
+          value: ""
+          type: path
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": "",
+                "input": "",
+                "ctx": {}
+              }
+            ]
+          }
