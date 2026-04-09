@@ -39,7 +39,7 @@ async def workflow_execution_schedule_task(
             total_sources = result.get("total_sources", 0)
             is_skipped = result.get("ok") and execution_count == 0 and total_sources == 0
             if is_skipped:
-                logger.info(
+                logger.debug(
                     "event=workflow_execution_schedule_task project_module=%s skipped reason_counts=%s",
                     project_module or "all",
                     result.get("reason_counts"),
@@ -159,7 +159,7 @@ async def discover_schedule_task(
                 and not result.get("blocked_by_in_flight")
             )
             if is_skipped:
-                logger.info(
+                logger.debug(
                     "event=discover_schedule_task project_module=%s skipped",
                     project_module or "all",
                 )

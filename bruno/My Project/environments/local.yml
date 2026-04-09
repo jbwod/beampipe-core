@@ -1,7 +1,7 @@
 name: local
 variables:
   - name: baseUrl
-    value: http://localhost:8000
+    value: http://localhost:80
   - name: username
     value: admin
   - secret: true

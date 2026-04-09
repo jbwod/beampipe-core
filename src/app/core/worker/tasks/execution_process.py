@@ -189,7 +189,7 @@ async def process_workflow_module_for_execution_schedule(
     min_sources_to_trigger = max(1, int(policy["min_sources_to_trigger"]))
     if not max_wait_triggered and pending_count < min_sources_to_trigger:
         _bump("threshold_not_met")
-        logger.info(
+        logger.debug(
             "event=workflow_execution_batch_skip_threshold project_module=%s pending_count=%s min_sources=%s",
             module_name,
             pending_count,
@@ -223,13 +223,13 @@ async def process_workflow_module_for_execution_schedule(
     runs_after_rate = min(max_executions_for_module, admitted_executions)
     if admitted_executions <= 0:
         _bump("rate_limited")
-        logger.info(
+        logger.debug(
             "event=workflow_execution_schedule_rate_limited project_module=%s requested_executions=%s admitted_executions=%s",
             module_name,
             int(policy["tick_execution_run_limit"]),
             admitted_executions,
         )
-        logger.info(
+        logger.debug(
             "event=workflow_execution_gate_funnel project_module=%s requested_runs_tick=%s "
             "runs_after_project_concurrency=%s runs_after_global_concurrency=%s runs_after_rate=%s "
             "enqueued_runs=%s requested_sources_tick=%s admitted_sources=%s",

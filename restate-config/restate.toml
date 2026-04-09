@@ -1,0 +1,24 @@
+# 
+# Restate Server Cluster Configuration
+# 
+# RESTATE_ prefix convention (see https://docs.restate.dev/server/configuration).
+#   https://docs.restate.dev/server/clusters
+#   https://docs.restate.dev/guides/local-to-replicated
+#   https://docs.restate.dev/server/snapshots
+# 
+
+cluster-name = "beampipe"
+
+# Requires 2 nodes to become operational; with 3 nodes tolerates 1 failure.
+default-replication = 2
+
+# All nodes run every role (default)
+# roles = ["worker", "admin", "metadata-server", "log-server", "http-ingress"]
+
+[bifrost]
+default-provider = "replicated"
+[worker.snapshots]
+destination = "s3://beampipe-production-535975787328-ap-southeast-2-an/cluster/"
+aws-region = "ap-southeast-2"
+snapshot-interval-num-records = 100000
+snapshot-interval = "60m"

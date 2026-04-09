@@ -14,9 +14,54 @@ http:
       {
         "items": [
           {
-            "project_module": "",
-            "source_identifier": "",
-            "enabled": false
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ1043-30b",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0855+02",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ1026-20",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ2109-45",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0333-19",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ1453-22",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ1004-41",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0222-03",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0937-22",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0909-33",
+            "enabled": true
           }
         ]
       }
@@ -55,9 +100,54 @@ examples:
           {
             "items": [
               {
-                "project_module": "",
-                "source_identifier": "",
-                "enabled": false
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ1043-30b",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0855+02",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ1026-20",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ2109-45",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0333-19",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ1453-22",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ1004-41",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0222-03",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0937-22",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0909-33",
+                "enabled": true
               }
             ]
           }

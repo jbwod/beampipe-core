@@ -17,7 +17,7 @@ async def workflow_execution_schedule(
 ) -> dict[str, Any]:
     scheduled_at = datetime.now(UTC).isoformat()
     if not settings.WORKFLOW_EXECUTION_AUTOMATION_ENABLED:
-        logger.info(
+        logger.debug(
             "event=workflow_execution_schedule_disabled_global project_module=%s",
             project_module or "all",
         )
