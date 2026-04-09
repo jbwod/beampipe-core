@@ -84,7 +84,66 @@ async def discover_schedule_task(
             redis = ctx.get("redis")
             if redis is None:
                 raise RuntimeError("Redis not available on worker context")
-            result = await discover_schedule(db=db, redis=redis, project_module=project_module)
+            target_modules = [project_module] if project_module else list_project_modules()
+            module_results: dict[str, dict[str, Any]] = {}
+            aggregate: dict[str, Any] = {
+                "ok": True,
+                "scheduled_at": datetime.now(UTC).isoformat(),
+                "project_module": project_module or "all",
+                "total_sources": 0,
+                "total_jobs": 0,
+                "job_ids": [],
+                "enqueue_failures": 0,
+                "failed_batches": [],
+                "max_sources_per_run": 0,
+                "queue_depth": None,
+                "skipped_due_to_queue_full": False,
+                "skipped_due_to_tap_unreachable": False,
+                "skipped_due_to_tick_discovery_batch_limit": False,
+                "admitted_by_rate": 0,
+                "blocked_by_rate": False,
+                "blocked_by_in_flight": False,
+                "tap_unreachable": [],
+                "module_results": module_results,
+            }
+            for module_name in target_modules:
+                module_result = await discover_schedule(
+                    db=db,
+                    redis=redis,
+                    project_module=module_name,
+                )
+                module_results[module_name] = module_result
+                aggregate["ok"] = bool(aggregate["ok"] and module_result.get("ok", True))
+                aggregate["total_sources"] += int(module_result.get("total_sources", 0))
+                aggregate["total_jobs"] += int(module_result.get("total_jobs", 0))
+                aggregate["enqueue_failures"] += int(module_result.get("enqueue_failures", 0))
+                aggregate["max_sources_per_run"] += int(module_result.get("max_sources_per_run", 0))
+                aggregate["admitted_by_rate"] += int(module_result.get("admitted_by_rate", 0))
+                aggregate["skipped_due_to_queue_full"] = bool(
+                    aggregate["skipped_due_to_queue_full"] or module_result.get("skipped_due_to_queue_full")
+                )
+                aggregate["skipped_due_to_tap_unreachable"] = bool(
+                    aggregate["skipped_due_to_tap_unreachable"]
+                    or module_result.get("skipped_due_to_tap_unreachable")
+                )
+                aggregate["skipped_due_to_tick_discovery_batch_limit"] = bool(
+                    aggregate["skipped_due_to_tick_discovery_batch_limit"]
+                    or module_result.get("skipped_due_to_tick_discovery_batch_limit")
+                )
+                aggregate["blocked_by_rate"] = bool(
+                    aggregate["blocked_by_rate"] or module_result.get("blocked_by_rate")
+                )
+                aggregate["blocked_by_in_flight"] = bool(
+                    aggregate["blocked_by_in_flight"] or module_result.get("blocked_by_in_flight")
+                )
+                aggregate["job_ids"].extend(module_result.get("job_ids") or [])
+                aggregate["failed_batches"].extend(module_result.get("failed_batches") or [])
+                if module_result.get("queue_depth") is not None:
+                    aggregate["queue_depth"] = module_result.get("queue_depth")
+                unreachable = module_result.get("tap_unreachable") or []
+                if isinstance(unreachable, list):
+                    aggregate["tap_unreachable"].extend(unreachable)
+            result = aggregate
             if "ok" not in result:
                 result["ok"] = True
             total_sources = result.get("total_sources", 0)

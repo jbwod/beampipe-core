@@ -4,7 +4,7 @@ from typing import Any
 import restate
 
 from ..core.config import settings
-from ..core.utils.positive_policy import positive_float, positive_int
+from ..core.positive_policy import positive_float, positive_int
 
 
 def _run_opts_external_io(

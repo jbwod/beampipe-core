@@ -68,7 +68,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  restate_app:
+  beamcore_rs:
     build:
       context: .
       dockerfile: Dockerfile
@@ -91,14 +91,14 @@ services:
     image: docker.restate.dev/restatedev/restate-cli:latest
     depends_on:
       - restate
-      - restate_app
+      - beamcore_rs
     environment:
       RESTATE_ADMIN_URL: http://restate:9070
     entrypoint:
       - /bin/sh
       - -c
     command:
-      - "sleep 3s; restate deployments register http://restate_app:9080 --use-http1.1 --force --yes || true"
+      - "sleep 3s; restate deployments register http://beamcore_rs:9080 --use-http1.1 --force --yes || true"
     restart: "no"
 
   db:

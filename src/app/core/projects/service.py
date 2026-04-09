@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from ..utils.positive_policy import positive_float_optional, positive_int_optional
+from ..positive_policy import positive_float_optional, positive_int_optional
 from .plugins import list_project_modules, load_project_module
 
 logger = logging.getLogger(__name__)
@@ -69,6 +69,14 @@ def get_workflow_execution_automation_policy(project_module: str) -> dict[str, A
     return dict(raw)
 
 
+def get_workflow_discovery_automation_policy(project_module: str) -> dict[str, Any]:
+    module = load_project_module(project_module)
+    raw = getattr(module, "WORKFLOW_DISCOVERY_AUTOMATION", None)
+    if not isinstance(raw, dict):
+        return {}
+    return dict(raw)
+
+
 def _resolve_workflow_step_overrides_from_policy(
     policy: dict[str, Any],
     *,
@@ -112,7 +120,7 @@ def resolve_workflow_execute_step_overrides(project_module: str | None) -> dict[
 def resolve_workflow_discovery_step_overrides(project_module: str | None) -> dict[str, Any]:
     if not project_module:
         return {}
-    policy = get_workflow_execution_automation_policy(project_module)
+    policy = get_workflow_discovery_automation_policy(project_module)
     return _resolve_workflow_step_overrides_from_policy(policy, family="discovery")
 
 
@@ -132,6 +140,10 @@ class ProjectModuleService:
             wf_auto = getattr(module, "WORKFLOW_EXECUTION_AUTOMATION", None)
             workflow_execution_automation: dict[str, Any] | None = (
                 dict(wf_auto) if isinstance(wf_auto, dict) else None
+            )
+            wf_disc = getattr(module, "WORKFLOW_DISCOVERY_AUTOMATION", None)
+            workflow_discovery_automation: dict[str, Any] | None = (
+                dict(wf_disc) if isinstance(wf_disc, dict) else None
             )
             return {
                 "project_module": project_module,
@@ -153,6 +165,7 @@ class ProjectModuleService:
                 "graph_path": graph_path,
                 "graph_github_url": graph_github_url,
                 "workflow_execution_automation": workflow_execution_automation,
+                "workflow_discovery_automation": workflow_discovery_automation,
             }
         except Exception as exc:
             return {
@@ -165,6 +178,7 @@ class ProjectModuleService:
                 "graph_path": None,
                 "graph_github_url": None,
                 "workflow_execution_automation": None,
+                "workflow_discovery_automation": None,
             }
 
     @staticmethod

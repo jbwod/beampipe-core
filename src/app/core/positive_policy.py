@@ -1,22 +1,23 @@
-"""Positive numeric reads from optional policy dicts (module automation, Restate overrides)."""
+from typing import Annotated, Any
 
-from typing import Any
+from pydantic import Field, TypeAdapter, ValidationError
+
+_PositiveInt = TypeAdapter(Annotated[int, Field(gt=0)])
+_PositiveFloat = TypeAdapter(Annotated[float, Field(gt=0)])
 
 
 def is_positive_int(value: Any) -> int | None:
     try:
-        v = int(value)
-    except (TypeError, ValueError):
+        return _PositiveInt.validate_python(value)
+    except ValidationError:
         return None
-    return v if v > 0 else None
 
 
 def is_positive_float(value: Any) -> float | None:
     try:
-        v = float(value)
-    except (TypeError, ValueError):
+        return _PositiveFloat.validate_python(value)
+    except ValidationError:
         return None
-    return v if v > 0 else None
 
 
 def positive_int_optional(policy: dict[str, Any] | None, key: str) -> int | None:

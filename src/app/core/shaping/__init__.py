@@ -10,7 +10,6 @@ from .policy import (
     execute_admission_budget,
     shaping_queue_max_depth,
     shaping_enqueue_pace,
-    take_tokens,
 )
 
 __all__ = [
@@ -23,5 +22,4 @@ __all__ = [
     "execute_admission_budget",
     "shaping_queue_max_depth",
     "shaping_enqueue_pace",
-    "take_tokens",
 ]

@@ -28,6 +28,10 @@ class ProjectModuleContractStatus(BaseModel):
         default=None,
         description="Module WORKFLOW_EXECUTION_AUTOMATION dict when present (workflow auto-scheduling policy)",
     )
+    workflow_discovery_automation: dict[str, Any] | None = Field(
+        default=None,
+        description="Module WORKFLOW_DISCOVERY_AUTOMATION dict when present (discovery auto-scheduling policy)",
+    )
 
 
 class ProjectModuleContractListResponse(BaseModel):

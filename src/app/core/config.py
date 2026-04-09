@@ -195,43 +195,25 @@ class DiscoverySettings(BaseSettings):
     DISCOVERY_TAP_TIMEOUT_SECONDS: int = 120
     DISCOVERY_RETRY_COOLDOWN_MINUTES: int = 60
     DISCOVERY_CLAIM_TTL_MINUTES: int = 180
-    DISCOVERY_MAX_FAILURES_BEFORE_BACKOFF_MULTIPLIER: int = 3
     DISCOVERY_MAX_SOURCES_PER_RUN: int = 2000
     DISCOVERY_TAP_HEALTH_CHECK_ENABLED: bool = True
     DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS: float = 10.0
 
 
 class ShapingSettings(BaseSettings):
-    # Hybrid Shaper
     SHAPING_ARQ_QUEUE_MAX_DEPTH: int | None = 200
 
-    # Admission strategy per workflow family.
-    SHAPING_DISCOVERY_ALGO: Literal["token", "leaky"] = "token"
-    SHAPING_EXECUTION_ALGO: Literal["token", "leaky"] = "leaky"
-
-    # Discovery admission (token bucket)
-    SHAPING_DISCOVERY_RATE_PER_MIN: int = 200
-    SHAPING_DISCOVERY_BURST: int = 400
-    # Discovery admission (leaky bucket policing; used when SHAPING_DISCOVERY_ALGO=leaky)
-    SHAPING_DISCOVERY_LEAK_RATE_PER_MIN: int = 200
-    SHAPING_DISCOVERY_LEAK_CAPACITY: int = 400
     # Discovery in-flight guard
     SHAPING_DISCOVERY_MAX_IN_FLIGHT_BATCHES: int | None = 4
 
-    # Execute admission (token bucket)
-    SHAPING_EXECUTE_RATE_PER_MIN: int = 20
-    SHAPING_EXECUTE_BURST: int = 40
-    # Execute admission (leaky bucket policing; used when SHAPING_EXECUTION_ALGO=leaky)
-    SHAPING_EXECUTE_LEAK_RATE_PER_MIN: int = 2
-    SHAPING_EXECUTE_LEAK_CAPACITY: int = 2
     # Execute in-flight guard
-    SHAPING_EXECUTE_MAX_IN_FLIGHT_RUNS: int | None = 2
+    SHAPING_EXECUTION_MAX_IN_FLIGHT_RUNS: int | None = 2
 
     # Sleep after each successful enqueue_job
     SHAPING_ENQUEUE_PACING_MS: float = 0.0
 
     # Cap discover_batch
-    SHAPING_DISCOVERY_MAX_JOBS_PER_TICK: int | None = None
+    SHAPING_DISCOVERY_MAX_BATCHES_PER_TICK: int | None = None
 
 
 class ArchiveSettings(BaseSettings):

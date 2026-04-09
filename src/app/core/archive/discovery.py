@@ -16,6 +16,8 @@ from arq.connections import ArqRedis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..positive_policy import positive_int_optional
+from ..projects import get_workflow_discovery_automation_policy
 from ..registry.service import source_registry_service
 from ..shaping.policy import (
     can_admit_by_in_flight,
@@ -27,6 +29,37 @@ from ..shaping.policy import (
 from .tap_health import all_taps_reachable, get_tap_health, unreachable_taps
 
 logger = logging.getLogger(__name__)
+
+
+def discovery_scheduler_policy_for_module(
+    project_module: str,
+) -> dict[str, Any]:
+    defaults = {
+        "enabled": True,
+        "tick_discovery_source_limit": settings.DISCOVERY_MAX_SOURCES_PER_RUN,
+        "batch_size": settings.DISCOVERY_BATCH_SIZE,
+        "tick_discovery_batch_limit": settings.SHAPING_DISCOVERY_MAX_BATCHES_PER_TICK,
+        "stale_after_hours": settings.DISCOVERY_STALE_HOURS,
+        "claim_ttl_minutes": settings.DISCOVERY_CLAIM_TTL_MINUTES,
+    }
+    raw = get_workflow_discovery_automation_policy(project_module)
+    if not raw:
+        return defaults
+    policy = dict(defaults)
+    policy["enabled"] = bool(raw.get("enabled", defaults["enabled"]))
+
+    sources_cap = positive_int_optional(raw, "tick_discovery_source_limit")
+    if sources_cap is not None:
+        policy["tick_discovery_source_limit"] = sources_cap
+
+    for key in ("batch_size", "tick_discovery_batch_limit", "stale_after_hours", "claim_ttl_minutes"):
+        val = positive_int_optional(raw, key)
+        if val is not None:
+            policy[key] = val
+    max_in_flight = positive_int_optional(raw, "concurrent_discovery_batch_limit")
+    if max_in_flight is not None:
+        policy["concurrent_discovery_batch_limit"] = max_in_flight
+    return policy
 
 
 def extract_filename_from_url(url: str) -> str | None:
@@ -63,8 +96,96 @@ async def discover_schedule(
     target_module = project_module or "all"
     max_sources_per_run = settings.DISCOVERY_MAX_SOURCES_PER_RUN
     max_queue_depth = shaping_queue_max_depth(settings)
-    max_discovery_jobs_per_tick = settings.SHAPING_DISCOVERY_MAX_JOBS_PER_TICK
+    max_discovery_jobs_per_tick = settings.SHAPING_DISCOVERY_MAX_BATCHES_PER_TICK
     max_in_flight_batches = settings.SHAPING_DISCOVERY_MAX_IN_FLIGHT_BATCHES
+    policy: dict[str, Any] | None = None
+    project_in_flight_cap: int | None = None
+
+    if project_module:
+        policy = discovery_scheduler_policy_for_module(project_module)
+        if not bool(policy.get("enabled", True)):
+            return {
+                "ok": True,
+                "scheduled_at": scheduled_at,
+                "project_module": target_module,
+                "total_sources": 0,
+                "total_jobs": 0,
+                "job_ids": [],
+                "enqueue_failures": 0,
+                "failed_batches": [],
+                "max_sources_per_run": 0,
+                "queue_depth": None,
+                "skipped_due_to_queue_full": False,
+                "skipped_due_to_tick_discovery_batch_limit": False,
+                "admitted_by_rate": 0,
+                "blocked_by_rate": False,
+                "blocked_by_in_flight": False,
+                "reason": "discovery_automation_disabled",
+            }
+        project_cap = max(1, int(policy["tick_discovery_source_limit"]))
+        max_sources_per_run = min(max_sources_per_run, project_cap)
+        if policy.get("tick_discovery_batch_limit") is not None:
+            project_jobs_cap = int(policy["tick_discovery_batch_limit"])
+            if max_discovery_jobs_per_tick is None:
+                max_discovery_jobs_per_tick = project_jobs_cap
+            else:
+                max_discovery_jobs_per_tick = min(max_discovery_jobs_per_tick, project_jobs_cap)
+        if policy.get("concurrent_discovery_batch_limit") is not None:
+            project_in_flight_cap = int(policy["concurrent_discovery_batch_limit"])
+            project_in_flight_batches = await estimate_discovery_in_flight_batches(
+                db,
+                redis,
+                queue_name=settings.WORKER_QUEUE_NAME,
+                project_module=project_module,
+            )
+            if not can_admit_by_in_flight(
+                current=project_in_flight_batches,
+                max_in_flight=project_in_flight_cap,
+            ):
+                return {
+                    "ok": True,
+                    "scheduled_at": scheduled_at,
+                    "project_module": target_module,
+                    "total_sources": 0,
+                    "total_jobs": 0,
+                    "job_ids": [],
+                    "enqueue_failures": 0,
+                    "failed_batches": [],
+                    "max_sources_per_run": max_sources_per_run,
+                    "queue_depth": None,
+                    "skipped_due_to_queue_full": False,
+                    "skipped_due_to_tick_discovery_batch_limit": False,
+                    "admitted_by_rate": 0,
+                    "blocked_by_rate": False,
+                    "blocked_by_in_flight": True,
+                }
+            project_remaining_slots = max(0, project_in_flight_cap - int(project_in_flight_batches))
+            if project_remaining_slots <= 0:
+                return {
+                    "ok": True,
+                    "scheduled_at": scheduled_at,
+                    "project_module": target_module,
+                    "total_sources": 0,
+                    "total_jobs": 0,
+                    "job_ids": [],
+                    "enqueue_failures": 0,
+                    "failed_batches": [],
+                    "max_sources_per_run": max_sources_per_run,
+                    "queue_depth": None,
+                    "skipped_due_to_queue_full": False,
+                    "skipped_due_to_tick_discovery_batch_limit": False,
+                    "admitted_by_rate": 0,
+                    "blocked_by_rate": False,
+                    "blocked_by_in_flight": True,
+                }
+            if max_discovery_jobs_per_tick is None:
+                max_discovery_jobs_per_tick = project_remaining_slots
+            else:
+                max_discovery_jobs_per_tick = min(max_discovery_jobs_per_tick, project_remaining_slots)
+    requested_sources_tick = max(0, int(max_sources_per_run))
+    requested_batches_tick = (
+        int(max_discovery_jobs_per_tick) if max_discovery_jobs_per_tick is not None else None
+    )
 
     def _error_result(error: str) -> dict[str, Any]:
         return {
@@ -80,7 +201,7 @@ async def discover_schedule(
             "max_sources_per_run": max_sources_per_run,
             "queue_depth": None,
             "skipped_due_to_queue_full": False,
-            "skipped_due_to_max_discovery_jobs_per_tick": False,
+            "skipped_due_to_tick_discovery_batch_limit": False,
             "admitted_by_rate": 0,
             "blocked_by_rate": False,
             "blocked_by_in_flight": False,
@@ -91,10 +212,16 @@ async def discover_schedule(
         logger.error("event=discover_schedule_error project_module=%s error=%s", target_module, error)
         return _error_result(error)
 
-    batch_size = batch_size if batch_size is not None else settings.DISCOVERY_BATCH_SIZE
-    stale_after_hours = (
-        stale_after_hours if stale_after_hours is not None else settings.DISCOVERY_STALE_HOURS
-    )
+    if batch_size is None:
+        if policy and policy.get("batch_size") is not None:
+            batch_size = int(policy["batch_size"])
+        else:
+            batch_size = settings.DISCOVERY_BATCH_SIZE
+    if stale_after_hours is None:
+        if policy and policy.get("stale_after_hours") is not None:
+            stale_after_hours = int(policy["stale_after_hours"])
+        else:
+            stale_after_hours = settings.DISCOVERY_STALE_HOURS
     queue_depth: int | None = None
     blocked_by_rate = False
     blocked_by_in_flight = False
@@ -141,13 +268,13 @@ async def discover_schedule(
                     "max_sources_per_run": max_sources_per_run,
                     "queue_depth": queue_depth,
                     "skipped_due_to_queue_full": True,
-                    "skipped_due_to_max_discovery_jobs_per_tick": False,
+                    "skipped_due_to_tick_discovery_batch_limit": False,
                     "admitted_by_rate": 0,
                     "blocked_by_rate": False,
                     "blocked_by_in_flight": False,
                 }
 
-    requested_sources = max(0, int(max_sources_per_run))
+    requested_sources = requested_sources_tick
     admitted_by_rate = await discovery_admission_budget(
         redis,
         desired_sources=requested_sources,
@@ -172,7 +299,7 @@ async def discover_schedule(
             "max_sources_per_run": max_sources_per_run,
             "queue_depth": queue_depth,
             "skipped_due_to_queue_full": False,
-            "skipped_due_to_max_discovery_jobs_per_tick": False,
+            "skipped_due_to_tick_discovery_batch_limit": False,
             "admitted_by_rate": 0,
             "blocked_by_rate": True,
             "blocked_by_in_flight": False,
@@ -211,7 +338,7 @@ async def discover_schedule(
                     "skipped_due_to_queue_full": False,
                     "skipped_due_to_tap_unreachable": True,
                     "tap_unreachable": unreachable,
-                    "skipped_due_to_max_discovery_jobs_per_tick": False,
+                    "skipped_due_to_tick_discovery_batch_limit": False,
                     "admitted_by_rate": admitted_by_rate,
                     "blocked_by_rate": blocked_by_rate,
                     "blocked_by_in_flight": blocked_by_in_flight,
@@ -293,6 +420,26 @@ async def discover_schedule(
                     max_in_flight_batches,
                 )
                 break
+        if project_in_flight_cap is not None and project_module is not None:
+            project_in_flight_batches = await estimate_discovery_in_flight_batches(
+                db,
+                redis,
+                queue_name=settings.WORKER_QUEUE_NAME,
+                project_module=project_module,
+            )
+            if not can_admit_by_in_flight(
+                current=project_in_flight_batches,
+                max_in_flight=project_in_flight_cap,
+            ):
+                blocked_by_in_flight = True
+                logger.warning(
+                    "event=discover_schedule_project_in_flight_cap "
+                    "project_module=%s in_flight_batches=%s max_in_flight_batches=%s action=stop",
+                    target_module,
+                    project_in_flight_batches,
+                    project_in_flight_cap,
+                )
+                break
 
         claim_token = None
         batch_limit = min(batch_size, remaining_sources)
@@ -302,7 +449,11 @@ async def discover_schedule(
                 project_module=project_module,
                 stale_after_hours=stale_after_hours,
                 limit=batch_limit,
-                lease_ttl_minutes=settings.DISCOVERY_CLAIM_TTL_MINUTES,
+                lease_ttl_minutes=(
+                    int(policy["claim_ttl_minutes"])
+                    if policy and policy.get("claim_ttl_minutes") is not None
+                    else settings.DISCOVERY_CLAIM_TTL_MINUTES
+                ),
                 commit=False,
             )
             if claimed_rows:
@@ -387,7 +538,7 @@ async def discover_schedule(
                     and discovery_jobs_this_tick >= max_discovery_jobs_per_tick
                 ):
                     logger.warning(
-                        "event=discover_schedule_max_jobs_per_tick "
+                        "event=discover_schedule_max_batches_per_tick "
                         "project_module=%s jobs_this_tick=%s max=%s action=stop",
                         target_module,
                         discovery_jobs_this_tick,
@@ -432,7 +583,7 @@ async def discover_schedule(
                         "max_sources_per_run": max_sources_per_run,
                         "queue_depth": queue_depth,
                         "skipped_due_to_queue_full": skipped_due_to_queue_full,
-                        "skipped_due_to_max_discovery_jobs_per_tick": True,
+                        "skipped_due_to_tick_discovery_batch_limit": True,
                         "admitted_by_rate": admitted_by_rate,
                         "blocked_by_rate": blocked_by_rate,
                         "blocked_by_in_flight": blocked_by_in_flight,
@@ -481,7 +632,7 @@ async def discover_schedule(
                 "max_sources_per_run": max_sources_per_run,
                 "queue_depth": queue_depth,
                 "skipped_due_to_queue_full": skipped_due_to_queue_full,
-                "skipped_due_to_max_discovery_jobs_per_tick": False,
+                "skipped_due_to_tick_discovery_batch_limit": False,
                 "admitted_by_rate": admitted_by_rate,
                 "blocked_by_rate": blocked_by_rate,
                 "blocked_by_in_flight": blocked_by_in_flight,
@@ -516,7 +667,7 @@ async def discover_schedule(
             "max_sources_per_run": max_sources_per_run,
             "queue_depth": queue_depth,
             "skipped_due_to_queue_full": False,
-            "skipped_due_to_max_discovery_jobs_per_tick": False,
+            "skipped_due_to_tick_discovery_batch_limit": False,
             "admitted_by_rate": admitted_by_rate,
             "blocked_by_rate": blocked_by_rate,
             "blocked_by_in_flight": blocked_by_in_flight,
@@ -526,7 +677,8 @@ async def discover_schedule(
         "event=discover_schedule_completed "
         "project_module=%s scheduled_at=%s total_sources=%s total_jobs=%s "
         "enqueue_failures=%s queue_depth=%s skipped_due_to_queue_full=%s "
-        "admitted_by_rate=%s blocked_by_rate=%s blocked_by_in_flight=%s",
+        "requested_sources_tick=%s requested_batches_tick=%s admitted_by_rate=%s "
+        "blocked_by_rate=%s blocked_by_in_flight=%s",
         target_module,
         scheduled_at,
         total_sources,
@@ -534,6 +686,8 @@ async def discover_schedule(
         enqueue_failures,
         queue_depth,
         skipped_due_to_queue_full,
+        requested_sources_tick,
+        requested_batches_tick,
         admitted_by_rate,
         blocked_by_rate,
         blocked_by_in_flight,
@@ -551,7 +705,7 @@ async def discover_schedule(
         "max_sources_per_run": max_sources_per_run,
         "queue_depth": queue_depth,
         "skipped_due_to_queue_full": skipped_due_to_queue_full,
-        "skipped_due_to_max_discovery_jobs_per_tick": False,
+        "skipped_due_to_tick_discovery_batch_limit": False,
         "admitted_by_rate": admitted_by_rate,
         "blocked_by_rate": blocked_by_rate,
         "blocked_by_in_flight": blocked_by_in_flight,

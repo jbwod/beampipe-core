@@ -9,8 +9,8 @@ class DiscoverBundle(TypedDict, total=False):
 # MANIFEST_SCHEMA
 # GRAPH_PATH
 # GRAPH_GITHUB_URL
-# WORKFLOW_EXECUTION_AUTOMATION [Optional]: may include ``deployment_profile_name`` (str) for the
-# daliuge deployment profile row name.
+# WORKFLOW_EXECUTION_AUTOMATION [Optional]: project-specific execution scheduling and retry policy.
+# WORKFLOW_DISCOVERY_AUTOMATION [Optional]: project-specific discovery scheduling policy.
 
 class ProjectDiscoveryModule(Protocol):
     REQUIRED_ADAPTERS: list[str]
