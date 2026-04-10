@@ -1,22 +1,59 @@
 """Execute DIM translate/deploy/poll."""
 
+import logging
 from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
 import restate
+from restate.exceptions import TerminalError
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ..core.config import settings
 from ..core.db.database import local_session
-from ..core.exceptions.workflow_exceptions import WorkflowErrorCode, WorkflowFailure
+from ..core.ledger.service import execution_ledger_service
+from ..core.exceptions.workflow_exceptions import (
+    WorkflowErrorCode,
+    WorkflowFailure,
+    wf_staging_requires_casda,
+)
 from ..core.log_context import bind_execution_log_context
 from ..core.orchestration import service as orchestration_service
 from ..core.projects import resolve_workflow_execute_step_overrides
+from ..models.ledger import ExecutionStatus
 from .options import _run_opts_database, _run_opts_external_io, _run_opts_poll
 from .runtime import _ingress_terminal, _run_step
 
+logger = logging.getLogger(__name__)
+
 ExecutionBatchWorkflow = restate.Workflow("ExecutionBatchWorkflow")
+
+
+async def _record_execution_workflow_terminal_failure(
+    execution_id: str,
+    exc: TerminalError,
+) -> None:
+    """Mark ledger FAILED when the Restate workflow exits with a terminal application error."""
+    cause = exc.__cause__
+    err_s = (
+        cause.format_for_ledger()
+        if isinstance(cause, WorkflowFailure)
+        else str(exc)
+    )
+    try:
+        async with local_session() as db:
+            await execution_ledger_service.update_execution_status(
+                db=db,
+                execution_id=UUID(execution_id),
+                status=ExecutionStatus.FAILED,
+                error=err_s,
+                execution_phase=None,
+            )
+    except Exception:
+        logger.exception(
+            "event=restate_execution_terminal_ledger_failed execution_id=%s",
+            execution_id,
+        )
 
 
 class ExecutionBatchWorkflowInput(BaseModel):
@@ -205,6 +242,8 @@ async def _execute_execution_workflow_body(
         execution_id=execution_id,
     )
     if not manifest:
+        if do_stage and settings.CASDA_USERNAME is None:
+            _ingress_terminal(wf_staging_requires_casda())
         stage_out = await _run_step(
             ctx,
             "execution.stage_sources",
@@ -297,4 +336,8 @@ async def execute_execution_workflow(
         arq_job_id=exec_req.arq_job_id,
         job_try=exec_req.arq_job_try,
     ):
-        return await _execute_execution_workflow_body(ctx, execution_id, exec_req)
+        try:
+            return await _execute_execution_workflow_body(ctx, execution_id, exec_req)
+        except TerminalError as e:
+            await _record_execution_workflow_terminal_failure(execution_id, e)
+            raise

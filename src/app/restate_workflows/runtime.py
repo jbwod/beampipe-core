@@ -1,3 +1,4 @@
+import inspect
 from typing import Any, NoReturn
 
 import restate
@@ -19,8 +20,16 @@ async def _run_step(
     /,
     **kwargs: Any,
 ) -> Any:
-    try:
-        return await ctx.run_typed(step_name, fn, opts, **kwargs)
-    except WorkflowFailure as wf:
-        raise TerminalError(wf.format_for_terminal()) from wf
-## _run_step ends here
+    async def _invoke() -> Any:
+        try:
+            if inspect.iscoroutinefunction(fn):
+                return await fn(**kwargs)
+            result = fn(**kwargs)
+            if inspect.isawaitable(result):
+                return await result
+            return result
+        except WorkflowFailure as wf:
+            # Convert the WorkflowFailure to a TerminalError
+            raise TerminalError(wf.format_for_terminal()) from wf
+
+    return await ctx.run_typed(step_name, _invoke, opts)
