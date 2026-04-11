@@ -1,7 +1,8 @@
-from typing import Annotated, Any
+from enum import Enum
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,11 +18,22 @@ from ...crud.crud_execution_record import crud_batch_execution_records
 from ...models.ledger import ExecutionStatus
 from ...schemas.ledger import (
     BatchExecutionRecordCreate,
+    BatchExecutionRecordListItem,
     BatchExecutionRecordRead,
     BatchExecutionRecordUpdate,
+    BatchExecutionStatusResponse,
+    ExecuteRequest,
     PrepareExecutionRequest,
     PrepareExecutionResponse,
 )
+
+
+class ExecutionSortField(str, Enum):
+    created_at = "created_at"
+    updated_at = "updated_at"
+    started_at = "started_at"
+    completed_at = "completed_at"
+    status = "status"
 
 router = APIRouter(prefix="/executions", tags=["executions"])
 
@@ -30,6 +42,7 @@ router = APIRouter(prefix="/executions", tags=["executions"])
 async def prepare_execution(
     request: Request,
     body: PrepareExecutionRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
     return await orchestration_prepare_execution(
@@ -39,7 +52,7 @@ async def prepare_execution(
     )
 
 
-@router.get("", response_model=PaginatedListResponse[BatchExecutionRecordRead])
+@router.get("", response_model=PaginatedListResponse[BatchExecutionRecordListItem])
 async def list_executions(
     request: Request,
     db: Annotated[AsyncSession, Depends(async_get_db)],
@@ -47,6 +60,8 @@ async def list_executions(
     items_per_page: int = 10,
     project_module: str | None = None,
     status: ExecutionStatus | None = None,
+    sort_by: ExecutionSortField = ExecutionSortField.created_at,
+    order: Annotated[Literal["asc", "desc"], Query(description="Sort direction")] = "desc",
 ) -> dict[str, Any]:
     filters: dict[str, Any] = {}
     if project_module:
@@ -58,6 +73,9 @@ async def list_executions(
         db=db,
         offset=compute_offset(page, items_per_page),
         limit=items_per_page,
+        schema_to_select=BatchExecutionRecordListItem,
+        sort_columns=[sort_by.value],
+        sort_orders=[order],
         **filters,
     )
 
@@ -128,15 +146,31 @@ async def update_execution(
     )
 
 
+@router.get("/{execution_id}/status", response_model=BatchExecutionStatusResponse)
+async def get_execution_status(
+    request: Request,
+    execution_id: UUID,
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    execution = await crud_batch_execution_records.get(
+        db=db, uuid=execution_id, schema_to_select=BatchExecutionStatusResponse
+    )
+    if execution is None:
+        raise NotFoundException(f"Execution {execution_id} not found")
+    return execution
+
+
 @router.post("/{execution_id}/execute", status_code=202)
 async def execute_execution(
     request: Request,
     execution_id: UUID,
     current_user: Annotated[dict, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
-    do_stage: bool = True,
-    do_submit: bool = True,
+    body: ExecuteRequest | None = None,
 ) -> dict[str, Any]:
+    do_stage = body.do_stage if body else True
+    do_submit = body.do_submit if body else True
+
     execution = await crud_batch_execution_records.get(
         db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
     )

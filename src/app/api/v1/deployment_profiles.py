@@ -1,7 +1,7 @@
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -131,7 +131,7 @@ async def update_deployment_profile(
     return _to_read_dict(updated)
 
 
-@router.delete("/{profile_id}", status_code=204)
+@router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_deployment_profile(
     request: Request,
     profile_id: UUID,
