@@ -2,6 +2,8 @@ import logging
 from typing import Any
 from uuid import UUID
 
+from arq import Worker
+
 from ...config import settings
 from ...db.database import local_session
 from ...log_context import bind_execution_log_context_from_arq
@@ -11,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 async def execute_execution_job(
-    ctx: Any,
+    ctx: Worker,
     execution_id: str,
     *,
     do_stage: bool = True,

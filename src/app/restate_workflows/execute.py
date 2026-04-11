@@ -282,8 +282,9 @@ async def _execute_execution_workflow_body(
             verify_ssl=tr["verify_ssl"],
         )
 
+    max_polls = settings.RESTATE_DIM_POLL_MAX_ROUNDS
     poll_round = 0
-    while True:
+    while poll_round < max_polls:
         poll = await _run_step(
             ctx,
             f"execution.poll_dim.{poll_round}",
@@ -302,6 +303,13 @@ async def _execute_execution_workflow_body(
             )
             return {**poll, "execution_id": execution_id, "ledger": ledger}
         await ctx.sleep(delta=timedelta(seconds=settings.RESTATE_DIM_POLL_INTERVAL_SECONDS))
+
+    _ingress_terminal(
+        WorkflowFailure(
+            WorkflowErrorCode.EXECUTION_DIM_STATE,
+            f"DIM poll exceeded {max_polls} rounds without reaching a terminal state",
+        )
+    )
 
 
 @ExecutionBatchWorkflow.main()

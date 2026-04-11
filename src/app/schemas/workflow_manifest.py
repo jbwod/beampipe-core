@@ -1,3 +1,3 @@
-from typing import Any, Dict
+from typing import Any
 
-Manifest = Dict[str, Any]
+Manifest = dict[str, Any]

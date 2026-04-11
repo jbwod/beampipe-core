@@ -20,14 +20,8 @@ class DaliugeTranslationConfig(BaseModel):
         default="metis",
         description="Partition algorithm",
     )
-    num_par: Annotated[int, Field(ge=1)] = Field(
-        default=1,
-        description="Partitions / nodes",
-    )
-    num_islands: Annotated[int, Field(ge=0)] = Field(
-        default=0,
-        description="Data islands; dlg -s",
-    )
+    num_par: int = Field(default=1, ge=1, description="Partitions / nodes")
+    num_islands: int = Field(default=0, ge=0, description="Data islands; dlg -s")
     tm_url: str | None = Field(
         default=None,
         max_length=255,
