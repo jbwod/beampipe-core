@@ -340,6 +340,7 @@ class SourceRegistryService:
         out: dict[str, dict[str, Any]] = {}
         for row in result.scalars().all():
             data = SourceRegistryRead.model_validate(row).model_dump()
+            data["discovery_claim_token"] = row.discovery_claim_token
             out[str(data["source_identifier"])] = data
         return out
 

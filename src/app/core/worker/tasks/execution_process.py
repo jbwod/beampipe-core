@@ -293,10 +293,31 @@ async def process_workflow_module_for_execution_schedule(
                         shaping_queue_max_depth(settings),
                     )
                     break
+                chunk_specs = [{"source_identifier": src} for src in chunk]
+                valid, skipped = await execution_ledger_service.partition_sources_ready_for_execution(
+                    db=db,
+                    project_module=module_name,
+                    sources=chunk_specs,
+                )
+                for row in skipped:
+                    _bump("sources_skipped_not_ready")
+                    logger.warning(
+                        "event=workflow_execution_source_skipped_not_ready project_module=%s source_identifier=%s reason=%s",
+                        module_name,
+                        row["source_identifier"],
+                        row["reason"],
+                    )
+                if not valid:
+                    logger.warning(
+                        "event=workflow_execution_chunk_all_sources_not_ready project_module=%s chunk_size=%s",
+                        module_name,
+                        len(chunk),
+                    )
+                    continue
                 execution = await execution_ledger_service.create_execution(
                     db=db,
                     project_module=module_name,
-                    sources=[{"source_identifier": src} for src in chunk],
+                    sources=valid,
                     archive_name=policy["archive_name"],
                     deployment_profile_id=dep_uuid,
                     created_by_id=None,
@@ -316,14 +337,14 @@ async def process_workflow_module_for_execution_schedule(
                 logger.info(
                     "event=workflow_execution_batch project_module=%s source_count=%s execution_uuid=%s job_id=%s",
                     module_name,
-                    len(chunk),
+                    len(valid),
                     execution_uuid,
                     job_id,
                 )
                 created_executions.append(execution_uuid)
                 if job_id:
                     enqueued_jobs.append(job_id)
-                sources_scheduled += len(chunk)
+                sources_scheduled += len(valid)
                 created_for_module += 1
                 await shaping_enqueue_pace()
     finally:

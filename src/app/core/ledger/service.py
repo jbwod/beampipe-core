@@ -16,7 +16,8 @@ from ...schemas.ledger import BatchExecutionRecordCreateInternal, BatchExecution
 from ..archive.service import archive_metadata_service
 from ..config import settings
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
-from ..utils.registry import validate_source_spec
+from .source_readiness import parse_execution_source_spec, parsed_source_readiness_error
+from ..registry.service import source_registry_service
 
 logger = logging.getLogger(__name__)
 

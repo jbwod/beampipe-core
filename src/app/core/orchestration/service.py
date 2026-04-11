@@ -23,13 +23,17 @@ from ..exceptions.workflow_exceptions import (
     wf_staging_requires_casda,
     wf_unexpected,
 )
+from ..ledger.source_readiness import (
+    filter_archive_rows_by_sbids,
+    parse_execution_source_spec,
+    parsed_source_readiness_error,
+)
 from ..ledger.service import execution_ledger_service
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..registry.service import source_registry_service
 from ..utils.daliuge import classify_dim_session_status as _parse_dim_session_status
-from ..utils.registry import validate_source_spec
 from .manifest import inject_manifest_config_into_graph
-from .manifest_builder import _get_sbids_for_source, build_manifest
+from .manifest_builder import build_manifest
 from .staging import stage_sources_for_manifest
 
 logger = logging.getLogger(__name__)
