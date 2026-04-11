@@ -29,7 +29,7 @@ class CryptSettings(BaseSettings):
 
 
 class DatabaseSettings(BaseSettings):
-    pass
+    ...
 
 
 class SQLiteSettings(DatabaseSettings):
@@ -138,7 +138,7 @@ class CRUDAdminSettings(BaseSettings):
     CRUD_ADMIN_REDIS_HOST: str = "localhost"
     CRUD_ADMIN_REDIS_PORT: int = 6379
     CRUD_ADMIN_REDIS_DB: int = 0
-    CRUD_ADMIN_REDIS_PASSWORD: str | None = "None"
+    CRUD_ADMIN_REDIS_PASSWORD: str | None = None
     CRUD_ADMIN_REDIS_SSL: bool = False
 
 
@@ -177,14 +177,17 @@ class RestateWorkflowSettings(BaseSettings):
 
     RESTATE_INVOKE_TIMEOUT_SECONDS: float = 30.0
     # ctx.run_typed policies (https://docs.restate.dev/develop/python/durable-steps).
-    RESTATE_STEP_EXTERNAL_MAX_ATTEMPTS: int = 12
+    RESTATE_STEP_EXTERNAL_MAX_ATTEMPTS: int = 3
     RESTATE_STEP_EXTERNAL_MAX_DURATION_MINUTES: int = 45
-    RESTATE_STEP_DB_MAX_ATTEMPTS: int = 10
+    RESTATE_STEP_DB_MAX_ATTEMPTS: int = 3
     RESTATE_STEP_DB_MAX_DURATION_MINUTES: int = 15
-    RESTATE_STEP_POLL_MAX_ATTEMPTS: int = 6
+    RESTATE_STEP_POLL_MAX_ATTEMPTS: int = 3
     RESTATE_STEP_POLL_MAX_DURATION_MINUTES: int = 5
     RESTATE_STEP_INITIAL_RETRY_SECONDS: float = 2.0
     RESTATE_STEP_MAX_RETRY_INTERVAL_SECONDS: float = 120.0
+
+    RESTATE_DIM_POLL_INTERVAL_SECONDS: float = 15.0
+    RESTATE_DIM_POLL_MAX_ROUNDS: int = 240
 
 
 class DiscoverySettings(BaseSettings):

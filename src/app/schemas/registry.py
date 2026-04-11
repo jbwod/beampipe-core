@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..core.schemas import TimestampSchema, UUIDSchema
 
@@ -61,32 +61,6 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
         description="Timestamp when source was marked pending for workflow execution.",
     )
 
-    @field_serializer("last_checked_at")
-    def serialize_last_checked_at(self, last_checked_at: datetime | None, _info):  # type: ignore[override]
-        if last_checked_at is not None:
-            return last_checked_at.isoformat()
-        return None
-
-    @field_serializer("last_attempted_at")
-    def serialize_last_attempted_at(self, last_attempted_at: datetime | None, _info):  # type: ignore[override]
-        if last_attempted_at is not None:
-            return last_attempted_at.isoformat()
-        return None
-
-    @field_serializer("discovery_claim_expires_at")
-    def serialize_discovery_claim_expires_at(
-        self, discovery_claim_expires_at: datetime | None, _info
-    ):  # type: ignore[override]
-        if discovery_claim_expires_at is not None:
-            return discovery_claim_expires_at.isoformat()
-        return None
-
-    @field_serializer("workflow_run_pending_at")
-    def serialize_workflow_run_pending_at(self, workflow_run_pending_at: datetime | None, _info):  # type: ignore[override]
-        if workflow_run_pending_at is not None:
-            return workflow_run_pending_at.isoformat()
-        return None
-
 
 class SourceRegistryUpdate(BaseModel):
     """Schema for updating source registry entries via API."""
@@ -130,6 +104,14 @@ class SourceRegistryBulkCreateResponse(BaseModel):
     total_existing: int
 
 
+class SourceMetadataResponse(BaseModel):
+    """Response for GET /sources/{id}/metadata."""
+
+    source: SourceRegistryRead
+    metadata: list[dict]
+    metadata_count: int
+
+
 class DiscoverTriggerRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -159,3 +141,7 @@ class DiscoverTriggerResponse(BaseModel):
     project_module: str = Field(description="Project module that was used")
     marked_count: int = Field(description="Number of sources marked for recheck")
     source_identifiers: list[str] = Field(description="Source identifiers that were updated")
+    message: str = Field(
+        default="Sources marked for rediscovery. Discovery runs asynchronously via the background scheduler.",
+        description="Human-readable status note",
+    )

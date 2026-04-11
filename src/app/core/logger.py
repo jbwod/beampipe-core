@@ -32,6 +32,22 @@ def _get_logging_level() -> int:
         )
 
 
+def _verbosity_name() -> str:
+    try:
+        from .config import settings
+
+        return str(getattr(settings, "LOG_VERBOSITY", "medium") or "medium")
+    except Exception:
+        return str(os.getenv("LOG_VERBOSITY", "medium") or "medium")
+
+
+def _quiet_third_party_chatter() -> None:
+    if _verbosity_name() == "full":
+        return
+    for name in ("httpx", "httpcore", "arq"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 LOGGING_LEVEL = _get_logging_level()
 
 _exec_ctx_filter = ExecutionLogContextFilter()
@@ -77,3 +93,5 @@ if not has_stream_handler:
     stream_handler.setLevel(LOGGING_LEVEL)
     _attach_exec_context(stream_handler)
     root_logger.addHandler(stream_handler)
+
+_quiet_third_party_chatter()

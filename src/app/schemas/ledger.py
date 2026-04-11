@@ -12,8 +12,14 @@ from ..models.ledger import ExecutionPhase, ExecutionStatus
 class ExecutionSourceSpec(BaseModel):
     """Per-source spec with optional SBID filter."""
 
-    source_identifier: Annotated[str, Field(min_length=1, max_length=100)]
-    sbids: list[str] | None = Field(default=None, description="Optional: restrict to these SBIDs for this source")
+    model_config = ConfigDict(json_schema_extra={"examples": [{"source_identifier": "HIPASSJ1318-21"}]})
+
+    source_identifier: Annotated[str, Field(min_length=1, max_length=100, examples=["HIPASSJ1318-21"])]
+    sbids: list[str] | None = Field(
+        default=None,
+        description="Optional: restrict to these SBIDs for this source. Omit to include all.",
+        json_schema_extra={"examples": [["12345", "12346"]]},
+    )
 
 
 class BatchExecutionRecordBase(BaseModel):
@@ -38,7 +44,6 @@ class BatchExecutionRecordCreate(BatchExecutionRecordBase):
         max_length=50,
         description="DALiuGE deployment profile name to resolve at create time",
     )
-    created_by_id: int | None = Field(default=None, description="User ID who triggered the execution")
 
 
 class BatchExecutionRecordCreateInternal(BatchExecutionRecordBase):
@@ -66,6 +71,33 @@ class BatchExecutionRecordRead(TimestampSchema, BatchExecutionRecordBase, UUIDSc
     retry_count: int = 0
     last_error: str | None = None
     created_by_id: int | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class BatchExecutionRecordListItem(TimestampSchema, BatchExecutionRecordBase, UUIDSchema):
+    model_config = ConfigDict(from_attributes=True)
+
+    deployment_profile_id: UUID | None = None
+    status: ExecutionStatus
+    execution_phase: ExecutionPhase | None = None
+    scheduler_name: str | None = None
+    scheduler_job_id: str | None = None
+    retry_count: int = 0
+    last_error: str | None = None
+    created_by_id: int | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class BatchExecutionStatusResponse(BaseModel):
+    uuid: UUID
+    status: ExecutionStatus
+    execution_phase: ExecutionPhase | None = None
+    scheduler_name: str | None = None
+    scheduler_job_id: str | None = None
+    last_error: str | None = None
+    retry_count: int = 0
     started_at: datetime | None = None
     completed_at: datetime | None = None
 
@@ -99,6 +131,13 @@ class BatchExecutionRecordDelete(BaseModel):
 
 
 # Prepare execution (validate + preview, no DB write)
+class ExecuteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    do_stage: bool = Field(default=True, description="Stage data from the archive before execution")
+    do_submit: bool = Field(default=True, description="Submit the graph to DALiuGE after staging")
+
+
 class PrepareExecutionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

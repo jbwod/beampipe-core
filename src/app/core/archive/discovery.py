@@ -281,7 +281,7 @@ async def discover_schedule(
     )
     if admitted_by_rate <= 0:
         blocked_by_rate = True
-        logger.info(
+        logger.debug(
             "event=discover_schedule_rate_limited project_module=%s requested_sources=%s admitted_sources=%s",
             target_module,
             requested_sources,
@@ -651,7 +651,7 @@ async def discover_schedule(
         and not blocked_by_rate
         and not blocked_by_in_flight
     ):
-        logger.info(
+        logger.debug(
             "event=discover_schedule_skipped project_module=%s reason=no_stale_sources",
             target_module,
         )
