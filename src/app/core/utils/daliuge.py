@@ -35,5 +35,29 @@ def get_roots(pg_spec: list[dict]) -> set[str]:
     return all_oids - nonroots
 
 
-__all__ = ["get_roots"]
+def classify_dim_session_status(status_payload: Any) -> str:
+    if isinstance(status_payload, int):
+        if status_payload == 4:
+            return "finished"
+        if status_payload == 3:
+            return "error"
+        return "running"
+
+    if isinstance(status_payload, str):
+        upper = status_payload.upper()
+        if upper == "FINISHED":
+            return "finished"
+        if upper == "ERROR":
+            return "error"
+        return "running"
+
+    if isinstance(status_payload, dict):
+        val = status_payload.get("status", status_payload)
+        if isinstance(val, (int, str)) and val != status_payload:
+            return classify_dim_session_status(val)
+
+    return "running"
+
+
+__all__ = ["get_roots", "classify_dim_session_status"]
 

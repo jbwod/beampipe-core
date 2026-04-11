@@ -26,6 +26,7 @@ from ..exceptions.workflow_exceptions import (
 from ..ledger.service import execution_ledger_service
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..registry.service import source_registry_service
+from ..utils.daliuge import classify_dim_session_status as _parse_dim_session_status
 from ..utils.registry import validate_source_spec
 from .manifest import inject_manifest_config_into_graph
 from .manifest_builder import _get_sbids_for_source, build_manifest
@@ -303,16 +304,16 @@ async def stage_sources_for_execution(
     project_module = execution["project_module"]
     sources = execution.get("sources") or []
 
+    casda_user = casda_username or settings.CASDA_USERNAME
+    if do_stage and not casda_user:
+        raise wf_staging_requires_casda()
+
     await execution_ledger_service.update_execution_status(
         db=db,
         execution_id=execution_id,
         status=ExecutionStatus.RUNNING,
         execution_phase=ExecutionPhase.STAGE_AND_MANIFEST,
     )
-
-    casda_user = casda_username or settings.CASDA_USERNAME
-    if do_stage and not casda_user:
-        raise wf_staging_requires_casda()
 
     if not do_stage:
         return {
@@ -690,6 +691,38 @@ async def submit_dim_session_for_execution(
     return session_id
 
 
+async def _fetch_dim_graph_status(
+    client: httpx.AsyncClient,
+    session_id: str,
+) -> dict[str, Any]:
+    """graph/status`` endpoint
+
+    Returns ``{"drop_statuses": {...}, "error_drops": [...], "has_errors": bool}``.
+    """
+    sid = quote(str(session_id))
+    try:
+        r = await client.get(f"/api/sessions/{sid}/graph/status")
+        r.raise_for_status()
+        drop_statuses = r.json()
+    except Exception as e:
+        logger.warning("event=dim_graph_status_error session_id=%s error=%s", session_id, e)
+        return {"drop_statuses": {}, "error_drops": [], "has_errors": False}
+
+    if not isinstance(drop_statuses, dict):
+        return {"drop_statuses": {}, "error_drops": [], "has_errors": False}
+
+    error_drops = [
+        uid for uid, st in drop_statuses.items()
+        if (isinstance(st, int) and st == 3)
+        or (isinstance(st, str) and st.upper() == "ERROR")
+    ]
+    return {
+        "drop_statuses": drop_statuses,
+        "error_drops": error_drops,
+        "has_errors": len(error_drops) > 0,
+    }
+
+
 async def poll_dim_session_for_execution(
     db: AsyncSession,
     execution_id: UUID,
@@ -697,10 +730,6 @@ async def poll_dim_session_for_execution(
     poll_timeout_seconds: float = 10.0,
 ) -> dict[str, Any]:
     """Poll DIM session and update execution status when terminal.
-
-    Returns:
-      - {"terminal": True, "status": "completed"} / {"terminal": True, "status": "failed"}
-      - {"terminal": False} when still running
     """
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
@@ -759,11 +788,14 @@ async def poll_dim_session_for_execution(
         r.raise_for_status()
         status_payload = r.json()
 
-    s = str(status_payload)
-    finished = ("4" in s) or ("FINISHED" in s) or ("Finished" in s)
-    error = ("3" in s) or ("ERROR" in s) or ("Error" in s)
-    if not finished and not error:
-        return {"terminal": False}
+        session_state = _parse_dim_session_status(status_payload)
+
+        if session_state == "running":
+            return {"terminal": False}
+
+        graph_info: dict[str, Any] = {}
+        if session_state == "finished":
+            graph_info = await _fetch_dim_graph_status(client, session_id)
 
     # Terminal: update ledger and clear registry pending sources.
     source_identifiers = [
@@ -778,7 +810,12 @@ async def poll_dim_session_for_execution(
         commit=False,
     )
 
-    if finished:
+    if session_state == "finished" and not graph_info.get("has_errors"):
+        logger.info(
+            "event=dim_session_completed execution_id=%s session_id=%s",
+            execution_id,
+            session_id,
+        )
         await execution_ledger_service.update_execution_status(
             db=db,
             execution_id=execution_id,
@@ -789,16 +826,36 @@ async def poll_dim_session_for_execution(
         )
         return {"terminal": True, "status": "completed"}
 
+    error_drops = graph_info.get("error_drops", [])
+    if session_state == "finished" and graph_info.get("has_errors"):
+        error_msg = (
+            f"DLG session finished with {len(error_drops)} errored drop(s): "
+            f"{error_drops[:20]}"
+        )
+    else:
+        error_msg = f"DLG session error: {status_payload}"
+
+    logger.error(
+        "event=dim_session_failed execution_id=%s session_id=%s error=%s",
+        execution_id,
+        session_id,
+        error_msg,
+    )
     await execution_ledger_service.update_execution_status(
         db=db,
         execution_id=execution_id,
         status=ExecutionStatus.FAILED,
-        error=str(status_payload),
+        error=error_msg,
         scheduler_name="daliuge",
         scheduler_job_id=str(session_id),
         execution_phase=ExecutionPhase.SUBMIT,
     )
-    return {"terminal": True, "status": "failed", "error": str(status_payload)}
+    return {
+        "terminal": True,
+        "status": "failed",
+        "error": error_msg,
+        "error_drops": error_drops[:50],
+    }
 
 
 async def execute_execution(
@@ -834,6 +891,9 @@ async def execute_execution(
     if execution_phase == ExecutionPhase.SUBMIT:
         await execution_ledger_service.update_execution_status(db=db, execution_id=execution_id, status=ExecutionStatus.RUNNING)
     else:
+        casda_user = casda_username or settings.CASDA_USERNAME
+        if do_stage and not casda_user:
+            raise wf_staging_requires_casda()
         await execution_ledger_service.update_execution_status(
             db=db,
             execution_id=execution_id,
@@ -850,10 +910,6 @@ async def execute_execution(
                     f"Execution {execution_id} has execution_phase submit but workflow_manifest is missing",
                 )
         else:
-            casda_user = casda_username or settings.CASDA_USERNAME
-            if do_stage and not casda_user:
-                raise wf_staging_requires_casda()
-
             stage_out = await stage_sources_for_execution(
                 db=db,
                 execution_id=execution_id,
@@ -902,15 +958,9 @@ async def execute_execution(
 
             sid = execution_after.get("scheduler_job_id")
             if sid:
-                await execution_ledger_service.update_execution_status(
-                    db=db,
-                    execution_id=execution_id,
-                    status=ExecutionStatus.COMPLETED,
-                    execution_phase=None,
-                )
                 return {
                     "execution_id": str(execution_id),
-                    "status": "completed",
+                    "status": "submitted",
                     "scheduler_job_id": str(sid),
                     "manifest": manifest,
                 }

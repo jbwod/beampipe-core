@@ -1,9 +1,7 @@
-# TBD Move to a ARQ Job this is how we will init the staging job
 import logging
 from typing import Any
 
-from astropy.table import Table
-from astropy.table import vstack
+from astropy.table import Table, vstack
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..archive.adapters.casda import (
@@ -16,15 +14,9 @@ from ..archive.adapters.casda.credentials import init_casda_client
 from ..archive.service import archive_metadata_service
 from ..projects import load_project_module
 from ..worker.tasks.discovery_batch import resolve_module_adapters
+from .manifest_builder import _get_sbids_for_source  # noqa: F401 — shared helper
 
 logger = logging.getLogger(__name__)
-
-
-def _get_sbids_for_source(spec: dict | Any) -> list[str] | None:
-    """Extract sbids from a source spec (dict or RunSourceSpec)."""
-    if isinstance(spec, dict):
-        return spec.get("sbids")
-    return getattr(spec, "sbids", None)
 
 
 async def stage_sources_for_manifest(

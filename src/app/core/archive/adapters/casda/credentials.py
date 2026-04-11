@@ -52,11 +52,16 @@ def init_casda_client(username: str) -> Casda:
     1. CASDA_PASSWORD env var
     2. keyring
     """
-    if not _get_casda_password():
-        logger.warning(
-            "CASDA_PASSWORD not set (env or .env); keyring will be used. "   )
     _ensure_env_password_in_keyring()
+    if not _get_casda_password():
+        logger.warning("event=casda_password_missing_using_keyring username=%s", username)
+
     casda = Casda()
-    casda.login(username=username)
+    authenticated = casda.login(username=username)
+    if not authenticated or not hasattr(casda, "_auth"):
+        raise RuntimeError(
+            "CASDA authentication failed. "
+            "Ensure CASDA_USERNAME/CASDA_PASSWORD are set correctly (or provide keyring)."
+        )
     logger.debug("event=casda_client_initialized username=%s", username)
     return casda
