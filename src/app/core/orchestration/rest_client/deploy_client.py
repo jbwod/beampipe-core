@@ -13,12 +13,17 @@ Poll: GET {dim_base}/api/sessions/{sessionId}/status  = JSON session status (e.g
       GET {dim_base}/api/sessions/{sessionId}/graph/status  = JSON dict { drop_uid: status, ... }
 """
 import json
-import sys
+import logging
 import time
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import quote
 
 import httpx
+
+from ...utils.daliuge import classify_dim_session_status
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -45,7 +50,7 @@ class DaliugeDeployClient:
     def deploy_session(
         self,
         session_id: str,
-        pg_spec: list,
+        pg_spec: list[dict[str, Any]],
         roots: list[str],
     ) -> None:
         """Create session, append graph, deploy. Raises on HTTP error."""
@@ -75,7 +80,7 @@ class DaliugeDeployClient:
         poll_interval: float = 3.0,
         timeout: float = 10.0,
     ) -> int:
-        """Poll session status until FINISHED or ERROR. Prints status; returns 0 on success, 1 on error."""
+        """Poll session status until FINISHED or ERROR."""
         sid = quote(session_id)
         while True:
             try:
@@ -86,24 +91,45 @@ class DaliugeDeployClient:
                 r.raise_for_status()
                 status = r.json()
             except Exception as e:
-                print(f"status: {e}", file=sys.stderr)
+                logger.warning("event=dim_poll_status_error session_id=%s error=%s", session_id, e)
                 time.sleep(5)
                 continue
-            s = str(status)
-            if "4" in s or "FINISHED" in s or "Finished" in s:
-                print("Session finished.")
+
+            state = classify_dim_session_status(status)
+
+            if state == "finished":
+                logger.info("event=dim_session_finished session_id=%s", session_id)
                 try:
                     r = self._client.get(
                         f"/api/sessions/{sid}/graph/status",
                         timeout=timeout,
                     )
                     r.raise_for_status()
-                    print(json.dumps(r.json(), indent=2))
+                    graph = r.json()
+                    logger.debug("event=dim_graph_status session_id=%s graph=%s", session_id, json.dumps(graph))
+                    if isinstance(graph, dict):
+                        error_drops = [
+                            uid for uid, st in graph.items()
+                            if (isinstance(st, int) and st == 3)
+                            or (isinstance(st, str) and st.upper() == "ERROR")
+                        ]
+                        if error_drops:
+                            logger.error(
+                                "event=dim_session_drop_errors session_id=%s error_count=%s",
+                                session_id,
+                                len(error_drops),
+                            )
+                            return 1
                 except Exception as e:
-                    print(f"(graph/status: {e})")
+                    logger.warning("event=dim_graph_status_error session_id=%s error=%s", session_id, e)
                 return 0
-            if "3" in s or "ERROR" in s or "Error" in s:
-                print("Session error.", file=sys.stderr)
-                print(json.dumps(status, indent=2), file=sys.stderr)
+
+            if state == "error":
+                logger.error(
+                    "event=dim_session_error session_id=%s status=%s",
+                    session_id,
+                    json.dumps(status),
+                )
                 return 1
+
             time.sleep(poll_interval)
