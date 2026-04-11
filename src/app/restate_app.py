@@ -8,22 +8,40 @@
   https://docs.restate.dev/develop/python/serving
   https://docs.restate.dev/foundations/key-concepts
 """
+from datetime import UTC, datetime
 
 import restate
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Mount, Route
 
-from .restate_workflows import discovery as _restate_discovery
-from .restate_workflows import execute as _restate_execute
-from .restate_workflows import hello as _restate_hello
 from .restate_workflows.discovery import DiscoveryBatchWorkflow
 from .restate_workflows.execute import ExecutionBatchWorkflow
 from .restate_workflows.hello import HelloWorldWorkflow
 
-# Root ASGI app served by `uvicorn app.restate_app:app ...`
-app = restate.app(
+
+async def _health(_request: Request) -> JSONResponse:
+    """Docker probe no Restate RPC paths."""
+    return JSONResponse(
+        {
+            "status": "healthy",
+            "service": "beamcore_rs",
+            "timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
+        }
+    )
+
+
+_restate_app = restate.app(
     [
-        
         ExecutionBatchWorkflow,
         DiscoveryBatchWorkflow,
         HelloWorldWorkflow,
     ]
+)
+app = Starlette(
+    routes=[
+        Route("/health", _health, methods=["GET", "HEAD"]),
+        Mount("/", _restate_app),
+    ],
 )
