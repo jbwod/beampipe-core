@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -233,34 +234,46 @@ async def prepare_execution(
     errors: list[str] = []
     sources_preview: list[dict] = []
     total_datasets = 0
+    parsed_ok: list[tuple[Any, str, list[str] | None]] = []
 
     for spec in sources:
-        sid, registered, err = await validate_source_spec(db, project_module, spec)
-        if err:
-            errors.append(err)
+        parse_err, sid, sbids = parse_execution_source_spec(spec)
+        if parse_err:
+            errors.append(parse_err)
             continue
+        assert sid is not None
+        parsed_ok.append((spec, sid, sbids))
 
-        sbids = _get_sbids_for_source(spec)
-        records = await archive_metadata_service.list_metadata_for_source(
-            db=db,
-            project_module=project_module,
-            source_identifier=sid,
-            sbids=sbids,
+    if parsed_ok:
+        unique_sids = list(dict.fromkeys(s for _, s, _ in parsed_ok))
+        registry_map, metadata_map = await asyncio.gather(
+            source_registry_service.get_registry_read_by_identifiers(
+                db, project_module, unique_sids
+            ),
+            archive_metadata_service.list_metadata_grouped_by_sources(
+                db, project_module, unique_sids
+            ),
         )
-        sbid_count = len(records)
-        dataset_count = sum(
-            len((r.get("metadata_json") or {}).get("datasets") or [])
-            for r in records
-        )
-        total_datasets += dataset_count
-        sources_preview.append({
-            "source_identifier": sid,
-            "sbid_count": sbid_count,
-            "dataset_count": dataset_count,
-        })
 
-    if not sources_preview and sources:
-        errors.append("No metadata found for any source")
+        for _, sid, sbids in parsed_ok:
+            rows = metadata_map.get(sid, [])
+            reg = registry_map.get(sid)
+            ready_err = parsed_source_readiness_error(sid, sbids, reg, rows)
+            if ready_err:
+                errors.append(ready_err)
+                continue
+            records = filter_archive_rows_by_sbids(rows, sbids)
+            sbid_count = len(records)
+            dataset_count = sum(
+                len((r.get("metadata_json") or {}).get("datasets") or [])
+                for r in records
+            )
+            total_datasets += dataset_count
+            sources_preview.append({
+                "source_identifier": sid,
+                "sbid_count": sbid_count,
+                "dataset_count": dataset_count,
+            })
 
     return {
         "project_module": project_module,

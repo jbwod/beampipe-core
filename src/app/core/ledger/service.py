@@ -2,6 +2,7 @@
 
 Provides execution tracking for batch workflow submissions (multiple sources, datasets).
 """
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -22,6 +23,17 @@ from ..registry.service import source_registry_service
 logger = logging.getLogger(__name__)
 
 _EXECUTION_PHASE_UNSET: object = object()
+
+
+def _validate_parsed_source_for_execution(
+    sid: str,
+    sbids: list[str] | None,
+    registered: dict[str, Any] | None,
+    all_rows_for_source: list[dict[str, Any]],
+) -> None:
+    err = parsed_source_readiness_error(sid, sbids, registered, all_rows_for_source)
+    if err:
+        raise BadRequestException(err)
 
 
 class ExecutionLedgerService:
@@ -49,6 +61,57 @@ class ExecutionLedgerService:
         return int(result.scalar() or 0)
 
     @staticmethod
+    async def partition_sources_ready_for_execution(
+        db: AsyncSession,
+        project_module: str,
+        sources: list,
+    ) -> tuple[list[Any], list[dict[str, str]]]:
+        valid: list[Any] = []
+        skipped: list[dict[str, str]] = []
+        parsed_ok: list[tuple[Any, str, list[str] | None]] = []
+
+        for spec in sources:
+            raw_sid = spec.get("source_identifier") if isinstance(spec, dict) else getattr(spec, "source_identifier", None)
+            parse_err, sid, sbids = parse_execution_source_spec(spec)
+            if parse_err:
+                skipped.append(
+                    {
+                        "source_identifier": str(raw_sid) if raw_sid else "",
+                        "reason": parse_err,
+                    }
+                )
+                continue
+            assert sid is not None
+            parsed_ok.append((spec, sid, sbids))
+
+        if not parsed_ok:
+            return valid, skipped
+
+        unique_sids = list(dict.fromkeys(s for _, s, _ in parsed_ok))
+        registry_map, metadata_map = await asyncio.gather(
+            source_registry_service.get_registry_read_by_identifiers(
+                db, project_module, unique_sids
+            ),
+            archive_metadata_service.list_metadata_grouped_by_sources(
+                db, project_module, unique_sids
+            ),
+        )
+
+        for spec, sid, sbids in parsed_ok:
+            err = parsed_source_readiness_error(
+                sid,
+                sbids,
+                registry_map.get(sid),
+                metadata_map.get(sid, []),
+            )
+            if err:
+                skipped.append({"source_identifier": sid, "reason": err})
+            else:
+                valid.append(spec)
+
+        return valid, skipped
+
+    @staticmethod
     async def create_execution(
         db: AsyncSession,
         project_module: str,
@@ -60,7 +123,7 @@ class ExecutionLedgerService:
     ) -> dict[str, Any]:
         """Create a new batch execution record.
 
-        Validates all sources are registered and enabled.
+        Validates all sources are registed and enabled, and all checks pass.
 
         Args:
             db: Database session
@@ -75,24 +138,30 @@ class ExecutionLedgerService:
         Raises:
             BadRequestException: If any source is not registered or disabled
         """
+        parsed: list[tuple[str, list[str] | None]] = []
         for spec in sources:
-            sid, _, err = await validate_source_spec(db, project_module, spec)
-            if err:
-                raise BadRequestException(err)
+            parse_err, sid, sbids = parse_execution_source_spec(spec)
+            if parse_err:
+                raise BadRequestException(parse_err)
+            assert sid is not None
+            parsed.append((sid, sbids))
 
-            sbids = spec.get("sbids") if isinstance(spec, dict) else getattr(spec, "sbids", None)
-            metadata = await archive_metadata_service.list_metadata_for_source(
-                db=db,
-                project_module=project_module,
-                source_identifier=sid,
-                sbids=sbids,
+        unique_sids = list(dict.fromkeys(s for s, _ in parsed))
+        registry_map, metadata_map = await asyncio.gather(
+            source_registry_service.get_registry_read_by_identifiers(
+                db, project_module, unique_sids
+            ),
+            archive_metadata_service.list_metadata_grouped_by_sources(
+                db, project_module, unique_sids
+            ),
+        )
+        for sid, sbids in parsed:
+            _validate_parsed_source_for_execution(
+                sid,
+                sbids,
+                registry_map.get(sid),
+                metadata_map.get(sid, []),
             )
-            if not metadata:
-                hint = f" (SBIDs: {sbids})" if sbids else ""
-                raise BadRequestException(
-                    f"Source {sid} has no discovered metadata{hint}. "
-                    f"(POST /api/v1/sources/discover)."
-                )
 
         try:
             execution_data = BatchExecutionRecordCreateInternal(
