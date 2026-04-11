@@ -324,6 +324,26 @@ class SourceRegistryService:
         ]
 
     @staticmethod
+    async def get_registry_read_by_identifiers(
+        db: AsyncSession,
+        project_module: str,
+        source_identifiers: Sequence[str],
+    ) -> dict[str, dict[str, Any]]:
+        if not source_identifiers:
+            return {}
+        result = await db.execute(
+            select(SourceRegistry).where(
+                SourceRegistry.project_module == project_module,
+                SourceRegistry.source_identifier.in_(list(source_identifiers)),
+            )
+        )
+        out: dict[str, dict[str, Any]] = {}
+        for row in result.scalars().all():
+            data = SourceRegistryRead.model_validate(row).model_dump()
+            out[str(data["source_identifier"])] = data
+        return out
+
+    @staticmethod
     async def get_sources_for_discovery(
         db: AsyncSession,
         project_module: str | None = None,
