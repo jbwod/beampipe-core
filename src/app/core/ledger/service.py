@@ -5,15 +5,16 @@ Provides execution tracking for batch workflow submissions (multiple sources, da
 import logging
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
 
 from ...crud.crud_execution_record import crud_batch_execution_records
 from ...models.ledger import BatchExecutionRecord, ExecutionPhase, ExecutionStatus
-from ..config import settings
 from ...schemas.ledger import BatchExecutionRecordCreateInternal, BatchExecutionRecordRead
+from ..archive.service import archive_metadata_service
+from ..config import settings
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
 from ..utils.registry import validate_source_spec
 
@@ -73,11 +74,24 @@ class ExecutionLedgerService:
         Raises:
             BadRequestException: If any source is not registered or disabled
         """
-        # Validate all sources are registered and enabled
         for spec in sources:
-            _, _, err = await validate_source_spec(db, project_module, spec)
+            sid, _, err = await validate_source_spec(db, project_module, spec)
             if err:
                 raise BadRequestException(err)
+
+            sbids = spec.get("sbids") if isinstance(spec, dict) else getattr(spec, "sbids", None)
+            metadata = await archive_metadata_service.list_metadata_for_source(
+                db=db,
+                project_module=project_module,
+                source_identifier=sid,
+                sbids=sbids,
+            )
+            if not metadata:
+                hint = f" (SBIDs: {sbids})" if sbids else ""
+                raise BadRequestException(
+                    f"Source {sid} has no discovered metadata{hint}. "
+                    f"(POST /api/v1/sources/discover)."
+                )
 
         try:
             execution_data = BatchExecutionRecordCreateInternal(
