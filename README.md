@@ -65,6 +65,37 @@
 
 > - **`DALiuGE Integrated`**: Supports multiple translator and deployment configuration profiles (REST DIM, Slurm remote, compute limits) which can be assigned per-run, per-module or as global defaults. By use of a dedicated `beampipe-ingest` PyFunc Drop, `beampipe` can be adapted for use in existing Graphs to handle generated JSON manfiests upon translation. The following [beampipe.pallette]() can be downloaded and imported to [EAGLE](https://eagle.icrar.org/).
 
+<table>
+  <tr>
+    <td>
+      <img width="717" height="442" alt="graphout" src="https://github.com/user-attachments/assets/45f1ff28-71e4-4c6c-8b25-2f00f9ad2441" />
+    </td>
+    <td>
+      <pre>
+    <code class="language-json">
+{
+  "name": "test-staging-e2e-rest-dim",
+  "description": "rest_dim",
+  "project_module": "wallaby_hires",
+  "is_default": true,
+  "translation": {
+    "algo": "metis",
+    "num_par": 1,
+    "num_islands": 0,
+    "tm_url": "http://dlg-tm.desk"
+  },
+  "deployment": {
+    "kind": "rest_dim",
+    "dim_host_for_tm": "dlg-dim",
+    "dim_port_for_tm": 8001,
+    "deploy_host": "dlg-dim.desk",
+    "deploy_port": 80,
+    "verify_ssl": false
+  }
+} </code></pre>
+  </tr>
+</table>
+
 ### `Adding a project module`
 > Project modules are installed via Python entry points under `beampipe.projects`.
 
