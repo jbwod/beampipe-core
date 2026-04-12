@@ -58,8 +58,7 @@ def query(query: str, tap_url: str | None = None) -> Table:
 
 def _iter_datasets(records: list[dict[str, Any]]) -> Iterator[dict[str, Any]]:
     for rec in records:
-        for ds in (rec.get("metadata_json") or {}).get("datasets") or []:
-            yield ds
+        yield from (rec.get("metadata_json") or {}).get("datasets") or []
 
 
 def _safe_table_column(table: Table, colname: str) -> list:
@@ -99,7 +98,7 @@ def stage_data(
         # Try to get a scan-id keyed mapping from CASDA job results (if available).
         # https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=scan-105366-255133
         # https://astroquery.readthedocs.io/en/latest/_modules/astroquery/casda/core.html#CasdaClass.stage_data
-        # TLDR; casda.stage_data returns a list of URLs, which is fine if we're using all of them, 
+        # TLDR; casda.stage_data returns a list of URLs, which is fine if we're using all of them,
         # but we need to get the scan-id keyed mapping from the CASDA job results.
         # otherwise we don't know which url corresponds to which scan-id (like with ingest
         #  we can infer from the path, but not for the checksums)

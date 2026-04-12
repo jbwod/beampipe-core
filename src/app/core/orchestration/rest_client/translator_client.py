@@ -78,5 +78,13 @@ class DaliugeTranslatorClient:
                 resp.text[:500] if resp.text else "(empty)",
             )
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        if not isinstance(data, list):
+            raise ValueError(f"gen_pg expected JSON list, got {type(data).__name__}")
+        out: list[dict[str, Any]] = []
+        for item in data:
+            if not isinstance(item, dict):
+                raise ValueError(f"gen_pg list items must be objects, got {type(item).__name__}")
+            out.append(item)
+        return out
 
