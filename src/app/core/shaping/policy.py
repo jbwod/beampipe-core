@@ -3,8 +3,9 @@
 import asyncio
 import logging
 from datetime import UTC, datetime
-from typing import Any
 from pathlib import Path
+from typing import Any, cast
+
 from sqlalchemy import and_, distinct, func, select
 
 from ...models.ledger import BatchExecutionRecord, ExecutionStatus
@@ -28,7 +29,7 @@ _LEAKY_BUCKET_LUA = _read_lua_script("leaky_bucket.lua")
 
 
 def shaping_queue_max_depth(settings: Any) -> int | None:
-    return settings.SHAPING_ARQ_QUEUE_MAX_DEPTH
+    return cast(int | None, settings.SHAPING_ARQ_QUEUE_MAX_DEPTH)
 
 
 def discovery_queue_max_depth(settings: Any) -> int | None:

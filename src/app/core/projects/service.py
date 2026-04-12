@@ -103,9 +103,9 @@ def _resolve_workflow_step_overrides_from_policy(
         f"{family}_max_retry_interval_seconds": "max_retry_interval_seconds",
     }
     for in_key, out_key in float_map.items():
-        v = positive_float_optional(policy, in_key)
-        if v is not None:
-            out[out_key] = v
+        float_val = positive_float_optional(policy, in_key)
+        if float_val is not None:
+            out[out_key] = float_val
 
     return out
 

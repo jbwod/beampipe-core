@@ -2,20 +2,20 @@ from typing import Annotated, Any, cast
 
 from pydantic import Field, TypeAdapter, ValidationError
 
-_PositiveInt = TypeAdapter(Annotated[int, Field(gt=0)])
-_PositiveFloat = TypeAdapter(Annotated[float, Field(gt=0)])
+_PositiveInt: TypeAdapter[int] = TypeAdapter(Annotated[int, Field(gt=0)])
+_PositiveFloat: TypeAdapter[float] = TypeAdapter(Annotated[float, Field(gt=0)])
 
 
 def is_positive_int(value: Any) -> int | None:
     try:
-        return _PositiveInt.validate_python(value)
+        return cast(int, _PositiveInt.validate_python(value))
     except ValidationError:
         return None
 
 
 def is_positive_float(value: Any) -> float | None:
     try:
-        return _PositiveFloat.validate_python(value)
+        return cast(float, _PositiveFloat.validate_python(value))
     except ValidationError:
         return None
 
