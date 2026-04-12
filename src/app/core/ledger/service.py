@@ -17,8 +17,8 @@ from ...schemas.ledger import BatchExecutionRecordCreateInternal, BatchExecution
 from ..archive.service import archive_metadata_service
 from ..config import settings
 from ..exceptions.http_exceptions import BadRequestException, NotFoundException
-from .source_readiness import parse_execution_source_spec, parsed_source_readiness_error
 from ..registry.service import source_registry_service
+from .source_readiness import parse_execution_source_spec, parsed_source_readiness_error
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,11 @@ class ExecutionLedgerService:
         parsed_ok: list[tuple[Any, str, list[str] | None]] = []
 
         for spec in sources:
-            raw_sid = spec.get("source_identifier") if isinstance(spec, dict) else getattr(spec, "source_identifier", None)
+            raw_sid = (
+                spec.get("source_identifier")
+                if isinstance(spec, dict)
+                else getattr(spec, "source_identifier", None)
+            )
             parse_err, sid, sbids = parse_execution_source_spec(spec)
             if parse_err:
                 skipped.append(

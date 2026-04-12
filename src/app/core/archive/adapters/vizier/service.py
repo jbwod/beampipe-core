@@ -3,6 +3,7 @@ Vizier adapter services.
 """
 
 import logging
+
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 

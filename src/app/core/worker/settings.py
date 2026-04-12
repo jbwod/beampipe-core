@@ -6,8 +6,8 @@ from ...core.config import settings
 from .functions import (
     discover_batch,
     discover_schedule_task,
-    execute_execution_job,
     enqueue_timer_task,
+    execute_execution_job,
     sample_background_task,
     shutdown,
     startup,

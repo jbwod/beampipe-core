@@ -23,8 +23,8 @@ from ..shaping.policy import (
     can_admit_by_in_flight,
     discovery_admission_budget,
     estimate_discovery_in_flight_batches,
-    shaping_queue_max_depth,
     shaping_enqueue_pace,
+    shaping_queue_max_depth,
 )
 from .tap_health import all_taps_reachable, get_tap_health, unreachable_taps
 
@@ -84,7 +84,7 @@ def _group_claimed_rows_by_module(
         batch_by_module.setdefault(row["project_module"], []).append(row["source_identifier"])
     return list(batch_by_module.items())
 
-async def discover_schedule(
+async def discover_schedule(  # noqa: C901
     db: AsyncSession,
     redis: ArqRedis,
     project_module: str | None = None,

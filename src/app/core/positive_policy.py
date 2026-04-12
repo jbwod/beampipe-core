@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from pydantic import Field, TypeAdapter, ValidationError
 

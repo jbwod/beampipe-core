@@ -16,13 +16,13 @@ so thinking perhaps an entry point?
 
 from .plugins import list_project_modules, load_project_module
 from .service import (
-    get_workflow_discovery_automation_policy,
-    get_workflow_execution_automation_policy,
     get_graph_github_url,
     get_graph_path,
+    get_workflow_discovery_automation_policy,
+    get_workflow_execution_automation_policy,
+    resolve_graph_content,
     resolve_workflow_discovery_step_overrides,
     resolve_workflow_execute_step_overrides,
-    resolve_graph_content,
 )
 
 

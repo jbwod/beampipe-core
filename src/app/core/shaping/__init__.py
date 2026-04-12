@@ -8,8 +8,8 @@ from .policy import (
     discovery_queue_max_depth,
     estimate_discovery_in_flight_batches,
     execute_admission_budget,
-    shaping_queue_max_depth,
     shaping_enqueue_pace,
+    shaping_queue_max_depth,
 )
 
 __all__ = [

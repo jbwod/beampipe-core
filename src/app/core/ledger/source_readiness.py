@@ -1,5 +1,6 @@
 from typing import Any
 
+
 def _discovery_lease_blocks_execution(registered: dict[str, Any]) -> bool:
     """True when discovery workers hold an active claim (token set on the registry row)."""
     return bool(registered.get("discovery_claim_token"))

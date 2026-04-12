@@ -5,9 +5,13 @@ from astropy.table import Table, vstack
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..archive.adapters.casda import (
-    metadata_records_to_staging_table,
     metadata_records_to_eval_staging_table,
+    metadata_records_to_staging_table,
+)
+from ..archive.adapters.casda import (
     stage_data as casda_stage_data,
+)
+from ..archive.adapters.casda import (
     stage_eval_data as casda_stage_eval_data,
 )
 from ..archive.adapters.casda.credentials import init_casda_client

@@ -1,5 +1,6 @@
 import logging
 import os
+
 import keyring
 from astroquery.casda import Casda
 
@@ -34,7 +35,7 @@ class _EnvKeyringBackend(keyring.backend.KeyringBackend):
         pass
 
     def delete_password(self, service: str, username: str) -> None:
-        pass 
+        pass
 
 
 def _ensure_env_password_in_keyring() -> None:
