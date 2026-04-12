@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from src.app.core.archive import discovery as discovery_service
+from src.app.core.exceptions.workflow_exceptions import WorkflowErrorCode, WorkflowFailure
 from src.app.core.worker.tasks import discovery as discovery_task
 from src.app.core.worker.tasks import discovery_batch
 from src.app.core.worker.tasks import discovery_execution
@@ -55,8 +56,10 @@ async def test_run_prepare_once_enforces_timeout():
 def test_resolve_module_adapters_raises_for_missing_adapter():
     module = SimpleNamespace(__name__="m", REQUIRED_ADAPTERS=["casda"])
     with patch.object(discovery_batch, "get_adapter", return_value=None):
-        with pytest.raises(ValueError, match="Required adapter 'casda' is not registered"):
+        with pytest.raises(WorkflowFailure) as excinfo:
             discovery_batch.resolve_module_adapters(module)
+    assert excinfo.value.code is WorkflowErrorCode.DISCOVERY_ADAPTER_NOT_REGISTERED
+    assert "casda" in excinfo.value.detail
 
 
 # ---- _process_source: bundle shape ----
