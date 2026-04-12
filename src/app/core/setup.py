@@ -33,7 +33,6 @@ from .db.database import Base
 from .db.database import async_engine as engine
 from .utils import cache, queue
 
-
 # -------------- database --------------
 _SCHEMA_BOOTSTRAP_LOCK_KEY1 = "beam"
 _SCHEMA_BOOTSTRAP_LOCK_KEY2 = "pipe"
