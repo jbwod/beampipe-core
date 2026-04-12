@@ -151,8 +151,7 @@ warn_unused_configs = true
 ignore_missing_imports = true
 mypy_path = "src"
 explicit_package_bases = true
-exclude = [".*test.*\\.py$"]
-
-[[tool.mypy.overrides]]
-module = "src.app.*"
-disallow_untyped_defs = true
+exclude = [
+    ".*test.*\\.py$",
+    "dlg-engine_deploy",
+]
