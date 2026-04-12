@@ -1,7 +1,7 @@
 """Discovery Restate workflow: tap then persist in Postgres."""
 import logging
 import time
-from typing import Any
+from typing import Any, cast
 
 import restate
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -178,7 +178,7 @@ async def discovery_batch_workflow(
             lambda tap_results: _summarize_tap_results(tap_results),
             tap_results=tap_out["tap_results"],
         )
-        return await _run_step(
+        persist_out = await _run_step(
             ctx,
             "discovery.persist",
             _run_opts_database(run_policy_overrides),
@@ -191,3 +191,4 @@ async def discovery_batch_workflow(
                 "wall_started_at": tap_out["wall_started_at"],
             },
         )
+        return cast(dict[str, Any], persist_out)

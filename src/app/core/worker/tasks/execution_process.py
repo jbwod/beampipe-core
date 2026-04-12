@@ -41,10 +41,12 @@ def workflow_execution_policy_for_module(project_module: str) -> dict[str, Any]:
     raw_policy = get_workflow_execution_automation_policy(project_module)
     if not raw_policy:
         return defaults
-    policy = {
+    policy: dict[str, Any] = {
         "enabled": bool(raw_policy.get("enabled", defaults["enabled"])),
         "archive_name": str(raw_policy.get("archive_name", defaults["archive_name"])),
-        "max_sources_per_execution": int(raw_policy.get("max_sources_per_execution", defaults["max_sources_per_execution"])),
+        "max_sources_per_execution": int(
+            raw_policy.get("max_sources_per_execution", defaults["max_sources_per_execution"])
+        ),
         "tick_execution_source_limit": int(
             raw_policy.get("tick_execution_source_limit", defaults["tick_execution_source_limit"])
         ),
@@ -84,9 +86,9 @@ def workflow_execution_policy_for_module(project_module: str) -> dict[str, Any]:
         "discovery_initial_retry_seconds",
         "discovery_max_retry_interval_seconds",
     ):
-        val = positive_float_optional(raw_policy, key)
-        if val is not None:
-            policy[key] = val
+        float_val = positive_float_optional(raw_policy, key)
+        if float_val is not None:
+            policy[key] = float_val
     return policy
 
 
@@ -224,7 +226,8 @@ async def process_workflow_module_for_execution_schedule(
     if admitted_executions <= 0:
         _bump("rate_limited")
         logger.debug(
-            "event=workflow_execution_schedule_rate_limited project_module=%s requested_executions=%s admitted_executions=%s",
+            "event=workflow_execution_schedule_rate_limited "
+            "project_module=%s requested_executions=%s admitted_executions=%s",
             module_name,
             int(policy["tick_execution_run_limit"]),
             admitted_executions,
@@ -270,7 +273,8 @@ async def process_workflow_module_for_execution_schedule(
         if dep_resolve_failed:
             _bump("deployment_profile_not_found")
             logger.error(
-                "event=workflow_execution_schedule_missing_deployment_profile project_module=%s deployment_profile_name=%s",
+                "event=workflow_execution_schedule_missing_deployment_profile "
+                "project_module=%s deployment_profile_name=%s",
                 module_name,
                 policy.get("deployment_profile_name"),
             )
@@ -286,7 +290,8 @@ async def process_workflow_module_for_execution_schedule(
                 if not allowed:
                     _bump("queue_full")
                     logger.warning(
-                        "event=workflow_execution_schedule_queue_full project_module=%s queue=%s queue_depth=%s max_queue_depth=%s action=stop_enqueue",
+                        "event=workflow_execution_schedule_queue_full "
+                        "project_module=%s queue=%s queue_depth=%s max_queue_depth=%s action=stop_enqueue",
                         module_name,
                         settings.WORKER_QUEUE_NAME,
                         qdepth,
@@ -302,7 +307,8 @@ async def process_workflow_module_for_execution_schedule(
                 for row in skipped:
                     _bump("sources_skipped_not_ready")
                     logger.warning(
-                        "event=workflow_execution_source_skipped_not_ready project_module=%s source_identifier=%s reason=%s",
+                        "event=workflow_execution_source_skipped_not_ready "
+                        "project_module=%s source_identifier=%s reason=%s",
                         module_name,
                         row["source_identifier"],
                         row["reason"],

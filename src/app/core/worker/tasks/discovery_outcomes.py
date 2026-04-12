@@ -129,7 +129,7 @@ async def handle_no_datasets(
 
     stored_sig = await resolve_existing_signature(
         db=db,
-        source=source,
+        source=persisted_source,
         project_module=project_module,
         source_identifier=source_identifier,
     )
