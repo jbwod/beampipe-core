@@ -65,7 +65,7 @@ class SlurmRemoteDeploymentConfig(BaseModel):
 #     module load py-mpi4py/3.1.5-py3.11.6
 #     module load py-numpy/1.26.4
 # VENV = source /software/projects/${ACCOUNT}/venv/bin/activate
-# EXEC_PREFIX = srun -l   
+# EXEC_PREFIX = srun -l
 
     model_config = ConfigDict(extra="forbid")
 
@@ -282,29 +282,28 @@ class DaliugeDeploymentProfileDelete(BaseModel):
 def expand_update_with_nested_optional(
     current: dict[str, Any], body: DaliugeDeploymentProfileUpdate
 ) -> dict[str, Any]:
-    return None
-    # patch = body.model_dump(exclude_unset=True)
-    # translation_patch = patch.pop("translation", None)
-    # deployment_patch = patch.pop("deployment", None)
-    # if translation_patch:
-    #     tr_patch = (
-    #         translation_patch
-    #         if isinstance(translation_patch, dict)
-    #         else translation_patch.model_dump(exclude_unset=True)
-    #     )
-    #     if isinstance(tr_patch, dict):
-    #         current_tr = dict(current.get("translation") or {})
-    #         patch["translation"] = {**current_tr, **tr_patch}
-    # if deployment_patch and isinstance(deployment_patch, dict):
-    #     current_dep = dict(current.get("deployment") or {})
-    #     merged_dep = {**current_dep, **deployment_patch}
-    #     kind = merged_dep.get("kind", "rest_dim")
-    #     if kind == "rest_dim":
-    #         patch["deployment"] = RestDimDeploymentConfig.model_validate(merged_dep).model_dump(
-    #             exclude_none=True
-    #         )
-    #     else:
-    #         patch["deployment"] = SlurmRemoteDeploymentConfig.model_validate(merged_dep).model_dump(
-    #             exclude_none=True
-    #         )
-    # return patch
+    patch = body.model_dump(exclude_unset=True)
+    translation_patch = patch.pop("translation", None)
+    deployment_patch = patch.pop("deployment", None)
+    if translation_patch:
+        tr_patch = (
+            translation_patch
+            if isinstance(translation_patch, dict)
+            else translation_patch.model_dump(exclude_unset=True)
+        )
+        if isinstance(tr_patch, dict):
+            current_tr = dict(current.get("translation") or {})
+            patch["translation"] = {**current_tr, **tr_patch}
+    if deployment_patch and isinstance(deployment_patch, dict):
+        current_dep = dict(current.get("deployment") or {})
+        merged_dep = {**current_dep, **deployment_patch}
+        kind = merged_dep.get("kind", "rest_dim")
+        if kind == "rest_dim":
+            patch["deployment"] = RestDimDeploymentConfig.model_validate(merged_dep).model_dump(
+                exclude_none=True
+            )
+        else:
+            patch["deployment"] = SlurmRemoteDeploymentConfig.model_validate(merged_dep).model_dump(
+                exclude_none=True
+            )
+    return patch

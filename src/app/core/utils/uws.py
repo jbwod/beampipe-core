@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 UWS_NS = "http://www.ivoa.net/xml/UWS/v1.0"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 
-# <uws:job xmlns:uws="http://www.ivoa.net/xml/UWS/v1.0" xmlns:xlink="http://www.w3.org/1999/xlink" 
+# <uws:job xmlns:uws="http://www.ivoa.net/xml/UWS/v1.0" xmlns:xlink="http://www.w3.org/1999/xlink"
 # xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
 def iter_uws_results(xml_text: str) -> Iterator[tuple[str, str]]:

@@ -8,11 +8,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, exists, func, or_, select, text, update
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_source_registry import crud_source_registry
-from ...models.archive import ArchiveMetadata
 from ...models.registry import SourceRegistry
 from ...schemas.registry import SourceRegistryCreateInternal, SourceRegistryRead
 from ..config import settings
@@ -36,23 +35,11 @@ def _validate_project_module(project_module: str) -> None:
         raise ValueError(invalid_project_module_message(project_module, available_modules))
 
 
-def _metadata_exists_clause() -> Any:
-    return exists(
-        select(1).where(
-            and_(
-                ArchiveMetadata.project_module == SourceRegistry.project_module,
-                ArchiveMetadata.source_identifier == SourceRegistry.source_identifier,
-            )
-        )
-    )
-
-
 def _discovery_eligibility_conditions(
     *,
     project_module: str | None = None,
     stale_after_hours: int | None = None,
 ) -> list[Any]:
-    metadata_exists = _metadata_exists_clause()
     default_stale = (
         stale_after_hours if stale_after_hours is not None else settings.DISCOVERY_STALE_HOURS
     )
