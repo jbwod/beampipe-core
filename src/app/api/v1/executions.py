@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -28,7 +28,7 @@ from ...schemas.ledger import (
 )
 
 
-class ExecutionSortField(str, Enum):
+class ExecutionSortField(StrEnum):
     created_at = "created_at"
     updated_at = "updated_at"
     started_at = "started_at"
@@ -73,14 +73,16 @@ async def list_executions(
         db=db,
         offset=compute_offset(page, items_per_page),
         limit=items_per_page,
-        schema_to_select=BatchExecutionRecordListItem,
+        schema_to_select=BatchExecutionRecordListItem,  # type: ignore[arg-type]
         sort_columns=[sort_by.value],
         sort_orders=[order],
         **filters,
     )
 
     return paginated_response(
-        crud_data=executions_data, page=page, items_per_page=items_per_page
+        crud_data=executions_data,  # type: ignore[arg-type]
+        page=page,
+        items_per_page=items_per_page,
     )
 
 
@@ -153,7 +155,9 @@ async def get_execution_status(
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
     execution = await crud_batch_execution_records.get(
-        db=db, uuid=execution_id, schema_to_select=BatchExecutionStatusResponse
+        db=db,
+        uuid=execution_id,
+        schema_to_select=BatchExecutionStatusResponse,  # type: ignore[arg-type]
     )
     if execution is None:
         raise NotFoundException(f"Execution {execution_id} not found")

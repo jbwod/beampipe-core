@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import Response
 
 from ...api.dependencies import get_current_user
 from ...core.db.database import async_get_db
@@ -137,7 +138,13 @@ async def delete_deployment_profile(
     profile_id: UUID,
     db: Annotated[AsyncSession, Depends(async_get_db)],
     current_user: Annotated[dict, Depends(get_current_user)],
-) -> None:
-    deleted = await crud_daliuge_deployment_profile.delete(db=db, uuid=profile_id)
-    if not deleted:
+) -> Response:
+    existing = await crud_daliuge_deployment_profile.get(
+        db=db,
+        uuid=profile_id,
+        schema_to_select=DaliugeDeploymentProfileStored,
+    )
+    if existing is None:
         raise NotFoundException(f"Deployment profile {profile_id} not found")
+    await crud_daliuge_deployment_profile.delete(db=db, uuid=profile_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -1,5 +1,5 @@
 import logging
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -28,7 +28,7 @@ from ...schemas.registry import (
 )
 
 
-class SourceSortField(str, Enum):
+class SourceSortField(StrEnum):
     created_at = "created_at"
     updated_at = "updated_at"
     source_identifier = "source_identifier"

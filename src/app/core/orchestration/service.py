@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 from uuid import UUID
 
@@ -19,17 +19,17 @@ from ..config import settings
 from ..exceptions.workflow_exceptions import (
     WorkflowErrorCode,
     WorkflowFailure,
-    wf_no_deployment_profile,
     wf_execution_not_found,
+    wf_no_deployment_profile,
     wf_staging_requires_casda,
     wf_unexpected,
 )
+from ..ledger.service import execution_ledger_service
 from ..ledger.source_readiness import (
     filter_archive_rows_by_sbids,
     parse_execution_source_spec,
     parsed_source_readiness_error,
 )
-from ..ledger.service import execution_ledger_service
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..registry.service import source_registry_service
 from ..utils.daliuge import classify_dim_session_status as _parse_dim_session_status
@@ -378,9 +378,9 @@ async def build_manifest_for_execution(
     execution_phase = _coerce_execution_phase(execution)
     existing_manifest = execution.get("workflow_manifest")
     if execution.get("status") == ExecutionStatus.COMPLETED and existing_manifest:
-        return existing_manifest
+        return cast(dict[Any, Any], existing_manifest)
     if execution_phase == ExecutionPhase.SUBMIT and existing_manifest:
-        return existing_manifest
+        return cast(dict[Any, Any], existing_manifest)
 
     project_module = execution["project_module"]
     sources = execution.get("sources") or []
@@ -906,7 +906,11 @@ async def execute_execution(
     execution_phase = _coerce_execution_phase(execution)
 
     if execution_phase == ExecutionPhase.SUBMIT:
-        await execution_ledger_service.update_execution_status(db=db, execution_id=execution_id, status=ExecutionStatus.RUNNING)
+        await execution_ledger_service.update_execution_status(
+            db=db,
+            execution_id=execution_id,
+            status=ExecutionStatus.RUNNING,
+        )
     else:
         casda_user = casda_username or settings.CASDA_USERNAME
         if do_stage and not casda_user:
