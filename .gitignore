@@ -130,6 +130,9 @@ cython_debug/
 # Macos
 .DS_Store
 
+# Local backup copies
+*.bak
+
 .ruff_cache
 
 .idea
