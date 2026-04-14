@@ -28,22 +28,7 @@ http:
           "verify_ssl": false
         }
       }
-  auth:
-    type: oauth2
-    flow: resource_owner_password_credentials
-    accessTokenUrl: /api/v1/login
-    refreshTokenUrl: "{{oauth_refresh_url}}"
-    credentials:
-      clientId: "{{oauth_client_id}}"
-      clientSecret: "{{oauth_client_secret}}"
-      placement: header
-    tokenConfig:
-      placement:
-        header: Bearer
-      source: access_token
-    settings:
-      autoFetchToken: false
-      autoRefreshToken: true
+  auth: inherit
 
 settings:
   encodeUrl: true
