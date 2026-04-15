@@ -1,0 +1,92 @@
+info:
+  name: Write User
+  type: http
+  seq: 1
+  tags:
+    - users
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/user"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "",
+        "username": "",
+        "email": "",
+        "password": ""
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 201 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/user"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "name": "",
+            "username": "",
+            "email": "",
+            "password": ""
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": 0,
+            "name": "",
+            "username": "",
+            "email": "",
+            "profile_image_url": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/user"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "name": "",
+            "username": "",
+            "email": "",
+            "password": ""
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": "",
+                "input": "",
+                "ctx": {}
+              }
+            ]
+          }

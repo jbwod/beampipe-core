@@ -6,6 +6,12 @@ class DiscoverBundle(TypedDict, total=False):
     query_results: Any
     enrichments: dict[str, Any]
 
+# MANIFEST_SCHEMA
+# GRAPH_PATH
+# GRAPH_GITHUB_URL
+# WORKFLOW_EXECUTION_AUTOMATION [Optional]: project-specific execution scheduling and retry policy.
+# WORKFLOW_DISCOVERY_AUTOMATION [Optional]: project-specific discovery scheduling policy.
+
 class ProjectDiscoveryModule(Protocol):
     REQUIRED_ADAPTERS: list[str]
     def discover(self, source_identifier: str, adapters: dict[str, Any] | None = None) -> DiscoverBundle: ...

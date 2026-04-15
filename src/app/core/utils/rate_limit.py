@@ -1,5 +1,7 @@
+# pyenv
+from __future__ import annotations
+
 from datetime import UTC, datetime
-from typing import Optional
 from urllib.parse import urlparse
 
 from redis.asyncio import ConnectionPool, Redis
@@ -19,11 +21,11 @@ def sanitize_path(path: str) -> str:
 
 
 class RateLimiter:
-    _instance: Optional["RateLimiter"] = None
-    pool: Optional[ConnectionPool] = None
-    client: Optional[Redis] = None
+    _instance: RateLimiter | None = None
+    pool: ConnectionPool | None = None
+    client: Redis | None = None
 
-    def __new__(cls) -> "RateLimiter":
+    def __new__(cls) -> RateLimiter:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance

@@ -3,10 +3,15 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
+from .log_context import ExecutionLogContextFilter
+
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
 LOG_FILE_PATH = os.path.join(LOG_DIR, "app.log")
 
-LOGGING_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+LOGGING_FORMAT = (
+    "%(asctime)s - %(name)s - %(levelname)s - "
+    "execution_id=%(execution_id)s arq_job_id=%(arq_job_id)s job_try=%(job_try)s - %(message)s"
+)
 
 _VERBOSITY_TO_LEVEL = {
     "full": logging.DEBUG,
@@ -27,7 +32,31 @@ def _get_logging_level() -> int:
         )
 
 
+def _verbosity_name() -> str:
+    try:
+        from .config import settings
+
+        return str(getattr(settings, "LOG_VERBOSITY", "medium") or "medium")
+    except Exception:
+        return str(os.getenv("LOG_VERBOSITY", "medium") or "medium")
+
+
+def _quiet_third_party_chatter() -> None:
+    if _verbosity_name() == "full":
+        return
+    for name in ("httpx", "httpcore", "arq"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 LOGGING_LEVEL = _get_logging_level()
+
+_exec_ctx_filter = ExecutionLogContextFilter()
+
+
+def _attach_exec_context(handler: logging.Handler) -> None:
+    handler.addFilter(_exec_ctx_filter)
+    handler.setFormatter(logging.Formatter(LOGGING_FORMAT))
+
 
 root_logger = logging.getLogger("")
 if not root_logger.handlers:
@@ -36,6 +65,8 @@ if not root_logger.handlers:
         format=LOGGING_FORMAT,
         stream=sys.stdout,
     )
+for _h in root_logger.handlers:
+    _attach_exec_context(_h)
 # going to use dozzle or loki or something to ingest the logs properly
 
 _logger = logging.getLogger(__name__)
@@ -46,7 +77,7 @@ try:
 
     file_handler = RotatingFileHandler(LOG_FILE_PATH, maxBytes=10485760, backupCount=5)
     file_handler.setLevel(LOGGING_LEVEL)
-    file_handler.setFormatter(logging.Formatter(LOGGING_FORMAT))
+    _attach_exec_context(file_handler)
     root_logger.addHandler(file_handler)
 except (PermissionError, OSError) as e:
     _logger.warning("event=logger_file_handler_failed error=%s", str(e))
@@ -60,5 +91,7 @@ has_stream_handler = any(
 if not has_stream_handler:
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setLevel(LOGGING_LEVEL)
-    stream_handler.setFormatter(logging.Formatter(LOGGING_FORMAT))
+    _attach_exec_context(stream_handler)
     root_logger.addHandler(stream_handler)
+
+_quiet_third_party_chatter()

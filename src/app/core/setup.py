@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
+from sqlalchemy import text
 
 from ..api.dependencies import get_current_superuser
 from ..core.utils.rate_limit import rate_limiter
@@ -32,10 +33,16 @@ from .db.database import Base
 from .db.database import async_engine as engine
 from .utils import cache, queue
 
-
 # -------------- database --------------
+_SCHEMA_BOOTSTRAP_LOCK_KEY1 = "beam"
+_SCHEMA_BOOTSTRAP_LOCK_KEY2 = "pipe"
+
 async def create_tables() -> None:
     async with engine.begin() as conn:
+        await conn.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:k1), hashtext(:k2))"),
+            {"k1": _SCHEMA_BOOTSTRAP_LOCK_KEY1, "k2": _SCHEMA_BOOTSTRAP_LOCK_KEY2},
+        )
         await conn.run_sync(Base.metadata.create_all)
 
 
@@ -213,9 +220,10 @@ def create_application(
     application = FastAPI(lifespan=lifespan, **kwargs)
     application.include_router(router)
 
-    # test
-    from ..views import router as views_router
-    application.include_router(views_router)
+    if isinstance(settings, EnvironmentSettings) and settings.ENVIRONMENT == EnvironmentOption.LOCAL:
+        from ..views import router as views_router
+
+        application.include_router(views_router)
 
     if isinstance(settings, ClientSideCacheSettings):
         application.add_middleware(ClientCacheMiddleware, max_age=settings.CLIENT_CACHE_MAX_AGE)  # type: ignore[arg-type]

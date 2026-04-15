@@ -39,6 +39,13 @@ async def view_sources(request: Request) -> HTMLResponse:
           show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
           style="display:none;"></andypf-json-viewer>
 
+        <h2>Deployment profiles</h2>
+        <p id="deployment-profiles-status">Not loaded.</p>
+        <p><button type="button" id="load-deployment-profiles-btn">Load deployment profiles</button></p>
+        <andypf-json-viewer id="deployment-profiles-json-viewer" indent="2" expanded="1" theme="eighties"
+          show-data-types="true" show-toolbar="true" show-copy="true" show-size="true"
+          style="display:none;"></andypf-json-viewer>
+
         <h2>Add Source</h2>
         <form id="add-source-form">
           <label>Project module:
@@ -106,6 +113,7 @@ async def view_sources(request: Request) -> HTMLResponse:
               authToken = data.access_token || null;
               if (authToken) {
                 statusEl.textContent = ' Logged in';
+                await loadDeploymentProfiles();
               } else {
                 statusEl.textContent = ' Login failed (no token)';
               }
@@ -113,6 +121,40 @@ async def view_sources(request: Request) -> HTMLResponse:
               console.error('Login error', err);
               statusEl.textContent = ' Login error';
               authToken = null;
+            }
+          }
+
+          async function loadDeploymentProfiles() {
+            const statusEl = document.getElementById('deployment-profiles-status');
+            const viewer = document.getElementById('deployment-profiles-json-viewer');
+            if (!statusEl || !viewer) {
+              console.warn('Deployment profiles UI elements missing (deployment-profiles-status / viewer).');
+              return;
+            }
+            viewer.style.display = 'none';
+            if (!authToken) {
+              statusEl.textContent = 'Log in first, then click Load deployment profiles.';
+              return;
+            }
+            statusEl.textContent = 'Loading deployment profiles…';
+            try {
+              const response = await fetch(
+                '/api/v1/deployment-profiles?page=1&items_per_page=200',
+                { headers: { 'Authorization': 'Bearer ' + authToken } }
+              );
+              if (!response.ok) {
+                statusEl.textContent = 'Failed to load deployment profiles (HTTP ' + response.status + ').';
+                return;
+              }
+              const data = await response.json();
+              const total = data.total_count != null ? data.total_count : (data.data || []).length;
+              statusEl.textContent = 'Loaded ' + (data.data || []).length + ' profile(s)'
+                + (total != null ? ' (total ' + total + ')' : '') + '.';
+              viewer.data = data;
+              viewer.style.display = 'block';
+            } catch (err) {
+              console.error('Error loading deployment profiles', err);
+              statusEl.textContent = 'Error loading deployment profiles.';
             }
           }
 
@@ -304,6 +346,9 @@ async def view_sources(request: Request) -> HTMLResponse:
 
           document.getElementById('login-form').addEventListener('submit', login);
           document.getElementById('add-source-form').addEventListener('submit', addSource);
+          document.getElementById('load-deployment-profiles-btn').addEventListener('click', function () {
+            loadDeploymentProfiles();
+          });
           loadReadyStatus();
           loadTapStatus();
           setInterval(loadReadyStatus, 60000);

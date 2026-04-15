@@ -32,9 +32,15 @@ services:
     depends_on:
       - db
       - redis
+      - restate_register
     volumes:
       - ./src/app:/code/app
       - ./src/.env:/code/.env
+    environment:
+      WORKFLOW_ENGINE_EXECUTION: restate
+      WORKFLOW_ENGINE_DISCOVERY: restate
+      RESTATE_INGRESS_BASE_URL: http://restate:8080
+      RESTATE_INVOKE_TIMEOUT_SECONDS: 30.0
 
   scheduler:
     build: 
@@ -49,6 +55,51 @@ services:
     volumes:
       - ./src/app:/code/app
       - ./src/.env:/code/.env
+
+  restate:
+    image: docker.restate.dev/restatedev/restate:latest
+    command: --node-name="restate-1"
+    volumes:
+      - restate-data:/restate-data
+    ports:
+      - "8081:8080"
+      - "9070:9070"
+      - "5122:5122"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  beamcore_rs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: uvicorn app.restate_app:app --host 0.0.0.0 --port 9080
+    env_file:
+      - ./src/.env
+    environment:
+      WORKFLOW_ENGINE_EXECUTION: arq
+      WORKFLOW_ENGINE_DISCOVERY: arq
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./src/app:/code/app
+      - ./src/.env:/code/.env
+    ports:
+      - "9080:9080"
+
+  restate_register:
+    image: docker.restate.dev/restatedev/restate-cli:latest
+    depends_on:
+      - restate
+      - beamcore_rs
+    environment:
+      RESTATE_ADMIN_URL: http://restate:9070
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - "sleep 3s; restate deployments register http://beamcore_rs:9080 --use-http1.1 --force --yes || true"
+    restart: "no"
 
   db:
     image: postgres:13
@@ -144,4 +195,5 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  restate-data:
  

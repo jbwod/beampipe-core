@@ -1,0 +1,85 @@
+info:
+  name: Delete Source
+  type: http
+  seq: 3
+  tags:
+    - sources
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/sources/:source_id"
+  params:
+    - name: source_id
+      value: ""
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 204 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/sources/:source_id"
+      method: DELETE
+      params:
+        - name: source_id
+          value: ""
+          type: path
+    response:
+      status: 204
+      statusText: No Content
+      body:
+        type: text
+        data: ""
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/sources/:source_id"
+      method: DELETE
+      params:
+        - name: source_id
+          value: ""
+          type: path
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": "",
+                "input": "",
+                "ctx": {}
+              }
+            ]
+          }
+
+docs: |-
+  Delete a source from the registry.
+
+  Note: This will prevent new runs from being created for this source,
+  but existing runs are not affected.
+
+  Args:
+      request: FastAPI request object
+      source_id: Source UUID
+      current_user: Current authenticated user
+      db: Database session
+
+  Returns:
+      HTTP 204 No Content on success
+
+  Raises:
+      NotFoundException: If source not found

@@ -1,0 +1,10 @@
+name: local
+variables:
+  - name: baseUrl
+    value: http://localhost:80
+  - name: username
+    value: admin
+  - secret: true
+    name: password
+  - name: access_token
+    value: ""

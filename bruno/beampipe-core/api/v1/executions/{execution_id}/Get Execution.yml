@@ -1,0 +1,94 @@
+info:
+  name: Get Execution
+  type: http
+  seq: 1
+  tags:
+    - executions
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/executions/:execution_id"
+  params:
+    - name: execution_id
+      value: ""
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/executions/:execution_id"
+      method: GET
+      params:
+        - name: execution_id
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "uuid": "",
+            "project_module": "",
+            "sources": [
+              {
+                "source_identifier": "",
+                "sbids": ""
+              }
+            ],
+            "archive_name": "",
+            "created_at": "",
+            "updated_at": "",
+            "deployment_profile_id": "",
+            "status": "pending",
+            "execution_phase": "",
+            "workflow_manifest": "",
+            "scheduler_name": "",
+            "scheduler_job_id": "",
+            "retry_count": 0,
+            "last_error": "",
+            "created_by_id": "",
+            "started_at": "",
+            "completed_at": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/executions/:execution_id"
+      method: GET
+      params:
+        - name: execution_id
+          value: ""
+          type: path
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": "",
+                "input": "",
+                "ctx": {}
+              }
+            ]
+          }

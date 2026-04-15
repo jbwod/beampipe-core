@@ -3,33 +3,147 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from arq.worker import Worker
-
 from ...archive.discovery import discover_schedule
 from ...config import settings
 from ...db.database import local_session
 from ...projects import list_project_modules, load_project_module
+from .execution_batch import workflow_execution_schedule
 
 logger = logging.getLogger(__name__)
 
 
-async def sample_background_task(ctx: Worker, name: str) -> str:
+async def sample_background_task(ctx: dict[str, Any], name: str) -> str:
     _ = ctx
     await asyncio.sleep(5)
     return f"Task {name} is complete!"
 
 
-async def discover_schedule_task(ctx: Worker, project_module: str | None = None) -> dict[str, Any]:
+async def workflow_execution_schedule_task(
+    ctx: dict[str, Any], project_module: str | None = None
+) -> dict[str, Any]:
+    logger.debug(
+        "event=workflow_execution_schedule_task_started project_module=%s",
+        project_module or "all",
+    )
+    try:
+        async with local_session() as db:
+            redis = ctx.get("redis")
+            if redis is None:
+                raise RuntimeError("Redis not available on worker context")
+            result = await workflow_execution_schedule(
+                db=db, redis=redis, project_module=project_module
+            )
+            if "ok" not in result:
+                result["ok"] = True
+            execution_count = result.get("execution_count", 0)
+            total_sources = result.get("total_sources", 0)
+            is_skipped = result.get("ok") and execution_count == 0 and total_sources == 0
+            if is_skipped:
+                logger.debug(
+                    "event=workflow_execution_schedule_task project_module=%s skipped reason_counts=%s",
+                    project_module or "all",
+                    result.get("reason_counts"),
+                )
+            else:
+                logger.info(
+                    "event=workflow_execution_schedule_task_result "
+                    "project_module=%s scheduled_at=%s ok=%s execution_count=%s total_sources=%s "
+                    "skipped_modules=%s reason_counts=%s",
+                    project_module or "all",
+                    result.get("scheduled_at"),
+                    result.get("ok"),
+                    execution_count,
+                    total_sources,
+                    result.get("skipped_modules"),
+                    result.get("reason_counts"),
+                )
+            return result
+    except Exception as exc:
+        logger.exception(
+            "event=workflow_execution_schedule_task_error project_module=%s error=%s",
+            project_module,
+            exc,
+        )
+        return {
+            "ok": False,
+            "error": str(exc),
+            "project_module": project_module,
+            "scheduled_at": datetime.now(UTC).isoformat(),
+        }
+
+
+async def discover_schedule_task(
+    ctx: dict[str, Any], project_module: str | None = None
+) -> dict[str, Any]:
     logger.debug(
         "event=discover_schedule_task_started project_module=%s",
         project_module or "all",
     )
     try:
         async with local_session() as db:
-            redis = getattr(ctx, "redis", None)
+            redis = ctx.get("redis")
             if redis is None:
                 raise RuntimeError("Redis not available on worker context")
-            result = await discover_schedule(db=db, redis=redis, project_module=project_module)
+            target_modules = [project_module] if project_module else list_project_modules()
+            module_results: dict[str, dict[str, Any]] = {}
+            aggregate: dict[str, Any] = {
+                "ok": True,
+                "scheduled_at": datetime.now(UTC).isoformat(),
+                "project_module": project_module or "all",
+                "total_sources": 0,
+                "total_jobs": 0,
+                "job_ids": [],
+                "enqueue_failures": 0,
+                "failed_batches": [],
+                "max_sources_per_run": 0,
+                "queue_depth": None,
+                "skipped_due_to_queue_full": False,
+                "skipped_due_to_tap_unreachable": False,
+                "skipped_due_to_tick_discovery_batch_limit": False,
+                "admitted_by_rate": 0,
+                "blocked_by_rate": False,
+                "blocked_by_in_flight": False,
+                "tap_unreachable": [],
+                "module_results": module_results,
+            }
+            for module_name in target_modules:
+                module_result = await discover_schedule(
+                    db=db,
+                    redis=redis,
+                    project_module=module_name,
+                )
+                module_results[module_name] = module_result
+                aggregate["ok"] = bool(aggregate["ok"] and module_result.get("ok", True))
+                aggregate["total_sources"] += int(module_result.get("total_sources", 0))
+                aggregate["total_jobs"] += int(module_result.get("total_jobs", 0))
+                aggregate["enqueue_failures"] += int(module_result.get("enqueue_failures", 0))
+                aggregate["max_sources_per_run"] += int(module_result.get("max_sources_per_run", 0))
+                aggregate["admitted_by_rate"] += int(module_result.get("admitted_by_rate", 0))
+                aggregate["skipped_due_to_queue_full"] = bool(
+                    aggregate["skipped_due_to_queue_full"] or module_result.get("skipped_due_to_queue_full")
+                )
+                aggregate["skipped_due_to_tap_unreachable"] = bool(
+                    aggregate["skipped_due_to_tap_unreachable"]
+                    or module_result.get("skipped_due_to_tap_unreachable")
+                )
+                aggregate["skipped_due_to_tick_discovery_batch_limit"] = bool(
+                    aggregate["skipped_due_to_tick_discovery_batch_limit"]
+                    or module_result.get("skipped_due_to_tick_discovery_batch_limit")
+                )
+                aggregate["blocked_by_rate"] = bool(
+                    aggregate["blocked_by_rate"] or module_result.get("blocked_by_rate")
+                )
+                aggregate["blocked_by_in_flight"] = bool(
+                    aggregate["blocked_by_in_flight"] or module_result.get("blocked_by_in_flight")
+                )
+                aggregate["job_ids"].extend(module_result.get("job_ids") or [])
+                aggregate["failed_batches"].extend(module_result.get("failed_batches") or [])
+                if module_result.get("queue_depth") is not None:
+                    aggregate["queue_depth"] = module_result.get("queue_depth")
+                unreachable = module_result.get("tap_unreachable") or []
+                if isinstance(unreachable, list):
+                    aggregate["tap_unreachable"].extend(unreachable)
+            result = aggregate
             if "ok" not in result:
                 result["ok"] = True
             total_sources = result.get("total_sources", 0)
@@ -41,9 +155,11 @@ async def discover_schedule_task(ctx: Worker, project_module: str | None = None)
                 and not result.get("enqueue_failures")
                 and not result.get("skipped_due_to_queue_full")
                 and not result.get("skipped_due_to_tap_unreachable")
+                and not result.get("blocked_by_rate")
+                and not result.get("blocked_by_in_flight")
             )
             if is_skipped:
-                logger.info(
+                logger.debug(
                     "event=discover_schedule_task project_module=%s skipped",
                     project_module or "all",
                 )
@@ -52,7 +168,8 @@ async def discover_schedule_task(ctx: Worker, project_module: str | None = None)
                     "event=discover_schedule_task_result "
                     "project_module=%s scheduled_at=%s ok=%s total_sources=%s total_jobs=%s "
                     "enqueue_failures=%s skipped_due_to_queue_full=%s "
-                    "skipped_due_to_tap_unreachable=%s tap_unreachable=%s",
+                    "skipped_due_to_tap_unreachable=%s blocked_by_rate=%s blocked_by_in_flight=%s "
+                    "admitted_by_rate=%s tap_unreachable=%s",
                     project_module or "all",
                     result.get("scheduled_at"),
                     result.get("ok"),
@@ -61,6 +178,9 @@ async def discover_schedule_task(ctx: Worker, project_module: str | None = None)
                     result.get("enqueue_failures"),
                     result.get("skipped_due_to_queue_full"),
                     result.get("skipped_due_to_tap_unreachable"),
+                    result.get("blocked_by_rate"),
+                    result.get("blocked_by_in_flight"),
+                    result.get("admitted_by_rate"),
                     result.get("tap_unreachable"),
                 )
             return result
@@ -78,8 +198,8 @@ async def discover_schedule_task(ctx: Worker, project_module: str | None = None)
         }
 
 
-async def enqueue_timer_task(ctx: Worker) -> dict[str, Any]:
-    redis = getattr(ctx, "redis", None)
+async def enqueue_timer_task(ctx: dict[str, Any]) -> dict[str, Any]:
+    redis = ctx.get("redis")
     if redis is None:
         raise RuntimeError("Redis queue is not available for timer enqueue")
 
@@ -92,7 +212,7 @@ async def enqueue_timer_task(ctx: Worker) -> dict[str, Any]:
     return {"status": "ok", "job_id": job_id}
 
 
-async def timer_task(ctx: Worker) -> dict[str, Any]:
+async def timer_task(ctx: dict[str, Any]) -> dict[str, Any]:
     _ = ctx
     modules = list_project_modules()
     logger.debug("event=timer_task_modules project_modules=%s", modules)
@@ -112,7 +232,7 @@ async def timer_task(ctx: Worker) -> dict[str, Any]:
             continue
         ping_fn = getattr(module, "ping", None)
         if callable(ping_fn):
-            logger.info("event=timer_task_ping module=%s", name)
+            logger.debug("event=timer_task_ping module=%s", name)
             ping_fn()
             logger.debug("event=timer_task_ping_done module=%s", name)
 

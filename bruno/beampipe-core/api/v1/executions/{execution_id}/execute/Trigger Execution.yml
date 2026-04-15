@@ -1,0 +1,90 @@
+info:
+  name: Trigger Execution
+  type: http
+  seq: 1
+  tags:
+    - executions
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/executions/:execution_id/execute"
+  params:
+    - name: execution_id
+      value: 019d6c90-ee20-77ea-962f-39e009ac77ac
+      type: path
+    - name: do_stage
+      value: "true"
+      type: query
+    - name: do_submit
+      value: "true"
+      type: query
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 202 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/executions/:execution_id/execute"
+      method: POST
+      params:
+        - name: execution_id
+          value: ""
+          type: path
+        - name: do_stage
+          value: "true"
+          type: query
+        - name: do_submit
+          value: "true"
+          type: query
+    response:
+      status: 202
+      statusText: Accepted
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: "{}"
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/executions/:execution_id/execute"
+      method: POST
+      params:
+        - name: execution_id
+          value: ""
+          type: path
+        - name: do_stage
+          value: "true"
+          type: query
+        - name: do_submit
+          value: "true"
+          type: query
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": "",
+                "input": "",
+                "ctx": {}
+              }
+            ]
+          }

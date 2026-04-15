@@ -1,0 +1,208 @@
+info:
+  name: Bulk Register Sources
+  type: http
+  seq: 1
+  tags:
+    - sources
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/sources/bulk"
+  body:
+    type: json
+    data: |-
+      {
+        "items": [
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ1043-30b",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0855+02",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ1026-20",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ2109-45",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0333-19",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ1453-22",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ1004-41",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0222-03",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0937-22",
+            "enabled": true
+          },
+          {
+            "project_module": "wallaby_hires",
+            "source_identifier": "HIPASSJ0909-33",
+            "enabled": true
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/sources/bulk"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "items": [
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ1043-30b",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0855+02",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ1026-20",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ2109-45",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0333-19",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ1453-22",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ1004-41",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0222-03",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0937-22",
+                "enabled": true
+              },
+              {
+                "project_module": "wallaby_hires",
+                "source_identifier": "HIPASSJ0909-33",
+                "enabled": true
+              }
+            ]
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "created": [
+              {
+                "uuid": "",
+                "project_module": "",
+                "source_identifier": "",
+                "created_at": "",
+                "updated_at": "",
+                "enabled": false,
+                "last_checked_at": "",
+                "last_attempted_at": "",
+                "stale_after_hours": "",
+                "discovery_signature": "",
+                "discovery_claim_expires_at": "",
+                "workflow_run_pending": false,
+                "workflow_run_pending_at": ""
+              }
+            ],
+            "existing": [
+              {}
+            ],
+            "total_created": 0,
+            "total_existing": 0
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/sources/bulk"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "items": [
+              {
+                "project_module": "",
+                "source_identifier": "",
+                "enabled": false
+              }
+            ]
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": "",
+                "input": "",
+                "ctx": {}
+              }
+            ]
+          }

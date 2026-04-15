@@ -1,0 +1,209 @@
+info:
+  name: Create Deployment Profile
+  type: http
+  seq: 2
+  tags:
+    - deployment-profiles
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/deployment-profiles"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "test-staging-e2e-rest-dim",
+        "description": "rest_dim",
+        "project_module": "wallaby_hires",
+        "is_default": true,
+        "translation": {
+          "algo": "metis",
+          "num_par": 1,
+          "num_islands": 0,
+          "tm_url": "http://dlg-tm.desk"
+        },
+        "deployment": {
+          "kind": "rest_dim",
+          "dim_host_for_tm": "dlg-dim",
+          "dim_port_for_tm": 8001,
+          "deploy_host": "dlg-dim.desk",
+          "deploy_port": 80,
+          "verify_ssl": false
+        }
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 201 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/deployment-profiles"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "name": "",
+            "description": "",
+            "project_module": "",
+            "is_default": false,
+            "translation": {
+              "algo": "metis",
+              "num_par": 1,
+              "num_islands": 0,
+              "tm_url": ""
+            },
+            "deployment": {
+              "kind": "rest_dim",
+              "dim_host_for_tm": "",
+              "dim_port_for_tm": 8001,
+              "deploy_host": "",
+              "deploy_port": 8001,
+              "verify_ssl": false
+            }
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "uuid": "",
+            "name": "",
+            "description": "",
+            "project_module": "",
+            "is_default": false,
+            "translation": {
+              "algo": "metis",
+              "num_par": 1,
+              "num_islands": 0,
+              "tm_url": ""
+            },
+            "deployment": {
+              "kind": "rest_dim",
+              "dim_host_for_tm": "",
+              "dim_port_for_tm": 8001,
+              "deploy_host": "",
+              "deploy_port": 8001,
+              "verify_ssl": false
+            },
+            "created_at": "",
+            "updated_at": null
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/deployment-profiles"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "name": "",
+            "description": "",
+            "project_module": "",
+            "is_default": false,
+            "translation": {
+              "algo": "metis",
+              "num_par": 1,
+              "num_islands": 0,
+              "tm_url": ""
+            },
+            "deployment": {
+              "kind": "rest_dim",
+              "dim_host_for_tm": "",
+              "dim_port_for_tm": 8001,
+              "deploy_host": "",
+              "deploy_port": 8001,
+              "verify_ssl": false
+            }
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": "",
+                "input": "",
+                "ctx": {}
+              }
+            ]
+          }
+  - name: dlg-REST example
+    description: For Local Development
+    request:
+      url: "{{baseUrl}}/api/v1/deployment-profiles"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "name": "test-staging-e2e-rest-dim",
+            "description": "rest_dim",
+            "project_module": "wallaby_hires",
+            "is_default": true,
+            "translation": {
+              "algo": "metis",
+              "num_par": 1,
+              "num_islands": 0,
+              "tm_url": "http://dlg-tm.desk"
+            },
+            "deployment": {
+              "kind": "rest_dim",
+              "dim_host_for_tm": "dlg-dim",
+              "dim_port_for_tm": 8001,
+              "deploy_host": "dlg-dim.desk",
+              "deploy_port": 80,
+              "verify_ssl": false
+            }
+          }
+    response:
+      status: 201
+      statusText: Created
+      body:
+        type: text
+        data: |-
+          {
+            "uuid": "019d6c0d-c4a7-72a0-ad60-3f03a6c5ddba",
+            "name": "test-staging-e2e-rest-dim",
+            "description": "rest_dim",
+            "project_module": "wallaby_hires",
+            "is_default": true,
+            "translation": {
+              "algo": "metis",
+              "num_par": 1,
+              "num_islands": 0,
+              "tm_url": "http://dlg-tm.desk"
+            },
+            "deployment": {
+              "kind": "rest_dim",
+              "dim_host_for_tm": "dlg-dim",
+              "dim_port_for_tm": 8001,
+              "deploy_host": "dlg-dim.desk",
+              "deploy_port": 80,
+              "verify_ssl": false
+            },
+            "created_at": "2026-04-08T07:45:34.887820+00:00",
+            "updated_at": null
+          }

@@ -1,12 +1,16 @@
 """Archive metadata service."""
 import logging
+from collections import defaultdict
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...crud.crud_archive_metadata import crud_archive_metadata
+from ...models.archive import ArchiveMetadata
 from ...schemas.archive import ArchiveMetadataCreateInternal, ArchiveMetadataRead
 from ..config import settings
 from ..exceptions.http_exceptions import NotFoundException
@@ -105,16 +109,78 @@ class ArchiveMetadataService:
         db: AsyncSession,
         project_module: str,
         source_identifier: str,
+        sbids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """List archive metadata entries for a source."""
+        """List archive metadata entries for a source.
+
+        Args:
+            db: Database session
+            project_module: Project module identifier
+            source_identifier: Source identifier
+            sbids: Optional list of SBIDs to filter to; if provided, only returns records for these SBIDs
+
+        Returns:
+            List of archive metadata records
+        """
+        filters: dict[str, Any] = {
+            "project_module": project_module,
+            "source_identifier": source_identifier,
+        }
+        if sbids is not None and len(sbids) > 0:
+            filters["sbid__in"] = sbids
         records = await crud_archive_metadata.get_multi(
             db=db,
-            project_module=project_module,
-            source_identifier=source_identifier,
             schema_to_select=ArchiveMetadataRead,
+            **filters,
         )
         # FastCRUD returns {"data": [...], "total_count": N}
         return cast(list[dict[str, Any]], records.get("data", []))
+
+    @staticmethod
+    async def list_metadata_grouped_by_sources(
+        db: AsyncSession,
+        project_module: str,
+        source_identifiers: Sequence[str],
+    ) -> dict[str, list[dict[str, Any]]]:
+        """All archive metadata rows for many sources in one query, grouped by identifier."""
+        if not source_identifiers:
+            return {}
+        ids = list(dict.fromkeys(source_identifiers))
+        result = await db.execute(
+            select(ArchiveMetadata).where(
+                ArchiveMetadata.project_module == project_module,
+                ArchiveMetadata.source_identifier.in_(ids),
+            )
+        )
+        by_source: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in result.scalars().all():
+            data = ArchiveMetadataRead.model_validate(row).model_dump()
+            by_source[str(data["source_identifier"])].append(data)
+        return dict(by_source)
+
+    @staticmethod
+    async def delete_metadata_for_source_except_sbids(
+        db: AsyncSession,
+        project_module: str,
+        source_identifier: str,
+        keep_sbids: list[str],
+    ) -> int:
+        """Delete metadata rows for a source except the supplied SBIDs."""
+        filters: dict[str, Any] = {
+            "project_module": project_module,
+            "source_identifier": source_identifier,
+        }
+        if keep_sbids:
+            filters["sbid__not_in"] = keep_sbids
+
+        count = await crud_archive_metadata.count(db=db, **filters)
+        await crud_archive_metadata.db_delete(
+            db=db,
+            allow_multiple=True,
+            commit=False,
+            **filters,
+        )
+        return count
 
 
 archive_metadata_service = ArchiveMetadataService()

@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -19,6 +21,16 @@ class ProjectModuleContractStatus(BaseModel):
     enrichment_keys: list[str] = Field(
         default_factory=list,
         description="Discover bundle enrichment keys this module uses (e.g. ra_dec_vsys, sbid_to_eval_file)",
+    )
+    graph_path: str | None = Field(default=None, description="Local path to .graph file if set")
+    graph_github_url: str | None = Field(default=None, description="GitHub raw URL to graph if set")
+    workflow_execution_automation: dict[str, Any] | None = Field(
+        default=None,
+        description="Module WORKFLOW_EXECUTION_AUTOMATION dict when present (workflow auto-scheduling policy)",
+    )
+    workflow_discovery_automation: dict[str, Any] | None = Field(
+        default=None,
+        description="Module WORKFLOW_DISCOVERY_AUTOMATION dict when present (discovery auto-scheduling policy)",
     )
 
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..core.schemas import TimestampSchema, UUIDSchema
 
@@ -48,18 +48,18 @@ class SourceRegistryRead(TimestampSchema, SourceRegistryBase, UUIDSchema):
         default=None,
         description="Hash of last discovery state; used to skip writes when unchanged.",
     )
-
-    @field_serializer("last_checked_at")
-    def serialize_last_checked_at(self, last_checked_at: datetime | None, _info):  # type: ignore[override]
-        if last_checked_at is not None:
-            return last_checked_at.isoformat()
-        return None
-
-    @field_serializer("last_attempted_at")
-    def serialize_last_attempted_at(self, last_attempted_at: datetime | None, _info):  # type: ignore[override]
-        if last_attempted_at is not None:
-            return last_attempted_at.isoformat()
-        return None
+    discovery_claim_expires_at: datetime | None = Field(
+        default=None,
+        description="When the current discovery lease expires; null means no active lease.",
+    )
+    workflow_run_pending: bool = Field(
+        default=False,
+        description="True when source has newly discovered metadata awaiting orchestration.",
+    )
+    workflow_run_pending_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when source was marked pending for workflow execution.",
+    )
 
 
 class SourceRegistryUpdate(BaseModel):
@@ -75,7 +75,7 @@ class SourceRegistryUpdate(BaseModel):
 
 
 class SourceRegistryUpdateInternal(SourceRegistryUpdate):
-    updated_at: datetime
+    pass
 
 
 class SourceRegistryDelete(BaseModel):
@@ -102,6 +102,14 @@ class SourceRegistryBulkCreateResponse(BaseModel):
     existing: list[SourceRegistryRead]
     total_created: int
     total_existing: int
+
+
+class SourceMetadataResponse(BaseModel):
+    """Response for GET /sources/{id}/metadata."""
+
+    source: SourceRegistryRead
+    metadata: list[dict]
+    metadata_count: int
 
 
 class DiscoverTriggerRequest(BaseModel):
@@ -133,3 +141,7 @@ class DiscoverTriggerResponse(BaseModel):
     project_module: str = Field(description="Project module that was used")
     marked_count: int = Field(description="Number of sources marked for recheck")
     source_identifiers: list[str] = Field(description="Source identifiers that were updated")
+    message: str = Field(
+        default="Sources marked for rediscovery. Discovery runs asynchronously via the background scheduler.",
+        description="Human-readable status note",
+    )

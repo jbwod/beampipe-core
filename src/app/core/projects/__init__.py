@@ -14,33 +14,16 @@ so thinking perhaps an entry point?
     wallaby_hires = "wallaby_hires.module"
 """
 
-from importlib.metadata import entry_points
-from types import ModuleType
-from typing import cast
-
-from .contracts import validate_project_module_interface
-
-
-def _entry_points_for(group: str):
-    eps = entry_points()
-    if hasattr(eps, "select"):
-        return eps.select(group=group)
-    return eps.get(group, [])
-
-
-def list_project_modules() -> list[str]:
-    return [ep.name for ep in _entry_points_for("beampipe.projects")]
-
-
-def load_project_module(name: str) -> ModuleType:
-    for ep in _entry_points_for("beampipe.projects"):
-        if ep.name == name:
-            module = ep.load()
-            validate_project_module_interface(module, name)
-            return cast(ModuleType, module)
-    raise ValueError(
-        f"Project module '{name}' not found. Available: {list_project_modules()}"
-    )
+from .plugins import list_project_modules, load_project_module
+from .service import (
+    get_graph_github_url,
+    get_graph_path,
+    get_workflow_discovery_automation_policy,
+    get_workflow_execution_automation_policy,
+    resolve_graph_content,
+    resolve_workflow_discovery_step_overrides,
+    resolve_workflow_execute_step_overrides,
+)
 
 
 def debug_print_modules(target: str | None = None) -> None:
@@ -50,3 +33,17 @@ def debug_print_modules(target: str | None = None) -> None:
         module = load_project_module(target)
         name = getattr(module, "PROJECT_NAME", None)
         print(f"Loaded module '{target}', PROJECT_NAME={name}")
+
+
+__all__ = [
+    "debug_print_modules",
+    "get_graph_github_url",
+    "get_graph_path",
+    "get_workflow_discovery_automation_policy",
+    "get_workflow_execution_automation_policy",
+    "list_project_modules",
+    "load_project_module",
+    "resolve_workflow_discovery_step_overrides",
+    "resolve_workflow_execute_step_overrides",
+    "resolve_graph_content",
+]

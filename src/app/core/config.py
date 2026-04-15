@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class LoggingSettings(BaseSettings):
-    LOG_VERBOSITY: Literal["full", "medium", "minimal"] = "medium"
+    LOG_VERBOSITY: Literal["full", "medium", "minimal"] = "full"
 
 
 class AppSettings(BaseSettings):
@@ -29,7 +29,7 @@ class CryptSettings(BaseSettings):
 
 
 class DatabaseSettings(BaseSettings):
-    pass
+    ...
 
 
 class SQLiteSettings(DatabaseSettings):
@@ -138,7 +138,7 @@ class CRUDAdminSettings(BaseSettings):
     CRUD_ADMIN_REDIS_HOST: str = "localhost"
     CRUD_ADMIN_REDIS_PORT: int = 6379
     CRUD_ADMIN_REDIS_DB: int = 0
-    CRUD_ADMIN_REDIS_PASSWORD: str | None = "None"
+    CRUD_ADMIN_REDIS_PASSWORD: str | None = None
     CRUD_ADMIN_REDIS_SSL: bool = False
 
 
@@ -158,26 +158,75 @@ class CORSSettings(BaseSettings):
     CORS_HEADERS: list[str] = ["*"]
 
 
-class RunLedgerSettings(BaseSettings):
+class ExecutionLedgerSettings(BaseSettings):
     MAX_RETRIES: int = 3
+    WORKFLOW_AUTOMATION_SCHEDULER_NAME: str = "workflow_auto"
+    WORKFLOW_EXECUTION_AUTOMATION_ENABLED: bool = False
+
+
+class RestateWorkflowSettings(BaseSettings):
+    WORKFLOW_ENGINE_EXECUTION: Literal["arq", "restate"] = "arq"
+    WORKFLOW_ENGINE_DISCOVERY: Literal["arq", "restate"] = "arq"
+
+    RESTATE_INGRESS_BASE_URL: str = ""
+
+    RESTATE_EXECUTION_WORKFLOW_NAME: str = "ExecutionBatchWorkflow"
+    RESTATE_DISCOVERY_WORKFLOW_NAME: str = "DiscoveryBatchWorkflow"
+    RESTATE_EXECUTION_WORKFLOW_HANDLER: str = "execute_execution_workflow"
+    RESTATE_DISCOVERY_WORKFLOW_HANDLER: str = "discovery_batch_workflow"
+
+    RESTATE_INVOKE_TIMEOUT_SECONDS: float = 30.0
+    # ctx.run_typed policies (https://docs.restate.dev/develop/python/durable-steps).
+    RESTATE_STEP_EXTERNAL_MAX_ATTEMPTS: int = 3
+    RESTATE_STEP_EXTERNAL_MAX_DURATION_MINUTES: int = 45
+    RESTATE_STEP_DB_MAX_ATTEMPTS: int = 3
+    RESTATE_STEP_DB_MAX_DURATION_MINUTES: int = 15
+    RESTATE_STEP_POLL_MAX_ATTEMPTS: int = 3
+    RESTATE_STEP_POLL_MAX_DURATION_MINUTES: int = 5
+    RESTATE_STEP_INITIAL_RETRY_SECONDS: float = 2.0
+    RESTATE_STEP_MAX_RETRY_INTERVAL_SECONDS: float = 120.0
+
+    RESTATE_DIM_POLL_INTERVAL_SECONDS: float = 15.0
+    RESTATE_DIM_POLL_MAX_ROUNDS: int = 240
 
 
 class DiscoverySettings(BaseSettings):
-    DISCOVERY_BATCH_SIZE: int = 25
+    DISCOVERY_BATCH_SIZE: int = 50
     DISCOVERY_BATCH_CONCURRENCY: int = 5
     DISCOVERY_STALE_HOURS: int = 24
     DISCOVERY_SCHEDULE_MINUTES: int = 1
     DISCOVERY_TAP_TIMEOUT_SECONDS: int = 120
     DISCOVERY_RETRY_COOLDOWN_MINUTES: int = 60
-    DISCOVERY_MAX_FAILURES_BEFORE_BACKOFF_MULTIPLIER: int = 3
-    DISCOVERY_MAX_SOURCES_PER_RUN: int = 500
-    DISCOVERY_MAX_QUEUE_DEPTH: int | None = None
+    DISCOVERY_CLAIM_TTL_MINUTES: int = 180
+    DISCOVERY_MAX_SOURCES_PER_RUN: int = 2000
     DISCOVERY_TAP_HEALTH_CHECK_ENABLED: bool = True
     DISCOVERY_TAP_HEALTH_TIMEOUT_SECONDS: float = 10.0
 
 
+class ShapingSettings(BaseSettings):
+    SHAPING_ARQ_QUEUE_MAX_DEPTH: int | None = 200
+
+    # Discovery in-flight guard
+    SHAPING_DISCOVERY_MAX_IN_FLIGHT_BATCHES: int | None = 4
+
+    # Execute in-flight guard
+    SHAPING_EXECUTION_MAX_IN_FLIGHT_RUNS: int | None = 2
+
+    # Sleep after each successful enqueue_job
+    SHAPING_ENQUEUE_PACING_MS: float = 0.0
+
+    # Cap discover_batch
+    SHAPING_DISCOVERY_MAX_BATCHES_PER_TICK: int | None = None
+
+
 class ArchiveSettings(BaseSettings):
     ARCHIVE_METADATA_VALIDATE_JSON: bool = False
+
+
+class CasdaSettings(BaseSettings):
+    CASDA_USERNAME: str | None = None
+    CASDA_PASSWORD: SecretStr | None = None
+
 
 class Settings(
     LoggingSettings,
@@ -195,9 +244,12 @@ class Settings(
     CRUDAdminSettings,
     EnvironmentSettings,
     CORSSettings,
-    RunLedgerSettings,
+    ExecutionLedgerSettings,
+    RestateWorkflowSettings,
     DiscoverySettings,
+    ShapingSettings,
     ArchiveSettings,
+    CasdaSettings,
 ):
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".env"),

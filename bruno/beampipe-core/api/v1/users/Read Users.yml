@@ -1,0 +1,94 @@
+info:
+  name: Read Users
+  type: http
+  seq: 1
+  tags:
+    - users
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/users"
+  params:
+    - name: page
+      value: "1"
+      type: query
+    - name: items_per_page
+      value: "10"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/users"
+      method: GET
+      params:
+        - name: page
+          value: "1"
+          type: query
+        - name: items_per_page
+          value: "10"
+          type: query
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "id": 0,
+                "name": "",
+                "username": "",
+                "email": "",
+                "profile_image_url": ""
+              }
+            ],
+            "total_count": 0,
+            "has_more": false,
+            "page": "",
+            "items_per_page": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/users"
+      method: GET
+      params:
+        - name: page
+          value: "1"
+          type: query
+        - name: items_per_page
+          value: "10"
+          type: query
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": "",
+                "input": "",
+                "ctx": {}
+              }
+            ]
+          }
