@@ -29,10 +29,15 @@ from ..ledger.source_readiness import (
     filter_archive_rows_by_sbids,
     parse_execution_source_spec,
     parsed_source_readiness_error,
+    source_identifiers_from_specs,
 )
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..registry.service import source_registry_service
-from ..utils.daliuge import classify_dim_session_status as _parse_dim_session_status
+from ..utils.daliuge import (
+    classify_dim_session_status as _parse_dim_session_status,
+    dim_graph_status_error_uids,
+    dim_rest_http_base,
+)
 from .manifest import inject_manifest_config_into_graph
 from .manifest_builder import build_manifest
 from .staging import stage_sources_for_manifest
@@ -100,7 +105,7 @@ async def read_execution_ledger_snapshot(
 
     phase = execution.get("execution_phase")
     st = execution.get("status")
-    return {
+    out: dict[str, Any] = {
         "execution_id": str(execution_id),
         "project_module": execution.get("project_module"),
         "status": str(st) if st is not None else None,
@@ -110,6 +115,8 @@ async def read_execution_ledger_snapshot(
         "has_manifest": bool(execution.get("workflow_manifest")),
         "last_error": execution.get("last_error"),
     }
+    out.update(await enrich_execution_dim_rest_urls(db, execution))
+    return out
 
 
 async def begin_restate_execution_for_execution(
@@ -173,6 +180,41 @@ def _profile_to_dict(profile: dict) -> dict:
         "deployment_backend": backend,
         "deployment_config": deployment,
     }
+
+
+def _dim_rest_session_debug_urls(profile: dict, session_id: str) -> dict[str, str]:
+    if profile.get("deployment_backend") != "rest_dim":
+        return {}
+    deploy_host = profile.get("deploy_host")
+    deploy_port = profile.get("deploy_port")
+    if deploy_host is None or deploy_port is None:
+        return {}
+    dim_base = dim_rest_http_base(str(deploy_host), int(deploy_port))
+    sid = quote(str(session_id))
+    base = dim_base.rstrip("/")
+    return {
+        "dim_session_status_url": f"{base}/api/sessions/{sid}/status",
+        "dim_graph_status_url": f"{base}/api/sessions/{sid}/graph/status",
+    }
+
+
+async def enrich_execution_dim_rest_urls(
+    db: AsyncSession,
+    execution: dict[str, Any],
+) -> dict[str, str]:
+    sid = execution.get("scheduler_job_id")
+    if not sid or execution.get("scheduler_name") != "daliuge":
+        return {}
+    try:
+        profile = await _resolve_deployment_profile(db, execution)
+        return _dim_rest_session_debug_urls(profile, str(sid))
+    except Exception:
+        logger.debug(
+            "event=dim_rest_urls_unresolved execution_id=%s",
+            execution.get("uuid"),
+            exc_info=True,
+        )
+        return {}
 
 
 async def _resolve_deployment_profile(
@@ -413,11 +455,7 @@ async def _fail_execution_after_dim_translate_error(
     session_id: str,
 ) -> dict[str, Any]:
     """Mark execution failed during TM errors and clear pending sources."""
-    source_identifiers = [
-        str(spec.get("source_identifier"))
-        for spec in (execution.get("sources") or [])
-        if isinstance(spec, dict) and spec.get("source_identifier")
-    ]
+    source_identifiers = source_identifiers_from_specs(execution.get("sources"))
     await source_registry_service.clear_workflow_pending_for_sources(
         db=db,
         project_module=project_module,
@@ -489,11 +527,7 @@ async def translate_dim_session_for_execution(
         )
 
     if graph_fetch_error:
-        source_identifiers = [
-            str(spec.get("source_identifier"))
-            for spec in (execution.get("sources") or [])
-            if isinstance(spec, dict) and spec.get("source_identifier")
-        ]
+        source_identifiers = source_identifiers_from_specs(execution.get("sources"))
         await source_registry_service.clear_workflow_pending_for_sources(
             db=db,
             project_module=project_module,
@@ -510,11 +544,7 @@ async def translate_dim_session_for_execution(
         return {"status": "terminal_failed", "session_id": session_id}
 
     if not graph_content:
-        source_identifiers = [
-            str(spec.get("source_identifier"))
-            for spec in (execution.get("sources") or [])
-            if isinstance(spec, dict) and spec.get("source_identifier")
-        ]
+        source_identifiers = source_identifiers_from_specs(execution.get("sources"))
         await source_registry_service.clear_workflow_pending_for_sources(
             db=db,
             project_module=project_module,
@@ -628,11 +658,7 @@ async def translate_dim_session_for_execution(
             WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
             "REST DIM deploy requires deploy_host and deploy_port on the deployment profile",
         )
-    dim_base = (
-        f"http://{deploy_host}:{deploy_port}"
-        if deploy_port != 80
-        else f"http://{deploy_host}"
-    )
+    dim_base = dim_rest_http_base(str(deploy_host), int(deploy_port))
 
     return {
         "status": "ready",
@@ -728,11 +754,7 @@ async def _fetch_dim_graph_status(
     if not isinstance(drop_statuses, dict):
         return {"drop_statuses": {}, "error_drops": [], "has_errors": False}
 
-    error_drops = [
-        uid for uid, st in drop_statuses.items()
-        if (isinstance(st, int) and st == 3)
-        or (isinstance(st, str) and st.upper() == "ERROR")
-    ]
+    error_drops = dim_graph_status_error_uids(drop_statuses)
     return {
         "drop_statuses": drop_statuses,
         "error_drops": error_drops,
@@ -789,11 +811,7 @@ async def poll_dim_session_for_execution(
             WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
             "REST DIM polling requires deploy_host and deploy_port on the deployment profile",
         )
-    dim_base = (
-        f"http://{deploy_host}:{deploy_port}"
-        if deploy_port != 80
-        else f"http://{deploy_host}"
-    )
+    dim_base = dim_rest_http_base(str(deploy_host), int(deploy_port))
 
     sid = quote(str(session_id))
     async with httpx.AsyncClient(
@@ -815,11 +833,7 @@ async def poll_dim_session_for_execution(
             graph_info = await _fetch_dim_graph_status(client, session_id)
 
     # Terminal: update ledger and clear registry pending sources.
-    source_identifiers = [
-        str(spec.get("source_identifier"))
-        for spec in (execution.get("sources") or [])
-        if isinstance(spec, dict) and spec.get("source_identifier")
-    ]
+    source_identifiers = source_identifiers_from_specs(execution.get("sources"))
     await source_registry_service.clear_workflow_pending_for_sources(
         db=db,
         project_module=project_module,
@@ -979,18 +993,16 @@ async def execute_execution(
 
             sid = execution_after.get("scheduler_job_id")
             if sid:
-                return {
+                out: dict[str, Any] = {
                     "execution_id": str(execution_id),
                     "status": "submitted",
                     "scheduler_job_id": str(sid),
                     "manifest": manifest,
                 }
+                out.update(await enrich_execution_dim_rest_urls(db, execution_after))
+                return out
 
-        source_identifiers = [
-            str(spec.get("source_identifier"))
-            for spec in sources
-            if isinstance(spec, dict) and spec.get("source_identifier")
-        ]
+        source_identifiers = source_identifiers_from_specs(sources)
         await source_registry_service.clear_workflow_pending_for_sources(
             db=db,
             project_module=project_module,
