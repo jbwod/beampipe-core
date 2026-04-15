@@ -40,6 +40,14 @@ def metadata_discovery_flags_message(source_identifier: str, metadata_rows: list
     return None
 
 
+def source_identifiers_from_specs(sources: list[Any] | None) -> list[str]:
+    return [
+        str(spec.get("source_identifier"))
+        for spec in (sources or [])
+        if isinstance(spec, dict) and spec.get("source_identifier")
+    ]
+
+
 def parse_execution_source_spec(spec: Any) -> tuple[str | None, str | None, list[str] | None]:
     """Parse ``source_identifier`` and optional ``sbids`` from a spec (dict or object).
 

@@ -1,6 +1,20 @@
 from typing import Any
 
 
+def dim_rest_http_base(deploy_host: str, deploy_port: int) -> str:
+    if deploy_port != 80:
+        return f"http://{deploy_host}:{deploy_port}"
+    return f"http://{deploy_host}"
+
+
+def dim_graph_status_error_uids(drop_statuses: dict[str, Any]) -> list[str]:
+    return [
+        uid
+        for uid, st in drop_statuses.items()
+        if (isinstance(st, int) and st == 3) or (isinstance(st, str) and st.upper() == "ERROR")
+    ]
+
+
 def _links(links: Any) -> list[str]:
     """list of oids."""
     if isinstance(links, list):
@@ -59,5 +73,10 @@ def classify_dim_session_status(status_payload: Any) -> str:
     return "running"
 
 
-__all__ = ["get_roots", "classify_dim_session_status"]
+__all__ = [
+    "classify_dim_session_status",
+    "dim_graph_status_error_uids",
+    "dim_rest_http_base",
+    "get_roots",
+]
 
