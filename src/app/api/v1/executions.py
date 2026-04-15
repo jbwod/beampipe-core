@@ -11,7 +11,10 @@ from ...core.config import settings
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import NotFoundException
 from ...core.ledger.service import execution_ledger_service
-from ...core.orchestration.service import prepare_execution as orchestration_prepare_execution
+from ...core.orchestration.service import (
+    enrich_execution_dim_rest_urls,
+    prepare_execution as orchestration_prepare_execution,
+)
 from ...core.utils import queue
 from ...crud.crud_daliuge_deployment_profile import crud_daliuge_deployment_profile
 from ...crud.crud_execution_record import crud_batch_execution_records
@@ -126,7 +129,9 @@ async def get_execution(
     )
     if execution is None:
         raise NotFoundException(f"Execution {execution_id} not found")
-    return execution
+    row = dict(execution)
+    row.update(await enrich_execution_dim_rest_urls(db, row))
+    return row
 
 
 @router.patch("/{execution_id}", response_model=BatchExecutionRecordRead)

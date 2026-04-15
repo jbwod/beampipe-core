@@ -68,6 +68,14 @@ class BatchExecutionRecordRead(TimestampSchema, BatchExecutionRecordBase, UUIDSc
     workflow_manifest: dict | None = None
     scheduler_name: str | None = None
     scheduler_job_id: str | None = None
+    dim_session_status_url: str | None = Field(
+        default=None,
+        description="DIM GET /api/sessions/{id}/status",
+    )
+    dim_graph_status_url: str | None = Field(
+        default=None,
+        description="DIM GET /api/sessions/{id}/graph/status",
+    )
     retry_count: int = 0
     last_error: str | None = None
     created_by_id: int | None = None

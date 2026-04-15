@@ -21,7 +21,7 @@ from urllib.parse import quote
 
 import httpx
 
-from ...utils.daliuge import classify_dim_session_status
+from ...utils.daliuge import classify_dim_session_status, dim_graph_status_error_uids
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +108,7 @@ class DaliugeDeployClient:
                     graph = r.json()
                     logger.debug("event=dim_graph_status session_id=%s graph=%s", session_id, json.dumps(graph))
                     if isinstance(graph, dict):
-                        error_drops = [
-                            uid for uid, st in graph.items()
-                            if (isinstance(st, int) and st == 3)
-                            or (isinstance(st, str) and st.upper() == "ERROR")
-                        ]
+                        error_drops = dim_graph_status_error_uids(graph)
                         if error_drops:
                             logger.error(
                                 "event=dim_session_drop_errors session_id=%s error_count=%s",
