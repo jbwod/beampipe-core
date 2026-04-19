@@ -88,3 +88,22 @@ class DaliugeTranslatorClient:
             out.append(item)
         return out
 
+    def download_pgt(self, pgt_id: str) -> Any:
+        """Fetch the PGT JSON body  structure consumed by
+        dlg.deploy.start_dlg_cluster --physical-graph
+        # /dlg/daliuge-translator/dlg/dropmake/web/translator_rest.py
+        """
+        resp = self._client.get("/pgt_jsonbody", params={"pgt_name": pgt_id})
+        if resp.status_code >= 500:
+            logger.error(
+                "pgt_jsonbody failed: status=%s url=%s body=%s",
+                resp.status_code,
+                resp.url,
+                resp.text[:500] if resp.text else "(empty)",
+            )
+        resp.raise_for_status()
+        try:
+            return resp.json()
+        except ValueError as e:
+            raise ValueError(f"pgt_jsonbody inval {pgt_id}: {e}") from e
+
