@@ -37,6 +37,7 @@ dependencies = [
     "tenacity>=9.1.2",
     "paramiko>=3.4.0",
     "scp>=0.14.0",
+    "asyncssh>=2.14.0",
     "ruff>=0.11.13",
     "mypy>=1.16.0",
     "restate-sdk>=0.16.0",
