@@ -202,8 +202,15 @@ class ExecutionLedgerService:
     def _validate_status_transition(current_status: ExecutionStatus, new_status: ExecutionStatus) -> bool:
         allowed_transitions = {
             ExecutionStatus.PENDING: [ExecutionStatus.RUNNING, ExecutionStatus.CANCELLED],
-            ExecutionStatus.RUNNING: [ExecutionStatus.COMPLETED, ExecutionStatus.FAILED, ExecutionStatus.CANCELLED],
+            ExecutionStatus.RUNNING: [
+                ExecutionStatus.COMPLETED,
+                ExecutionStatus.NOT_SUBMITTED,
+                ExecutionStatus.FAILED,
+                ExecutionStatus.CANCELLED,
+            ],
             ExecutionStatus.COMPLETED: [],  # no more transitions allowed
+            # Manifest-only run finished; may re-execute with submit enabled.
+            ExecutionStatus.NOT_SUBMITTED: [ExecutionStatus.RUNNING, ExecutionStatus.CANCELLED],
             # FAILED -> RUNNING: worker/ARQ retry picks up the same execution after a transient error
             ExecutionStatus.FAILED: [ExecutionStatus.RETRYING, ExecutionStatus.CANCELLED, ExecutionStatus.RUNNING],
             ExecutionStatus.RETRYING: [ExecutionStatus.RUNNING, ExecutionStatus.FAILED, ExecutionStatus.CANCELLED],
@@ -265,7 +272,12 @@ class ExecutionLedgerService:
             update_data["status"] = status
             if status == ExecutionStatus.RUNNING and not started_at_value:
                 update_data["started_at"] = now
-            elif status in [ExecutionStatus.COMPLETED, ExecutionStatus.FAILED, ExecutionStatus.CANCELLED]:
+            elif status in [
+                ExecutionStatus.COMPLETED,
+                ExecutionStatus.NOT_SUBMITTED,
+                ExecutionStatus.FAILED,
+                ExecutionStatus.CANCELLED,
+            ]:
                 if not completed_at_value:
                     update_data["completed_at"] = now
 
