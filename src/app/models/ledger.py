@@ -14,6 +14,7 @@ from ..core.db.database import Base
 class ExecutionStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
+    NOT_SUBMITTED = "not_submitted"
     COMPLETED = "completed"
     FAILED = "failed"
     RETRYING = "retrying"

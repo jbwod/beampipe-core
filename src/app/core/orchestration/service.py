@@ -345,7 +345,11 @@ async def stage_sources_for_execution(
 
     execution_phase = _coerce_execution_phase(execution)
     existing_manifest = execution.get("workflow_manifest")
-    if execution.get("status") == ExecutionStatus.COMPLETED and existing_manifest:
+    st = execution.get("status")
+    if (
+        st in (ExecutionStatus.COMPLETED, ExecutionStatus.NOT_SUBMITTED)
+        and existing_manifest
+    ):
         return {
             "staged_urls_by_scan_id": {},
             "eval_urls_by_sbid": {},
@@ -419,7 +423,8 @@ async def build_manifest_for_execution(
 
     execution_phase = _coerce_execution_phase(execution)
     existing_manifest = execution.get("workflow_manifest")
-    if execution.get("status") == ExecutionStatus.COMPLETED and existing_manifest:
+    st = execution.get("status")
+    if st in (ExecutionStatus.COMPLETED, ExecutionStatus.NOT_SUBMITTED) and existing_manifest:
         return cast(dict[Any, Any], existing_manifest)
     if execution_phase == ExecutionPhase.SUBMIT and existing_manifest:
         return cast(dict[Any, Any], existing_manifest)
@@ -779,9 +784,12 @@ async def poll_dim_session_for_execution(
     if not execution:
         raise wf_execution_not_found(execution_id)
 
-    if execution["status"] == ExecutionStatus.COMPLETED:
+    st_poll = execution["status"]
+    if st_poll == ExecutionStatus.COMPLETED:
         return {"terminal": True, "status": "completed"}
-    if execution["status"] == ExecutionStatus.FAILED:
+    if st_poll == ExecutionStatus.NOT_SUBMITTED:
+        return {"terminal": True, "status": "not_submitted"}
+    if st_poll == ExecutionStatus.FAILED:
         return {"terminal": True, "status": "failed", "error": execution.get("last_error")}
 
     session_id = execution.get("scheduler_job_id")
@@ -901,7 +909,7 @@ async def execute_execution(
     1. Update execution status to RUNNING (and execution checkpoint)
     2. Stage data and build manifest unless ``execution_phase`` is already ``submit``
     3. Submit to DALiuGE (optional)
-    4. Update execution status to COMPLETED or FAILED
+    4. Update execution status to NOT_SUBMITTED (manifest-only), COMPLETED, or FAILED
 
     ``batch_execution_record.execution_phase`` survives ARQ retries so staging/manifest are not
     repeated after the manifest row has been persisted. See docs/execution_run_phases.md.
@@ -1009,6 +1017,19 @@ async def execute_execution(
             source_identifiers=source_identifiers,
             commit=False,
         )
+        if not do_submit:
+            await execution_ledger_service.update_execution_status(
+                db=db,
+                execution_id=execution_id,
+                status=ExecutionStatus.NOT_SUBMITTED,
+                execution_phase=None,
+            )
+            return {
+                "execution_id": str(execution_id),
+                "status": "not_submitted",
+                "manifest": manifest,
+            }
+
         await execution_ledger_service.update_execution_status(
             db=db,
             execution_id=execution_id,
