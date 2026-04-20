@@ -562,34 +562,41 @@ async def deploy_dim_session_payload_for_execution(
     dim_base: str,
     verify_ssl: bool,
 ) -> None:
-    """Deploy physical graph to DIM and checkpoint ``scheduler_job_id`` (replay-safe)."""
-    from ...crud.crud_execution_record import crud_batch_execution_records
-    from ...schemas.ledger import BatchExecutionRecordRead
-    from .rest_client.deploy_client import DaliugeDeployClient
-
-    execution = await crud_batch_execution_records.get(
-        db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
-    )
-    if not execution:
-        raise wf_execution_not_found(execution_id)
-    if execution.get("scheduler_name") == "daliuge" and execution.get("scheduler_job_id") == session_id:
-        return
-
-    deploy = DaliugeDeployClient(
-        base_url=dim_base,
-        verify=verify_ssl,
-    )
-    try:
-        deploy.deploy_session(session_id, pg_spec, roots)
-    finally:
-        deploy.close()
-
-    await execution_ledger_service.update_execution_status(
+    """Back-compat wrapper around :func:`rest.deploy_session_payload`."""
+    await rest.deploy_session_payload(
         db=db,
         execution_id=execution_id,
-        scheduler_name="daliuge",
-        scheduler_job_id=session_id,
-        execution_phase=ExecutionPhase.SUBMIT,
+        session_id=session_id,
+        pg_spec=pg_spec,
+        roots=roots,
+        dim_base=dim_base,
+        verify_ssl=verify_ssl,
+    )
+
+
+async def submit_slurm_session_payload_for_execution(
+    db: AsyncSession,
+    execution_id: UUID,
+    *,
+    session_id: str,
+    pgt_name: str,
+    pgt_json: Any,
+    deployment_config: dict[str, Any],
+    dlg_root: str,
+    login_node: str,
+    username: str,
+) -> None:
+    """Back-compat wrapper around :func:`slurm.submit_session_payload`."""
+    await slurm.submit_session_payload(
+        db=db,
+        execution_id=execution_id,
+        session_id=session_id,
+        pgt_name=pgt_name,
+        pgt_json=pgt_json,
+        deployment_config=deployment_config,
+        dlg_root=dlg_root,
+        login_node=login_node,
+        username=username,
     )
 
 
@@ -603,7 +610,8 @@ async def submit_dim_session_for_execution(
     """
     tr = await translate_dim_session_for_execution(db=db, execution_id=execution_id)
     session_id = str(tr["session_id"])
-    if tr["status"] == "ready":
+    status = tr.get("status")
+    if status == "ready_rest_remote":
         await deploy_dim_session_payload_for_execution(
             db=db,
             execution_id=execution_id,
@@ -614,34 +622,6 @@ async def submit_dim_session_for_execution(
             verify_ssl=bool(tr["verify_ssl"]),
         )
     return session_id
-
-
-async def _fetch_dim_graph_status(
-    client: httpx.AsyncClient,
-    session_id: str,
-) -> dict[str, Any]:
-    """graph/status`` endpoint
-
-    Returns ``{"drop_statuses": {...}, "error_drops": [...], "has_errors": bool}``.
-    """
-    sid = quote(str(session_id))
-    try:
-        r = await client.get(f"/api/sessions/{sid}/graph/status")
-        r.raise_for_status()
-        drop_statuses = r.json()
-    except Exception as e:
-        logger.warning("event=dim_graph_status_error session_id=%s error=%s", session_id, e)
-        return {"drop_statuses": {}, "error_drops": [], "has_errors": False}
-
-    if not isinstance(drop_statuses, dict):
-        return {"drop_statuses": {}, "error_drops": [], "has_errors": False}
-
-    error_drops = dim_graph_status_error_uids(drop_statuses)
-    return {
-        "drop_statuses": drop_statuses,
-        "error_drops": error_drops,
-        "has_errors": len(error_drops) > 0,
-    }
 
 
 async def poll_dim_session_for_execution(
@@ -669,9 +649,7 @@ async def poll_dim_session_for_execution(
     if st_poll == ExecutionStatus.FAILED:
         return {"terminal": True, "status": "failed", "error": execution.get("last_error")}
 
-    session_id = execution.get("scheduler_job_id")
-    project_module = execution["project_module"]
-    if not session_id:
+    if not execution.get("scheduler_job_id"):
         raise WorkflowFailure(
             WorkflowErrorCode.EXECUTION_DIM_STATE,
             f"Execution {execution_id} has no scheduler_job_id; call submit_dim_session_for_execution first",
@@ -679,99 +657,43 @@ async def poll_dim_session_for_execution(
 
     profile = await _resolve_deployment_profile(db, execution)
     deployment_backend = profile.get("deployment_backend")
-    if deployment_backend != "rest_dim":
-        await execution_ledger_service.update_execution_status(
+    if deployment_backend == "slurm_remote":
+        return await slurm.poll_session(
             db=db,
             execution_id=execution_id,
-            status=ExecutionStatus.FAILED,
-            error=f"durable DIM polling not implemented for backend={deployment_backend}",
-            execution_phase=ExecutionPhase.SUBMIT,
+            execution=execution,
+            profile=profile,
         )
-        return {"terminal": True, "status": "failed", "error": f"backend={deployment_backend}"}
-
-    deploy_host = profile.get("deploy_host")
-    deploy_port = profile.get("deploy_port")
-    if deploy_host is None or deploy_port is None:
-        raise WorkflowFailure(
-            WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
-            "REST DIM polling requires deploy_host and deploy_port on the deployment profile",
-        )
-    dim_base = dim_rest_http_base(str(deploy_host), int(deploy_port))
-
-    sid = quote(str(session_id))
-    async with httpx.AsyncClient(
-        base_url=dim_base.rstrip("/"),
-        verify=profile["verify_ssl"],
-        timeout=poll_timeout_seconds,
-    ) as client:
-        r = await client.get(f"/api/sessions/{sid}/status")
-        r.raise_for_status()
-        status_payload = r.json()
-
-        session_state = _parse_dim_session_status(status_payload)
-
-        if session_state == "running":
-            return {"terminal": False}
-
-        graph_info: dict[str, Any] = {}
-        if session_state == "finished":
-            graph_info = await _fetch_dim_graph_status(client, session_id)
-
-    # Terminal: update ledger and clear registry pending sources.
-    source_identifiers = source_identifiers_from_specs(execution.get("sources"))
-    await source_registry_service.clear_workflow_pending_for_sources(
-        db=db,
-        project_module=project_module,
-        source_identifiers=source_identifiers,
-        commit=False,
-    )
-
-    if session_state == "finished" and not graph_info.get("has_errors"):
-        logger.info(
-            "event=dim_session_completed execution_id=%s session_id=%s",
-            execution_id,
-            session_id,
-        )
-        await execution_ledger_service.update_execution_status(
+    if deployment_backend == "rest_remote":
+        return await rest.poll_session(
             db=db,
             execution_id=execution_id,
-            status=ExecutionStatus.COMPLETED,
-            scheduler_name="daliuge",
-            scheduler_job_id=str(session_id),
-            execution_phase=None,
+            execution=execution,
+            profile=profile,
+            poll_timeout_seconds=poll_timeout_seconds,
         )
-        return {"terminal": True, "status": "completed"}
 
-    error_drops = graph_info.get("error_drops", [])
-    if session_state == "finished" and graph_info.get("has_errors"):
-        error_msg = (
-            f"DLG session finished with {len(error_drops)} errored drop(s): "
-            f"{error_drops[:20]}"
-        )
-    else:
-        error_msg = f"DLG session error: {status_payload}"
-
-    logger.error(
-        "event=dim_session_failed execution_id=%s session_id=%s error=%s",
-        execution_id,
-        session_id,
-        error_msg,
-    )
     await execution_ledger_service.update_execution_status(
         db=db,
         execution_id=execution_id,
         status=ExecutionStatus.FAILED,
-        error=error_msg,
-        scheduler_name="daliuge",
-        scheduler_job_id=str(session_id),
+        error=f"durable polling not implemented for backend={deployment_backend}",
         execution_phase=ExecutionPhase.SUBMIT,
     )
-    return {
-        "terminal": True,
-        "status": "failed",
-        "error": error_msg,
-        "error_drops": error_drops[:50],
-    }
+    return {"terminal": True, "status": "failed", "error": f"backend={deployment_backend}"}
+
+
+async def poll_slurm_session_for_execution(
+    db: AsyncSession,
+    execution_id: UUID,
+    *,
+    execution: dict[str, Any],
+    profile: dict[str, Any],
+) -> dict[str, Any]:
+    """Back-compat wrapper around :func:`slurm.poll_session`."""
+    return await slurm.poll_session(
+        db=db, execution_id=execution_id, execution=execution, profile=profile
+    )
 
 
 async def execute_execution(
