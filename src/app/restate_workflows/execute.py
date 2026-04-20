@@ -268,10 +268,11 @@ async def _execute_execution_workflow_body(
         _execution_translate_dim,
         execution_id=execution_id,
     )
-    if tr["status"] == "ready":
+    tr_status = tr.get("status")
+    if tr_status == "ready_rest_remote":
         await _run_step(
             ctx,
-            "execution.deploy_dim",
+            "execution.deploy_rest_remote",
             _run_opts_external_io(run_policy_overrides),
             _execution_deploy_dim,
             execution_id=execution_id,
@@ -281,15 +282,60 @@ async def _execute_execution_workflow_body(
             dim_base=tr["dim_base"],
             verify_ssl=tr["verify_ssl"],
         )
+        max_polls = positive_int(
+            run_policy_overrides,
+            "rest_remote_poll_max_rounds",
+            settings.RESTATE_REST_REMOTE_POLL_MAX_ROUNDS,
+        )
+        poll_interval = settings.RESTATE_REST_REMOTE_POLL_INTERVAL_SECONDS
+        poll_step_prefix = "execution.poll_rest_remote"
+        poll_callable = _execution_poll_dim
+        poll_timeout_code = WorkflowErrorCode.EXECUTION_DIM_STATE
+        poll_timeout_what = "REST remote session"
+    elif tr_status == "ready_slurm":
+        await _run_step(
+            ctx,
+            "execution.submit_slurm",
+            _run_opts_external_io(run_policy_overrides),
+            _execution_submit_slurm,
+            execution_id=execution_id,
+            session_id=tr["session_id"],
+            pgt_name=tr["pgt_name"],
+            pgt_json=tr["pgt_json"],
+            deployment_config=tr.get("deployment_config") or {},
+            dlg_root=tr["dlg_root"],
+            login_node=tr["login_node"],
+            username=tr["username"],
+        )
+        max_polls = positive_int(
+            run_policy_overrides,
+            "slurm_remote_poll_max_rounds",
+            settings.RESTATE_SLURM_REMOTE_POLL_MAX_ROUNDS,
+        )
+        poll_interval = settings.RESTATE_SLURM_REMOTE_POLL_INTERVAL_SECONDS
+        poll_step_prefix = "execution.poll_slurm"
+        poll_callable = _execution_poll_slurm
+        poll_timeout_code = WorkflowErrorCode.EXECUTION_SLURM_STATE
+        poll_timeout_what = "SLURM job"
+    else:
+        # ``noop`` / ``terminal_completed`` / ``terminal_failed`` already wrote
+        # the ledger; just surface the snapshot.
+        ledger = await _run_step(
+            ctx,
+            "execution.read_snapshot",
+            _run_opts_database(run_policy_overrides),
+            _execution_read_snapshot,
+            execution_id=execution_id,
+        )
+        return {**tr, "execution_id": execution_id, "ledger": ledger}
 
-    max_polls = settings.RESTATE_DIM_POLL_MAX_ROUNDS
     poll_round = 0
     while poll_round < max_polls:
         poll = await _run_step(
             ctx,
-            f"execution.poll_dim.{poll_round}",
+            f"{poll_step_prefix}.{poll_round}",
             _run_opts_poll(run_policy_overrides),
-            _execution_poll_dim,
+            poll_callable,
             execution_id=execution_id,
         )
         poll_round += 1
@@ -302,12 +348,13 @@ async def _execute_execution_workflow_body(
                 execution_id=execution_id,
             )
             return {**poll, "execution_id": execution_id, "ledger": ledger}
-        await ctx.sleep(delta=timedelta(seconds=settings.RESTATE_DIM_POLL_INTERVAL_SECONDS))
+        await ctx.sleep(delta=timedelta(seconds=poll_interval))
 
     _ingress_terminal(
         WorkflowFailure(
-            WorkflowErrorCode.EXECUTION_DIM_STATE,
-            f"DIM poll exceeded {max_polls} rounds without reaching a terminal state",
+            poll_timeout_code,
+            f"{poll_timeout_what} ({poll_step_prefix}) exceeded {max_polls} rounds "
+            f"({max_polls * poll_interval:.0f}s) without reaching a terminal state",
         )
     )
 

@@ -90,8 +90,10 @@ def _resolve_workflow_step_overrides_from_policy(
         f"{family}_max_duration_minutes_db": "db_max_duration_minutes",
     }
     if family == "execution":
-        int_map[f"{family}_max_polls"] = "poll_max_attempts"
-        int_map[f"{family}_poll_max_duration_minutes"] = "poll_max_duration_minutes"
+        int_map[f"{family}_poll_step_max_attempts"] = "poll_max_attempts"
+        int_map[f"{family}_poll_step_max_duration_minutes"] = "poll_max_duration_minutes"
+        int_map[f"{family}_rest_remote_poll_max_rounds"] = "rest_remote_poll_max_rounds"
+        int_map[f"{family}_slurm_remote_poll_max_rounds"] = "slurm_remote_poll_max_rounds"
 
     for in_key, out_key in int_map.items():
         v = positive_int_optional(policy, in_key)

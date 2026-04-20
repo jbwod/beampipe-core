@@ -6,7 +6,7 @@ from ..core.schemas import TimestampSchema, UUIDSchema
 
 # per https://daliuge.readthedocs.io/en/v6.3.0/cli/cli_translator.html
 DaliugeAlgo = Literal["metis", "mysarkar"]
-DeploymentBackend = Literal["rest_dim", "slurm_remote"]
+DeploymentBackend = Literal["rest_remote", "slurm_remote"]
 SlurmPreset = Literal["setonix", "default"]
 
 
@@ -29,12 +29,12 @@ class DaliugeTranslationConfig(BaseModel):
     )
 
 
-class RestDimDeploymentConfig(BaseModel):
-    """DALiuGE REST DIM deployment"""
+class RestRemoteDeploymentConfig(BaseModel):
+    """DALiuGE REST remote deployment"""
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["rest_dim"] = "rest_dim"
+    kind: Literal["rest_remote"] = "rest_remote"
     dim_host_for_tm: str | None = Field(
         default=None,
         max_length=100,
@@ -103,7 +103,7 @@ class SlurmRemoteDeploymentConfig(BaseModel):
 
 
 DeploymentConfigUnion = Annotated[
-    Union[RestDimDeploymentConfig, SlurmRemoteDeploymentConfig],
+    Union[RestRemoteDeploymentConfig, SlurmRemoteDeploymentConfig],
     Field(discriminator="kind"),
 ]
 
@@ -111,9 +111,9 @@ DeploymentConfigUnion = Annotated[
 def _validate_deployment_payload(payload: dict[str, Any]) -> dict[str, Any]:
     raw = dict(payload)
     if "kind" not in raw:
-        raw["kind"] = "rest_dim"
-    if raw.get("kind") == "rest_dim":
-        return RestDimDeploymentConfig.model_validate(raw).model_dump(exclude_none=True)
+        raw["kind"] = "rest_remote"
+    if raw.get("kind") == "rest_remote":
+        return RestRemoteDeploymentConfig.model_validate(raw).model_dump(exclude_none=True)
     return SlurmRemoteDeploymentConfig.model_validate(raw).model_dump(exclude_none=True)
 
 
@@ -186,9 +186,9 @@ class DaliugeDeploymentProfileCreate(BaseModel):
     deployment: DeploymentConfigUnion
 
     @model_validator(mode="after")
-    def _default_rest_dim_ports(self) -> Self:
+    def _default_rest_remote_ports(self) -> Self:
         dep = self.deployment
-        if dep.kind == "rest_dim":
+        if dep.kind == "rest_remote":
             updates: dict[str, Any] = {}
             if dep.dim_port_for_tm is None:
                 updates["dim_port_for_tm"] = 8001
@@ -290,9 +290,9 @@ def expand_update_with_nested_optional(
     if deployment_patch and isinstance(deployment_patch, dict):
         current_dep = dict(current.get("deployment") or {})
         merged_dep = {**current_dep, **deployment_patch}
-        kind = merged_dep.get("kind", "rest_dim")
-        if kind == "rest_dim":
-            patch["deployment"] = RestDimDeploymentConfig.model_validate(merged_dep).model_dump(
+        kind = merged_dep.get("kind", "rest_remote")
+        if kind == "rest_remote":
+            patch["deployment"] = RestRemoteDeploymentConfig.model_validate(merged_dep).model_dump(
                 exclude_none=True
             )
         else:

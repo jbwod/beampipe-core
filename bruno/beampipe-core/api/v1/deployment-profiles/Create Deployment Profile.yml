@@ -13,7 +13,7 @@ http:
     data: |-
       {
         "name": "test-staging-e2e-rest-dim",
-        "description": "rest_dim",
+        "description": "rest_remote",
         "project_module": "wallaby_hires",
         "is_default": true,
         "translation": {
@@ -23,7 +23,7 @@ http:
           "tm_url": "http://dlg-tm.desk"
         },
         "deployment": {
-          "kind": "rest_dim",
+          "kind": "rest_remote",
           "dim_host_for_tm": "dlg-dim",
           "dim_port_for_tm": 8001,
           "deploy_host": "dlg-dim.desk",
@@ -62,7 +62,7 @@ examples:
               "tm_url": ""
             },
             "deployment": {
-              "kind": "rest_dim",
+              "kind": "rest_remote",
               "dim_host_for_tm": "",
               "dim_port_for_tm": 8001,
               "deploy_host": "",
@@ -92,7 +92,7 @@ examples:
               "tm_url": ""
             },
             "deployment": {
-              "kind": "rest_dim",
+              "kind": "rest_remote",
               "dim_host_for_tm": "",
               "dim_port_for_tm": 8001,
               "deploy_host": "",
@@ -122,7 +122,7 @@ examples:
               "tm_url": ""
             },
             "deployment": {
-              "kind": "rest_dim",
+              "kind": "rest_remote",
               "dim_host_for_tm": "",
               "dim_port_for_tm": 8001,
               "deploy_host": "",
@@ -159,8 +159,8 @@ examples:
         type: json
         data: |-
           {
-            "name": "test-staging-e2e-rest-dim",
-            "description": "rest_dim",
+            "name": "test-staging-e2e-rest-remote",
+            "description": "rest_remote",
             "project_module": "wallaby_hires",
             "is_default": true,
             "translation": {
@@ -170,7 +170,7 @@ examples:
               "tm_url": "http://dlg-tm.desk"
             },
             "deployment": {
-              "kind": "rest_dim",
+              "kind": "rest_remote",
               "dim_host_for_tm": "dlg-dim",
               "dim_port_for_tm": 8001,
               "deploy_host": "dlg-dim.desk",
@@ -186,8 +186,8 @@ examples:
         data: |-
           {
             "uuid": "019d6c0d-c4a7-72a0-ad60-3f03a6c5ddba",
-            "name": "test-staging-e2e-rest-dim",
-            "description": "rest_dim",
+            "name": "test-staging-e2e-rest-remote",
+            "description": "rest_remote",
             "project_module": "wallaby_hires",
             "is_default": true,
             "translation": {
@@ -197,7 +197,7 @@ examples:
               "tm_url": "http://dlg-tm.desk"
             },
             "deployment": {
-              "kind": "rest_dim",
+              "kind": "rest_remote",
               "dim_host_for_tm": "dlg-dim",
               "dim_port_for_tm": 8001,
               "deploy_host": "dlg-dim.desk",

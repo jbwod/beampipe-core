@@ -24,7 +24,7 @@ http:
           "algo": "metis"
         },
         "deployment": {
-          "kind": "rest_dim",
+          "kind": "rest_remote",
           "verify_ssl": false
         }
       }
@@ -58,7 +58,7 @@ examples:
               "algo": "metis"
             },
             "deployment": {
-              "kind": "rest_dim",
+              "kind": "rest_remote",
               "verify_ssl": false
             }
           }
@@ -84,7 +84,7 @@ examples:
               "tm_url": ""
             },
             "deployment": {
-              "kind": "rest_dim",
+              "kind": "rest_remote",
               "dim_host_for_tm": "",
               "dim_port_for_tm": 8001,
               "deploy_host": "",
@@ -115,7 +115,7 @@ examples:
               "algo": "metis"
             },
             "deployment": {
-              "kind": "rest_dim",
+              "kind": "rest_remote",
               "verify_ssl": false
             }
           }
