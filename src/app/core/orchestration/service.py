@@ -196,7 +196,22 @@ async def enrich_execution_dim_rest_urls(
             execution.get("uuid"),
             exc_info=True,
         )
+        if scheduler_name == "slurm":
+            return slurm.slurm_session_debug_paths(str(sid))
         return {}
+
+    if scheduler_name == "slurm":
+        out = slurm.slurm_session_debug_paths(str(sid))
+        deployment_config = dict(profile.get("deployment_config") or {})
+        login_node = deployment_config.get("login_node")
+        if login_node:
+            out["slurm_login_node"] = str(login_node)
+        remote_user = deployment_config.get("remote_user")
+        if remote_user:
+            out["slurm_remote_user"] = str(remote_user)
+        return out
+
+    return rest.session_debug_urls(profile, str(sid))
 
 
 async def _resolve_deployment_profile(
@@ -528,6 +543,7 @@ async def translate_dim_session_for_execution(
 
     profile = await _resolve_deployment_profile(db, execution)
     deployment_backend = profile.get("deployment_backend")
+
     if deployment_backend == "slurm_remote":
         return await slurm.translate(
             db=db,
@@ -586,7 +602,7 @@ async def submit_slurm_session_payload_for_execution(
     login_node: str,
     username: str,
 ) -> None:
-    """Back-compat wrapper around :func:`slurm.submit_session_payload`."""
+    """slurm.submit_session_payload wrap"""
     await slurm.submit_session_payload(
         db=db,
         execution_id=execution_id,
@@ -620,6 +636,18 @@ async def submit_dim_session_for_execution(
             roots=tr["roots"],
             dim_base=str(tr["dim_base"]),
             verify_ssl=bool(tr["verify_ssl"]),
+        )
+    elif status == "ready_slurm":
+        await submit_slurm_session_payload_for_execution(
+            db=db,
+            execution_id=execution_id,
+            session_id=session_id,
+            pgt_name=str(tr["pgt_name"]),
+            pgt_json=tr["pgt_json"],
+            deployment_config=dict(tr.get("deployment_config") or {}),
+            dlg_root=str(tr["dlg_root"]),
+            login_node=str(tr["login_node"]),
+            username=str(tr["username"]),
         )
     return session_id
 
