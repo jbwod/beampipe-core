@@ -74,8 +74,8 @@
       <pre>
     <code class="language-json">
 {
-  "name": "test-staging-e2e-rest-dim",
-  "description": "rest_dim",
+  "name": "test-staging-e2e-rest-remote",
+  "description": "rest_remote",
   "project_module": "wallaby_hires",
   "is_default": true,
   "translation": {
@@ -85,7 +85,7 @@
     "tm_url": "http://dlg-tm.desk"
   },
   "deployment": {
-    "kind": "rest_dim",
+    "kind": "rest_remote",
     "dim_host_for_tm": "dlg-dim",
     "dim_port_for_tm": 8001,
     "deploy_host": "dlg-dim.desk",
