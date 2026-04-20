@@ -76,6 +76,7 @@ class SlurmRemoteDeploymentConfig(BaseModel):
 
     # Facility (dlg deploy INI [FACILITY])
     login_node: Annotated[str, Field(min_length=1, max_length=255)]
+    ssh_port: int = Field(default=22,ge=1,le=65535,description="SSH Port (default 22).",)
     dlg_root: Annotated[str, Field(min_length=1, max_length=512)]
     account: Annotated[str, Field(min_length=1, max_length=100)]
     job_duration_minutes: Annotated[int, Field(ge=1, le=10080)]
