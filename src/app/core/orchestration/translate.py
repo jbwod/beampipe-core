@@ -27,20 +27,20 @@ async def translate_lg_to_pgt_artifact(
     graph_json: Any,
     profile: dict[str, Any],
 ) -> tuple[str, Any]:
-    """Run TM ``gen_pgt`` and download the resulting PGT JSON body.
+    """Run TM POST /unroll_and_partition and return partitioned PGT JSON.
 
-    Returns ``(pgt_name, pgt_json)``. ``rest_remote`` additionally calls ``gen_pg``
-    against ``pgt_name``; ``slurm_remote`` streams ``pgt_json`` to the login
-    node.
+    Returns (pgt_name, pgt_json) where pgt_jso` is [pgt_filename, drop_list] as dlg.deploy.create_dlg_job -P
+    find_numislands expects - only this SLURM handover needs the full partitioned body.
     """
-    pgt_id = translator.translate_lg_to_pgt(
+    raw = translator.unroll_and_partition_lg(
         lg_name,
         graph_json,
         algo=profile["algo"],
         num_par=profile["num_par"],
         num_islands=profile["num_islands"],
     )
-    pgt_json = translator.download_pgt(pgt_id)
+    pgt_json = partitioned_pgt_for_dlg_deploy(raw, lg_name)
+    pgt_id = pgt_handle_from_partitioned_payload(pgt_json, lg_name)
     return pgt_id, pgt_json
 
 

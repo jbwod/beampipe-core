@@ -1,7 +1,7 @@
-from .daliuge import SlurmPreset, SlurmRemoteDeploymentConfig
+from .daliuge import SlurmFacility, SlurmRemoteDeploymentConfig
 
 __all__ = [
-    "SlurmPreset",
+    "SlurmFacility",
     "SlurmRemoteDeploymentConfig",
 ]
 

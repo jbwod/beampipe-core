@@ -1,4 +1,4 @@
-"""Execute DIM translate/deploy/poll."""
+"""Execute translation, submission, and backend polling."""
 
 import logging
 from datetime import timedelta
@@ -19,7 +19,9 @@ from ..core.exceptions.workflow_exceptions import (
 from ..core.ledger.service import execution_ledger_service
 from ..core.log_context import bind_execution_log_context
 from ..core.orchestration import service as orchestration_service
+from ..core.positive_policy import positive_int
 from ..core.projects import resolve_workflow_execute_step_overrides
+from ..core.restate_invoke import invoke_restate_workflow
 from ..models.ledger import ExecutionStatus
 from .options import _run_opts_database, _run_opts_external_io, _run_opts_poll
 from .runtime import _ingress_terminal, _run_step
@@ -154,6 +156,56 @@ async def _execution_poll_dim(execution_id: str) -> dict[str, Any]:
         return await orchestration_service.poll_dim_session_for_execution(
             db=db, execution_id=UUID(execution_id)
         )
+
+
+async def _execution_submit_slurm(
+    execution_id: str,
+    session_id: str,
+    pgt_json: Any,
+    deployment_config: dict[str, Any],
+    dlg_root: str,
+    login_node: str,
+    username: str,
+) -> dict[str, Any]:
+    async with local_session() as db:
+        await orchestration_service.submit_slurm_session_payload_for_execution(
+            db=db,
+            execution_id=UUID(execution_id),
+            session_id=session_id,
+            pgt_json=pgt_json,
+            deployment_config=dict(deployment_config or {}),
+            dlg_root=dlg_root,
+            login_node=login_node,
+            username=username,
+        )
+    return {"session_id": session_id}
+
+
+async def _execution_kickoff_slurm_completion(
+    execution_id: str,
+    arq_job_id: str | None,
+    arq_job_try: int | None,
+) -> dict[str, Any]:
+    """Fire-and-forget send to SlurmCompletionWorkflow keyed by execution_id.
+
+    Uses the existing HTTP ingress helper (/workflow/<id>/<handler>/send) because
+    it already tolerates the 409 "already accepted" reply for replays: Restate dedupes
+    on the workflow key, so a retry of this step cannot spawn a second completion
+    workflow. Invoked from one-shot kickoff as a single durable step.
+    """
+    payload: dict[str, Any] = {}
+    if arq_job_id is not None:
+        payload["arq_job_id"] = arq_job_id
+    if arq_job_try is not None:
+        payload["arq_job_try"] = arq_job_try
+    return await invoke_restate_workflow(
+        workflow_name=settings.RESTATE_SLURM_COMPLETION_WORKFLOW_NAME,
+        workflow_id=execution_id,
+        handler_name=settings.RESTATE_SLURM_COMPLETION_WORKFLOW_HANDLER,
+        payload=payload,
+        arq_job_id=arq_job_id,
+        job_try=arq_job_try,
+    )
 
 
 async def _execute_execution_no_submit_step(execution_id: str, do_stage: bool) -> dict[str, Any]:
@@ -300,23 +352,38 @@ async def _execute_execution_workflow_body(
             _execution_submit_slurm,
             execution_id=execution_id,
             session_id=tr["session_id"],
-            pgt_name=tr["pgt_name"],
             pgt_json=tr["pgt_json"],
             deployment_config=tr.get("deployment_config") or {},
             dlg_root=tr["dlg_root"],
             login_node=tr["login_node"],
             username=tr["username"],
         )
-        max_polls = positive_int(
-            run_policy_overrides,
-            "slurm_remote_poll_max_rounds",
-            settings.RESTATE_SLURM_REMOTE_POLL_MAX_ROUNDS,
+        # Hand off the squeue/sacct poll loop to a separate workflow so this
+        # workflow can return as soon as the job is in the scheduler's queue.
+        # slurm.submit_session_payload has already flipped the ledger to
+        # AWAITING_SCHEDULER
+        await _run_step(
+            ctx,
+            "execution.kickoff_slurm_completion",
+            _run_opts_external_io(run_policy_overrides),
+            _execution_kickoff_slurm_completion,
+            execution_id=execution_id,
+            arq_job_id=exec_req.arq_job_id,
+            arq_job_try=exec_req.arq_job_try,
         )
-        poll_interval = settings.RESTATE_SLURM_REMOTE_POLL_INTERVAL_SECONDS
-        poll_step_prefix = "execution.poll_slurm"
-        poll_callable = _execution_poll_slurm
-        poll_timeout_code = WorkflowErrorCode.EXECUTION_SLURM_STATE
-        poll_timeout_what = "SLURM job"
+        ledger = await _run_step(
+            ctx,
+            "execution.read_snapshot",
+            _run_opts_database(run_policy_overrides),
+            _execution_read_snapshot,
+            execution_id=execution_id,
+        )
+        return {
+            "status": "submitted_slurm",
+            "session_id": tr["session_id"],
+            "execution_id": execution_id,
+            "ledger": ledger,
+        }
     else:
         # ``noop`` / ``terminal_completed`` / ``terminal_failed`` already wrote
         # the ledger; just surface the snapshot.
