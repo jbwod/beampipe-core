@@ -3,7 +3,6 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import quote
 from uuid import UUID
 
 import httpx
@@ -33,11 +32,7 @@ from ..ledger.source_readiness import (
 )
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..registry.service import source_registry_service
-from ..utils.daliuge import (
-    classify_dim_session_status as _parse_dim_session_status,
-    dim_graph_status_error_uids,
-    dim_rest_http_base,
-)
+from . import rest, slurm
 from .manifest import inject_manifest_config_into_graph
 from .manifest_builder import build_manifest
 from .staging import stage_sources_for_manifest
@@ -166,7 +161,7 @@ def _coerce_execution_phase(run: dict) -> ExecutionPhase | None:
 def _profile_to_dict(profile: dict) -> dict:
     translation = dict(profile.get("translation") or {})
     deployment = dict(profile.get("deployment") or {})
-    backend = str(deployment.get("kind") or "rest_dim")
+    backend = str(deployment.get("kind") or "rest_remote")
     return {
         "algo": translation.get("algo", "metis"),
         "num_par": translation.get("num_par", 1),
@@ -182,35 +177,22 @@ def _profile_to_dict(profile: dict) -> dict:
     }
 
 
-def _dim_rest_session_debug_urls(profile: dict, session_id: str) -> dict[str, str]:
-    if profile.get("deployment_backend") != "rest_dim":
-        return {}
-    deploy_host = profile.get("deploy_host")
-    deploy_port = profile.get("deploy_port")
-    if deploy_host is None or deploy_port is None:
-        return {}
-    dim_base = dim_rest_http_base(str(deploy_host), int(deploy_port))
-    sid = quote(str(session_id))
-    base = dim_base.rstrip("/")
-    return {
-        "dim_session_status_url": f"{base}/api/sessions/{sid}/status",
-        "dim_graph_status_url": f"{base}/api/sessions/{sid}/graph/status",
-    }
-
-
 async def enrich_execution_dim_rest_urls(
     db: AsyncSession,
     execution: dict[str, Any],
 ) -> dict[str, str]:
     sid = execution.get("scheduler_job_id")
-    if not sid or execution.get("scheduler_name") != "daliuge":
+    if not sid:
+        return {}
+    scheduler_name = execution.get("scheduler_name")
+    # need to align as scheduler name a bit redundant
+    if scheduler_name not in {"daliuge", "slurm"}:
         return {}
     try:
         profile = await _resolve_deployment_profile(db, execution)
-        return _dim_rest_session_debug_urls(profile, str(sid))
     except Exception:
         logger.debug(
-            "event=dim_rest_urls_unresolved execution_id=%s",
+            "event=execution_paths_unresolved execution_id=%s",
             execution.get("uuid"),
             exc_info=True,
         )
@@ -451,32 +433,6 @@ async def build_manifest_for_execution(
     return manifest
 
 
-async def _fail_execution_after_dim_translate_error(
-    db: AsyncSession,
-    execution: dict,
-    execution_id: UUID,
-    project_module: str,
-    error_message: str,
-    session_id: str,
-) -> dict[str, Any]:
-    """Mark execution failed during TM errors and clear pending sources."""
-    source_identifiers = source_identifiers_from_specs(execution.get("sources"))
-    await source_registry_service.clear_workflow_pending_for_sources(
-        db=db,
-        project_module=project_module,
-        source_identifiers=source_identifiers,
-        commit=False,
-    )
-    await execution_ledger_service.update_execution_status(
-        db=db,
-        execution_id=execution_id,
-        status=ExecutionStatus.FAILED,
-        error=error_message,
-        execution_phase=ExecutionPhase.SUBMIT,
-    )
-    return {"status": "terminal_failed", "session_id": session_id}
-
-
 async def translate_dim_session_for_execution(
     db: AsyncSession,
     execution_id: UUID,
@@ -487,8 +443,6 @@ async def translate_dim_session_for_execution(
     """
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
-    from ..utils.daliuge import get_roots
-    from .rest_client.translator_client import DaliugeTranslatorClient
 
     execution = await crud_batch_execution_records.get(
         db=db, uuid=execution_id, schema_to_select=BatchExecutionRecordRead
@@ -575,104 +529,27 @@ async def translate_dim_session_for_execution(
     profile = await _resolve_deployment_profile(db, execution)
     deployment_backend = profile.get("deployment_backend")
     if deployment_backend == "slurm_remote":
-
-        await execution_ledger_service.update_execution_status(
-            db=db,
-            execution_id=execution_id,
-            status=ExecutionStatus.FAILED,
-            error="not yet implemented",
-            execution_phase=ExecutionPhase.SUBMIT,
-        )
-        return {"status": "terminal_failed", "session_id": session_id}
-        # rest_dim: TM gen_pgt + gen_pg + DIM (requires tm_url, dim_*, deploy_*)
-
-    tm_url = profile.get("tm_url")
-    if not tm_url:
-        raise WorkflowFailure(
-            WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
-            "rest_dim requires tm_url on the deployment profile",
-        )
-    dim_host = profile.get("dim_host_for_tm")
-    dim_port = profile.get("dim_port_for_tm")
-    if dim_host is None or dim_port is None:
-        raise WorkflowFailure(
-            WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
-            "rest_dim requires dim_host_for_tm and dim_port_for_tm for gen_pg",
-        )
-
-    translator = DaliugeTranslatorClient(
-        base_url=tm_url,
-        verify=profile["verify_ssl"],
-    )
-    try:
-        try:
-            pgt_id = translator.translate_lg_to_pgt(
-                lg_name,
-                graph_json,
-                algo=profile["algo"],
-                num_par=profile["num_par"],
-                num_islands=profile["num_islands"],
-            )
-            pg_spec = translator.translate_pgt_to_pg(
-                pgt_id,
-                dim_host_for_tm=dim_host,
-                dim_port_for_tm=dim_port,
-            )
-        except (httpx.RequestError, json.JSONDecodeError) as e:
-            err_detail = str(e)
-            if isinstance(e, httpx.HTTPStatusError) and e.response is not None:
-                body = (e.response.text or "").strip()[:1200]
-                if body:
-                    err_detail = f"{err_detail} response_body={body}"
-            logger.warning(
-                "event=translate_dim_tm_error execution_id=%s project_module=%s error=%s",
-                execution_id,
-                project_module,
-                err_detail,
-                exc_info=True,
-            )
-            return await _fail_execution_after_dim_translate_error(
-                db=db,
-                execution=execution,
-                execution_id=execution_id,
-                project_module=project_module,
-                error_message=err_detail,
-                session_id=session_id,
-            )
-    finally:
-        translator.close()
-
-    if not isinstance(pg_spec, list) or len(pg_spec) == 0:
-        return await _fail_execution_after_dim_translate_error(
+        return await slurm.translate(
             db=db,
             execution=execution,
             execution_id=execution_id,
             project_module=project_module,
-            error_message="Empty physical graph from translator",
             session_id=session_id,
+            graph_json=graph_json,
+            lg_name=lg_name,
+            profile=profile,
         )
 
-    drops = pg_spec[1:] if isinstance(pg_spec[0], str) else pg_spec
-    specs = [x for x in drops if isinstance(x, dict) and x.get("oid")]
-    roots = list(get_roots(specs))
-
-    deploy_host = profile.get("deploy_host")
-    deploy_port = profile.get("deploy_port")
-    if deploy_host is None or deploy_port is None:
-        raise WorkflowFailure(
-            WorkflowErrorCode.EXECUTION_DEPLOYMENT_PROFILE,
-            "REST DIM deploy requires deploy_host and deploy_port on the deployment profile",
-        )
-    dim_base = dim_rest_http_base(str(deploy_host), int(deploy_port))
-
-    return {
-        "status": "ready",
-        "session_id": session_id,
-        "pg_spec": pg_spec,
-        "roots": roots,
-        "dim_base": dim_base,
-        "verify_ssl": profile["verify_ssl"],
-    }
+    return await rest.translate(
+        db=db,
+        execution=execution,
+        execution_id=execution_id,
+        project_module=project_module,
+        session_id=session_id,
+        graph_json=graph_json,
+        lg_name=lg_name,
+        profile=profile,
+    )
 
 
 async def deploy_dim_session_payload_for_execution(
