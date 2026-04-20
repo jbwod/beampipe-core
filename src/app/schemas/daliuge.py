@@ -47,25 +47,28 @@ class RestDimDeploymentConfig(BaseModel):
 
 
 class SlurmRemoteDeploymentConfig(BaseModel):
-# [ENGINE]
-# NUM_NODES = 1
-# NUM_ISLANDS = 1
-# ALL_NICS =
+    """DALiuGE remote SLURM deployment (login node + sbatch).
+    reference setonix.ini from dlg/daliuge-engine/dlg/deploy/configs/
 
+        [ENGINE]
+        NUM_NODES = 1
+        NUM_ISLANDS = 1
+        ALL_NICS =
 
-# [FACILITY]
-# ACCOUNT = pawsey0411
-# USER =
-# LOGIN_NODE = setonix.pawsey.org.au
-# HOME_DIR = /scratch/${ACCOUNT}
-# DLG_ROOT = ${HOME_DIR}/${USER}/dlg
-# LOG_DIR = ${DLG_ROOT}/log
-# MODULES = module use /group/askap/modulefiles
-#     module load singularity/4.1.0-mpi
-#     module load py-mpi4py/3.1.5-py3.11.6
-#     module load py-numpy/1.26.4
-# VENV = source /software/projects/${ACCOUNT}/venv/bin/activate
-# EXEC_PREFIX = srun -l
+        [FACILITY]
+        ACCOUNT = pawsey0411
+        USER =
+        LOGIN_NODE = setonix.pawsey.org.au
+        HOME_DIR = /scratch/${ACCOUNT}
+        DLG_ROOT = ${HOME_DIR}/${USER}/dlg
+        LOG_DIR = ${DLG_ROOT}/log
+        MODULES = module use /group/askap/modulefiles
+            module load singularity/4.1.0-mpi
+            module load py-mpi4py/3.1.5-py3.11.6
+            module load py-numpy/1.26.4
+        VENV = source /software/projects/${ACCOUNT}/venv/bin/activate
+        EXEC_PREFIX = srun -l
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -82,31 +85,21 @@ class SlurmRemoteDeploymentConfig(BaseModel):
     venv: str | None = Field(default=None, description="Shell snippet to activate venv")
     exec_prefix: str | None = Field(default="srun -l", max_length=100)
 
-    # sbatch_mem: str | None = Field(default="16G", max_length=32, description="e.g. 16G, 64G")
-    # sbatch_partition: str | None = Field(default=None, max_length=100)
-    # sbatch_qos: str | None = Field(default=None, max_length=100)
-    # sbatch_extra_directives: list[str] | None = Field(
-    #     default=None,
-    #     description="Additional #SBATCH lines",
-    # )
-    # shell_preamble: str | None = Field(
-    #     default=None,
-    #     description="Shell block before engine line",
-    # )
+    # sbatch
+    num_nodes: int = Field(default=1, ge=1, le=1024, description="#SBATCH --nodes")
+    num_islands: int = Field(default=1, ge=0, le=64, description="dlg start_dlg_cluster --num_islands")
+    sbatch_mem: str | None = Field(default="16G", max_length=32, description="eg 16G, 64G")
+    verbose_level: int = Field(default=1, ge=0, le=5, description="dlg -v")
+    max_threads: int = Field(default=0, ge=0, description="dlg --max-threads")
+    all_nics: bool = Field(default=False, description="dlg --all_nics")
 
-    # verbose_level: int = Field(default=1, ge=0, le=5)
-    # max_threads: int = Field(default=0, ge=0)
-    # zerorun: bool = False
-    # sleepncopy: bool = False
-    # all_nics: bool = False
-    # check_with_session: bool = False
-    # visualise_graph: bool = False
-
-    # slurm_preset: SlurmPreset | None = None
-    # slurm_header_template: str | None = Field(
-    #     default=None,
-    #     description="Full SLURM header + preamble",
-    # )
+    slurm_template_name: str = Field(
+        default="setonix",
+        max_length=64,
+        description=(
+            "Template in orchestration/slurm_client/templates/<name>.slurm"
+        ),
+    )
 
 
 DeploymentConfigUnion = Annotated[
