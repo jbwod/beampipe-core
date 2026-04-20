@@ -186,8 +186,19 @@ class RestateWorkflowSettings(BaseSettings):
     RESTATE_STEP_INITIAL_RETRY_SECONDS: float = 2.0
     RESTATE_STEP_MAX_RETRY_INTERVAL_SECONDS: float = 120.0
 
-    RESTATE_DIM_POLL_INTERVAL_SECONDS: float = 15.0
-    RESTATE_DIM_POLL_MAX_ROUNDS: int = 240
+    RESTATE_REST_REMOTE_POLL_INTERVAL_SECONDS: float = 15.0
+    RESTATE_REST_REMOTE_POLL_MAX_ROUNDS: int = 240
+
+    RESTATE_SLURM_REMOTE_POLL_INTERVAL_SECONDS: float = 30.0
+    RESTATE_SLURM_REMOTE_POLL_MAX_ROUNDS: int = 480
+
+
+class SlurmSshSettings(BaseSettings):
+    SLURM_SSH_PRIVATE_KEY_PATH: str | None = None
+    SLURM_SSH_PRIVATE_KEY_PASSPHRASE: SecretStr | None = None
+    SLURM_SSH_KNOWN_HOSTS: str | None = None
+    SLURM_SSH_CONNECT_TIMEOUT_SECONDS: float = 30.0
+    SLURM_SSH_COMMAND_TIMEOUT_SECONDS: float = 60.0
 
 
 class DiscoverySettings(BaseSettings):
@@ -250,6 +261,7 @@ class Settings(
     ShapingSettings,
     ArchiveSettings,
     CasdaSettings,
+    SlurmSshSettings,
 ):
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".env"),
