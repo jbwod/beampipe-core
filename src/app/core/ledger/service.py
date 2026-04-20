@@ -203,8 +203,17 @@ class ExecutionLedgerService:
         allowed_transitions = {
             ExecutionStatus.PENDING: [ExecutionStatus.RUNNING, ExecutionStatus.CANCELLED],
             ExecutionStatus.RUNNING: [
+                ExecutionStatus.AWAITING_SCHEDULER,
                 ExecutionStatus.COMPLETED,
                 ExecutionStatus.NOT_SUBMITTED,
+                ExecutionStatus.FAILED,
+                ExecutionStatus.CANCELLED,
+            ],
+            # Job is queued/running on an external scheduler (e.g. SLURM) a
+            # completion workflow polls until terminal.
+            ExecutionStatus.AWAITING_SCHEDULER: [
+                ExecutionStatus.RUNNING,
+                ExecutionStatus.COMPLETED,
                 ExecutionStatus.FAILED,
                 ExecutionStatus.CANCELLED,
             ],

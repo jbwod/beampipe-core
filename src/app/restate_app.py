@@ -19,6 +19,7 @@ from starlette.routing import Mount, Route
 from .restate_workflows.discovery import DiscoveryBatchWorkflow
 from .restate_workflows.execute import ExecutionBatchWorkflow
 from .restate_workflows.hello import HelloWorldWorkflow
+from .restate_workflows.slurm_completion import SlurmCompletionWorkflow
 
 
 async def _health(_request: Request) -> JSONResponse:
@@ -37,6 +38,7 @@ _restate_app = restate.app(
         ExecutionBatchWorkflow,
         DiscoveryBatchWorkflow,
         HelloWorldWorkflow,
+        SlurmCompletionWorkflow,
     ]
 )
 app = Starlette(

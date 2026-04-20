@@ -32,6 +32,7 @@ from ..ledger.source_readiness import (
 )
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..registry.service import source_registry_service
+from ..restate_invoke import invoke_restate_workflow
 from . import rest, slurm
 from .manifest import inject_manifest_config_into_graph
 from .manifest_builder import build_manifest
@@ -595,7 +596,6 @@ async def submit_slurm_session_payload_for_execution(
     execution_id: UUID,
     *,
     session_id: str,
-    pgt_name: str,
     pgt_json: Any,
     deployment_config: dict[str, Any],
     dlg_root: str,
@@ -607,12 +607,24 @@ async def submit_slurm_session_payload_for_execution(
         db=db,
         execution_id=execution_id,
         session_id=session_id,
-        pgt_name=pgt_name,
         pgt_json=pgt_json,
         deployment_config=deployment_config,
         dlg_root=dlg_root,
         login_node=login_node,
         username=username,
+    )
+
+
+async def kickoff_slurm_completion_workflow_for_execution(
+    execution_id: UUID,
+) -> dict[str, Any]:
+    if not settings.RESTATE_INGRESS_BASE_URL:
+        return {"status": "skipped", "reason": "restate_ingress_not_configured"}
+    return await invoke_restate_workflow(
+        workflow_name=settings.RESTATE_SLURM_COMPLETION_WORKFLOW_NAME,
+        workflow_id=str(execution_id),
+        handler_name=settings.RESTATE_SLURM_COMPLETION_WORKFLOW_HANDLER,
+        payload={},
     )
 
 
@@ -642,7 +654,6 @@ async def submit_dim_session_for_execution(
             db=db,
             execution_id=execution_id,
             session_id=session_id,
-            pgt_name=str(tr["pgt_name"]),
             pgt_json=tr["pgt_json"],
             deployment_config=dict(tr.get("deployment_config") or {}),
             dlg_root=str(tr["dlg_root"]),
@@ -672,6 +683,8 @@ async def poll_dim_session_for_execution(
     st_poll = execution["status"]
     if st_poll == ExecutionStatus.COMPLETED:
         return {"terminal": True, "status": "completed"}
+    if st_poll == ExecutionStatus.CANCELLED:
+        return {"terminal": True, "status": "cancelled"}
     if st_poll == ExecutionStatus.NOT_SUBMITTED:
         return {"terminal": True, "status": "not_submitted"}
     if st_poll == ExecutionStatus.FAILED:
@@ -680,7 +693,10 @@ async def poll_dim_session_for_execution(
     if not execution.get("scheduler_job_id"):
         raise WorkflowFailure(
             WorkflowErrorCode.EXECUTION_DIM_STATE,
-            f"Execution {execution_id} has no scheduler_job_id; call submit_dim_session_for_execution first",
+            (
+                f"Execution {execution_id} has no scheduler_job_id; call the backend "
+                "submit step before polling"
+            ),
         )
 
     profile = await _resolve_deployment_profile(db, execution)
@@ -709,19 +725,6 @@ async def poll_dim_session_for_execution(
         execution_phase=ExecutionPhase.SUBMIT,
     )
     return {"terminal": True, "status": "failed", "error": f"backend={deployment_backend}"}
-
-
-async def poll_slurm_session_for_execution(
-    db: AsyncSession,
-    execution_id: UUID,
-    *,
-    execution: dict[str, Any],
-    profile: dict[str, Any],
-) -> dict[str, Any]:
-    """Back-compat wrapper around :func:`slurm.poll_session`."""
-    return await slurm.poll_session(
-        db=db, execution_id=execution_id, execution=execution, profile=profile
-    )
 
 
 async def execute_execution(
@@ -834,6 +837,23 @@ async def execute_execution(
                     "scheduler_job_id": str(sid),
                     "manifest": manifest,
                 }
+                if (
+                    st_enum == ExecutionStatus.AWAITING_SCHEDULER
+                    and execution_after.get("scheduler_name") == "slurm"
+                ):
+                    try:
+                        out["slurm_completion"] = (
+                            await kickoff_slurm_completion_workflow_for_execution(execution_id)
+                        )
+                    except Exception as e:
+                        logger.exception(
+                            "event=slurm_completion_kickoff_failed execution_id=%s",
+                            execution_id,
+                        )
+                        out["slurm_completion"] = {
+                            "status": "failed",
+                            "error": str(e),
+                        }
                 out.update(await enrich_execution_dim_rest_urls(db, execution_after))
                 return out
 

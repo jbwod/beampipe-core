@@ -174,6 +174,8 @@ class RestateWorkflowSettings(BaseSettings):
     RESTATE_DISCOVERY_WORKFLOW_NAME: str = "DiscoveryBatchWorkflow"
     RESTATE_EXECUTION_WORKFLOW_HANDLER: str = "execute_execution_workflow"
     RESTATE_DISCOVERY_WORKFLOW_HANDLER: str = "discovery_batch_workflow"
+    RESTATE_SLURM_COMPLETION_WORKFLOW_NAME: str = "SlurmCompletionWorkflow"
+    RESTATE_SLURM_COMPLETION_WORKFLOW_HANDLER: str = "slurm_completion_workflow"
 
     RESTATE_INVOKE_TIMEOUT_SECONDS: float = 30.0
     # ctx.run_typed policies (https://docs.restate.dev/develop/python/durable-steps).

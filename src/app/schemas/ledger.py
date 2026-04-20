@@ -121,7 +121,7 @@ class BatchExecutionRecordUpdate(BaseModel):
     status: ExecutionStatus | None = Field(default=None, description="New execution status")
     workflow_manifest: dict | None = Field(default=None, description="Workflow manifest JSON")
     scheduler_name: str | None = Field(default=None, max_length=50, description="Name of scheduler")
-    scheduler_job_id: str | None = Field(default=None, max_length=100, description="Scheduler job ID")
+    scheduler_job_id: str | None = Field(default=None, max_length=512, description="Scheduler job ID")
     last_error: str | None = Field(default=None, description="Error message if execution failed")
 
 

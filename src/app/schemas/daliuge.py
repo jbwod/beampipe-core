@@ -7,7 +7,17 @@ from ..core.schemas import TimestampSchema, UUIDSchema
 # per https://daliuge.readthedocs.io/en/v6.3.0/cli/cli_translator.html
 DaliugeAlgo = Literal["metis", "mysarkar"]
 DeploymentBackend = Literal["rest_remote", "slurm_remote"]
-SlurmPreset = Literal["setonix", "default"]
+SlurmFacility = Literal[
+    "galaxy_mwa",
+    "galaxy_askap",
+    "magnus",
+    "galaxy",
+    "setonix",
+    "shao",
+    "hyades",
+    "ood",
+    "ood_cloud",
+]
 
 
 
@@ -47,60 +57,80 @@ class RestRemoteDeploymentConfig(BaseModel):
 
 
 class SlurmRemoteDeploymentConfig(BaseModel):
-    """DALiuGE remote SLURM deployment (login node + sbatch).
-    reference setonix.ini from dlg/daliuge-engine/dlg/deploy/configs/
+    """DALiuGE remote SLURM deployment (generated INI + SSH submit).
 
-        [ENGINE]
-        NUM_NODES = 1
-        NUM_ISLANDS = 1
-        ALL_NICS =
-
-        [FACILITY]
-        ACCOUNT = pawsey0411
-        USER =
-        LOGIN_NODE = setonix.pawsey.org.au
-        HOME_DIR = /scratch/${ACCOUNT}
-        DLG_ROOT = ${HOME_DIR}/${USER}/dlg
-        LOG_DIR = ${DLG_ROOT}/log
-        MODULES = module use /group/askap/modulefiles
-            module load singularity/4.1.0-mpi
-            module load py-mpi4py/3.1.5-py3.11.6
-            module load py-numpy/1.26.4
-        VENV = source /software/projects/${ACCOUNT}/venv/bin/activate
-        EXEC_PREFIX = srun -l
+    At submit time Beampipe stages a generated DALiuGE ``--config_file`` INI on
+    the login node and calls ``python3 -m dlg.deploy.create_dlg_job`` over SSH.
+    Profile fields therefore capture both transport/auth details and the
+    INI-style facility/engine controls used by DALiuGE.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["slurm_remote"] = "slurm_remote"
 
-    # Facility (dlg deploy INI [FACILITY])
+    # SSH transport to the login node.
     login_node: Annotated[str, Field(min_length=1, max_length=255)]
-    ssh_port: int = Field(default=22,ge=1,le=65535,description="SSH Port (default 22).",)
+    ssh_port: int = Field(default=22, ge=1, le=65535, description="SSH port on the login node.")
+    remote_user: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Remote user for SLURM_REMOTE_USER / USER",
+    )
+
+    # Environment / facility values for generated DALiuGE config_file ([FACILITY]).
+    account: Annotated[str, Field(min_length=1, max_length=64)]
+    home_dir: Annotated[str, Field(min_length=1, max_length=512)]
+    log_dir: Annotated[str, Field(min_length=1, max_length=512)]
+    exec_prefix: str = Field(
+        default="srun -l",
+        description="FACILITY EXEC_PREFIX used in generated jobsub command prefix.",
+    )
+
+    # Environment to reach the dlg install on the cluster.
     dlg_root: Annotated[str, Field(min_length=1, max_length=512)]
-    account: Annotated[str, Field(min_length=1, max_length=100)]
-    job_duration_minutes: Annotated[int, Field(ge=1, le=10080)]
-    remote_user: str | None = Field(default=None, max_length=100)
-    home_dir: str | None = Field(default=None, max_length=512, description="e.g. /scratch/account")
-    modules: str | None = Field(default=None, description="Multiline module load commands")
-    venv: str | None = Field(default=None, description="Shell snippet to activate venv")
-    exec_prefix: str | None = Field(default="srun -l", max_length=100)
-
-    # sbatch
-    num_nodes: int = Field(default=1, ge=1, le=1024, description="#SBATCH --nodes")
-    num_islands: int = Field(default=1, ge=0, le=64, description="dlg start_dlg_cluster --num_islands")
-    sbatch_mem: str | None = Field(default="16G", max_length=32, description="eg 16G, 64G")
-    verbose_level: int = Field(default=1, ge=0, le=5, description="dlg -v")
-    max_threads: int = Field(default=0, ge=0, description="dlg --max-threads")
-    all_nics: bool = Field(default=False, description="dlg --all_nics")
-
-    slurm_template_name: str = Field(
-        default="setonix",
-        max_length=64,
+    venv: str | None = Field(
+        default=None,
         description=(
-            "Template in orchestration/slurm_client/templates/<name>.slurm"
+            "Shell snippet to source before invoking"
+            "(e.g. 'source /software/projects/<acc>/venv/bin/activate')."
         ),
     )
+    modules: str | None = Field(
+        default=None,
+        description="Optional multi-line 'module load' snippet sourced before venv.",
+    )
+
+    # create_dlg_job CLI arguments
+    facility: SlurmFacility = Field(
+        default="setonix",
+        description="``-f`` facility known to dlg.deploy.configs (setonix, hyades, ...).",
+    )
+    job_duration_minutes: Annotated[int, Field(ge=1, le=10080)] = Field(
+        default=30,
+        description="``-t`` minutes passed to create_dlg_job.",
+    )
+    num_nodes: int = Field(default=1, ge=1, le=1024, description="``-n`` number of compute nodes.")
+    num_islands: int = Field(default=1, ge=0, le=64, description="``-s`` number of data islands.")
+    verbose_level: int = Field(default=1, ge=0, le=5, description="``-v`` verbosity level.")
+    max_threads: int = Field(default=0, ge=0, description="``-T`` drop thread pool size.")
+    all_nics: bool = Field(default=False, description="``--all_nics`` flag.")
+    zerorun: bool = Field(default=False, description="``--zerorun`` flag.")
+    sleepncopy: bool = Field(default=False, description="``--sleepncopy`` flag.")
+    check_with_session: bool = Field(default=False, description="``--check_with_session`` flag.")
+    verify_ssl: bool | None = Field(
+        default=None,
+        description="TLS verification used by TM translation HTTP calls.",
+    )
+
+    # # Optional inline override of the SLURM template
+    # slurm_template: str | None = Field(
+    #     default=None,
+    #     description=(
+    #         "Optional inline SLURM template body; when set it is staged on the "
+    #         "login node and passed to create_dlg_job via ``--slurm_template``."
+    #     ),
+    # )
 
 
 DeploymentConfigUnion = Annotated[
