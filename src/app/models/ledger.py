@@ -15,6 +15,7 @@ class ExecutionStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     NOT_SUBMITTED = "not_submitted"
+    AWAITING_SCHEDULER = "awaiting_scheduler"
     COMPLETED = "completed"
     FAILED = "failed"
     RETRYING = "retrying"
@@ -54,7 +55,7 @@ class BatchExecutionRecord(Base):
         default=None,
     )
     scheduler_name: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
-    scheduler_job_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True, default=None)
+    scheduler_job_id: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True, default=None)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("user.id"), nullable=True, index=True, default=None
