@@ -80,7 +80,55 @@ async def translate(
     lg_name: str,
     profile: dict,
 ) -> dict[str, Any]:
-    raise NotImplementedError("slurm translate")
+# https://github.com/ICRAR/daliuge/tree/master/daliuge-engine/dlg/deploy/configs
+# https://daliuge.readthedocs.io/en/latest/deployment/slurm_deployment.html#configuration-ini
+def _render_generated_ini(
+    *,
+    deployment_config: dict[str, Any],
+    username: str,
+    pgt_remote_path: str,
+    dlg_root: str,
+) -> str:
+    cfg = ConfigParser(interpolation=None)
+    cfg.optionxform = str
+
+    all_nics = bool(deployment_config.get("all_nics"))
+    check_with_session = bool(deployment_config.get("check_with_session"))
+    zerorun = bool(deployment_config.get("zerorun"))
+    sleepncopy = bool(deployment_config.get("sleepncopy"))
+
+    cfg["DEPLOYMENT"] = {
+        "remote": "False",
+        "submit": "False",
+    }
+    cfg["ENGINE"] = {
+        "NUM_NODES": str(int(deployment_config.get("num_nodes") or 1)),
+        "NUM_ISLANDS": str(int(deployment_config.get("num_islands") or 1)),
+        "ALL_NICS": "True" if all_nics else "",
+        "CHECK_WITH_SESSION": "True" if check_with_session else "",
+        "MAX_THREADS": str(int(deployment_config.get("max_threads") or 0)),
+        "VERBOSE_LEVEL": str(int(deployment_config.get("verbose_level") or 1)),
+        "ZERORUN": "True" if zerorun else "",
+        "SLEEPNCOPY": "True" if sleepncopy else "",
+    }
+    cfg["GRAPH"] = {
+        "PHYSICAL_GRAPH": pgt_remote_path,
+    }
+    cfg["FACILITY"] = {
+        "USER": username,
+        "ACCOUNT": str(deployment_config.get("account") or ""),
+        "LOGIN_NODE": str(deployment_config.get("login_node") or ""),
+        "HOME_DIR": str(deployment_config.get("home_dir") or ""),
+        "DLG_ROOT": dlg_root,
+        "LOG_DIR": str(deployment_config.get("log_dir") or f"{dlg_root.rstrip('/')}/log"),
+        "MODULES": str(deployment_config.get("modules") or ""),
+        "VENV": str(deployment_config.get("venv") or ""),
+        "EXEC_PREFIX": str(deployment_config.get("exec_prefix") or "srun -l"),
+    }
+
+    out = StringIO()
+    cfg.write(out)
+    return out.getvalue()
 
 
 async def submit_session_payload(
