@@ -14,8 +14,11 @@ from ...models.ledger import ExecutionPhase, ExecutionStatus
 from ..ledger.service import execution_ledger_service
 from ..ledger.source_readiness import source_identifiers_from_specs
 from ..registry.service import source_registry_service
-
-from .rest_client.translator_client import DaliugeTranslatorClient
+from .rest_client.translator_client import (
+    DaliugeTranslatorClient,
+    partitioned_pgt_for_dlg_deploy,
+    pgt_handle_from_partitioned_payload,
+)
 
 logger = logging.getLogger(__name__)
 

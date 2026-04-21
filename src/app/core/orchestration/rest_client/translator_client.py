@@ -9,6 +9,30 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
+def pgt_handle_from_partitioned_payload(pgt_json: Any, fallback_lg_name: str) -> str:
+    if isinstance(pgt_json, list) and len(pgt_json) > 0 and isinstance(pgt_json[0], str):
+        return pgt_json[0]
+    base = fallback_lg_name.rsplit("/", 1)[-1]
+    return base
+
+
+def partitioned_pgt_for_dlg_deploy(pgt_json: Any, lg_name: str) -> list[Any]:
+    if (
+        isinstance(pgt_json, list)
+        and len(pgt_json) == 2
+        and isinstance(pgt_json[0], str)
+        and isinstance(pgt_json[1], list)
+    ):
+        return pgt_json
+    base = lg_name.rsplit("/", 1)[-1]
+    # depnds on what we actually save with I suppose
+    if base.endswith(".graph"):
+        pgt_filename = base[: -len(".graph")] + "_pgt.graph"
+    else:
+        pgt_filename = f"{base}.pgt.graph"
+    return [pgt_filename, pgt_json]
+
+
 @dataclass
 class DaliugeTranslatorClient:
     """Very small helper for DALiuGE translator REST calls."""
@@ -88,15 +112,34 @@ class DaliugeTranslatorClient:
             out.append(item)
         return out
 
-    def download_pgt(self, pgt_id: str) -> Any:
-        """Fetch the PGT JSON body  structure consumed by
-        dlg.deploy.start_dlg_cluster --physical-graph
-        # /dlg/daliuge-translator/dlg/dropmake/web/translator_rest.py
+    def unroll_and_partition_lg(
+        self,
+        lg_name: str,
+        lg_json: dict[str, Any],
+        *,
+        algo: str = "metis",
+        num_par: int = 1,
+        num_islands: int = 0,
+    ) -> Any:
+        """Call /unroll_and_partition and return the TM JSON
+        Wrap with `partitioned_pgt_for_dlg_deploy`
         """
-        resp = self._client.get("/pgt_jsonbody", params={"pgt_name": pgt_id})
+        np = int(num_par) if num_par is not None else 1
+        if np < 1:
+            np = 1
+        ni = int(num_islands) if num_islands is not None else 1
+        if ni < 1:
+            ni = 1
+        data = {
+            "lg_content": json.dumps(lg_json),
+            "num_partitions": str(np),
+            "num_islands": str(ni),
+            "algorithm": algo,
+        }
+        resp = self._client.post("/unroll_and_partition", data=data)
         if resp.status_code >= 500:
             logger.error(
-                "pgt_jsonbody failed: status=%s url=%s body=%s",
+                "unroll_and_partition failed: status=%s url=%s body=%s",
                 resp.status_code,
                 resp.url,
                 resp.text[:500] if resp.text else "(empty)",
@@ -105,5 +148,5 @@ class DaliugeTranslatorClient:
         try:
             return resp.json()
         except ValueError as e:
-            raise ValueError(f"pgt_jsonbody inval {pgt_id}: {e}") from e
+            raise ValueError(f"unroll_and_partition invalid JSON for lg={lg_name!r}: {e}") from e
 
