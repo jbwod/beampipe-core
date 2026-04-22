@@ -22,11 +22,55 @@ from app.core.orchestration.slurm import (
 from app.core.orchestration.slurm_client.client import SlurmDeployClient, shell_quote
 
 
-def _create_dlg_job_argv(deployment_config: dict[str, Any], pgt_remote_path: str, config_file_remote_path: str, slurm_template_remote_path: str | None) -> list[str]:
-    return None
+def _create_dlg_job_argv(
+    *,
+    deployment_config: dict[str, Any],
+    pgt_remote_path: str,
+    config_file_remote_path: str,
+    slurm_template_remote_path: str | None,
+) -> list[str]:
+    facility = str(deployment_config.get("facility") or "setonix")
+
+    argv: list[str] = [
+        "python3",
+        "-m",
+        "dlg.deploy.create_dlg_job",
+        "--action",
+        "submit",
+        "-f",
+        facility,
+        "-P",
+        pgt_remote_path,
+        "--config_file",
+        config_file_remote_path,
+    ]
+    if slurm_template_remote_path:
+        argv.extend(["--slurm_template", slurm_template_remote_path])
+    return argv
 
 def _env_prelude(deployment_config: dict[str, Any]) -> str:
-    return None
+    # set -euo pipefail
+    # modules load
+    # set +u
+    # source <path>/venv/bin/activate
+    # set -u
+    # source <path>/venv/bin/activete
+    parts = ["set -euo pipefail"]
+    modules = str(deployment_config.get("modules") or "").strip()
+    if modules:
+        parts.append("set +u")
+        for line in modules.splitlines():
+            line = line.strip()
+            if line:
+                parts.append(line)
+        parts.append("set -u")
+    venv = str(deployment_config.get("venv") or "").strip()
+    if venv:
+        parts.append("set +u")
+        parts.append(venv)
+        parts.append("set -u")
+    return "\n".join(parts)
+    # return None
 
 def _parse_jobsub_path(stdout: str, *, stderr: str = "") -> str:
     return None
