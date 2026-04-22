@@ -55,7 +55,6 @@ def _require_uuid_workflow_key(execution_id: str) -> None:
 
 
 async def _completion_read_snapshot(execution_id: str) -> dict[str, Any]:
-    raise NotImplementedError
     async with local_session() as db:
         return await orchestration_service.read_execution_ledger_snapshot(
             db=db, execution_id=UUID(execution_id)
@@ -63,9 +62,6 @@ async def _completion_read_snapshot(execution_id: str) -> dict[str, Any]:
 
 
 async def _completion_poll_slurm(execution_id: str) -> dict[str, Any]:
-    raise NotImplementedError
-
-
     async with local_session() as db:
         return await orchestration_service.poll_dim_session_for_execution(
             db=db, execution_id=UUID(execution_id)
@@ -77,10 +73,6 @@ async def _completion_mark_failed_if_non_terminal(
     *,
     error: str,
 ) -> None:
-    raise NotImplementedError
-
-
-
     async with local_session() as db:
         snapshot = await orchestration_service.read_execution_ledger_snapshot(
             db=db, execution_id=UUID(execution_id)
@@ -106,8 +98,6 @@ async def _slurm_completion_workflow_body(
     ctx: restate.WorkflowContext,
     execution_id: str,
 ) -> dict[str, Any]:
-    raise NotImplementedError
-
     snapshot = await _run_step(
         ctx,
         "slurm_completion.read_snapshot_start",

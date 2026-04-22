@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
@@ -39,6 +40,12 @@ from .manifest_builder import build_manifest
 from .staging import stage_sources_for_manifest
 
 logger = logging.getLogger(__name__)
+
+
+def beampipe_session_id(*, execution_id: UUID, created_at: datetime) -> str:
+    """Deterministic DALiuGE session/workspace id for REST and SLURM backends."""
+    stamp = created_at.astimezone(UTC).strftime("%Y-%m-%dT%H-%M-%S")
+    return f"BeampipeExecution-{execution_id}-{stamp}"
 
 
 async def _record_execute_execution_failure(
@@ -439,6 +446,13 @@ async def build_manifest_for_execution(
         checksum_urls_by_scan_id=checksum_urls_by_scan_id or {},
         eval_checksum_urls_by_sbid=eval_checksum_urls_by_sbid or {},
     )
+    sid = beampipe_session_id(
+        execution_id=execution_id,
+        created_at=cast(datetime, execution["created_at"]),
+    )
+    manifest["execution_id"] = str(execution_id)
+    manifest["session_id"] = sid
+    manifest["created_at"] = cast(datetime, execution["created_at"]).astimezone(UTC).isoformat()
 
     await execution_ledger_service.update_execution_status(
         db=db,
@@ -474,7 +488,10 @@ async def translate_dim_session_for_execution(
             f"Execution {execution_id} missing workflow_manifest; run staging and manifest build first",
         )
 
-    session_id = f"BeampipeExecution_{execution_id}"
+    session_id = beampipe_session_id(
+        execution_id=execution_id,
+        created_at=cast(datetime, execution["created_at"]),
+    )
     if execution.get("scheduler_name") == "daliuge" and execution.get("scheduler_job_id") == session_id:
         return {"status": "noop", "session_id": session_id}
 
