@@ -285,6 +285,22 @@ async def poll_session(
         )
         return {"terminal": True, "status": "completed"}
 
+    if session_state == "cancelled":
+        logger.info(
+            "event=dim_session_cancelled execution_id=%s session_id=%s",
+            execution_id,
+            session_id,
+        )
+        await execution_ledger_service.update_execution_status(
+            db=db,
+            execution_id=execution_id,
+            status=ExecutionStatus.CANCELLED,
+            scheduler_name="daliuge",
+            scheduler_job_id=str(session_id),
+            execution_phase=ExecutionPhase.SUBMIT,
+        )
+        return {"terminal": True, "status": "cancelled"}
+
     error_drops = graph_info.get("error_drops", [])
     if session_state == "finished" and graph_info.get("has_errors"):
         error_msg = (
@@ -292,7 +308,7 @@ async def poll_session(
             f"{error_drops[:20]}"
         )
     else:
-        error_msg = f"DLG session error: {status_payload}"
+        error_msg = f"DLG session failed: {status_payload}"
 
     logger.error(
         "event=dim_session_failed execution_id=%s session_id=%s error=%s",

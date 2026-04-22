@@ -59,7 +59,7 @@ def init_casda_client(username: str) -> Casda:
 
     casda = Casda()
     authenticated = casda.login(username=username)
-    if not authenticated or not hasattr(casda, "_auth"):
+    if authenticated is False:
         raise RuntimeError(
             "CASDA authentication failed. "
             "Ensure CASDA_USERNAME/CASDA_PASSWORD are set correctly (or provide keyring)."

@@ -51,24 +51,52 @@ def get_roots(pg_spec: list[dict]) -> set[str]:
 
 def classify_dim_session_status(status_payload: Any) -> str:
     if isinstance(status_payload, int):
+        # DALiuGE SessionStates (dlg/manager/session.py):
+        # PRISTINE=0, BUILDING=1, DEPLOYING=2, RUNNING=3, FINISHED=4, CANCELLED=5, FAILED=6
         if status_payload == 4:
             return "finished"
-        if status_payload == 3:
-            return "error"
+        if status_payload == 5:
+            return "cancelled"
+        if status_payload == 6:
+            return "failed"
         return "running"
 
     if isinstance(status_payload, str):
         upper = status_payload.upper()
         if upper == "FINISHED":
             return "finished"
+        if upper == "CANCELLED":
+            return "cancelled"
+        if upper in ("FAILED", "FAIL"):
+            return "failed"
         if upper == "ERROR":
-            return "error"
+            return "failed"
         return "running"
 
     if isinstance(status_payload, dict):
-        val = status_payload.get("status", status_payload)
-        if isinstance(val, (int, str)) and val != status_payload:
-            return classify_dim_session_status(val)
+        # Some DIM deployments return either:
+        # - {"status": 4}
+        # - {"status": "FINISHED"}
+        # - {"dlg-nm1:...": 4, "dlg-nm2:...": 4}  (per-node status map)
+        if "status" in status_payload:
+            val = status_payload.get("status")
+            if isinstance(val, (int, str)):
+                return classify_dim_session_status(val)
+
+        # Per-node status map: if any node reports failed => failed; if all finished => finished;
+        # if all cancelled => cancelled; otherwise running.
+        states: list[str] = []
+        for v in status_payload.values():
+            if isinstance(v, (int, str)):
+                states.append(classify_dim_session_status(v))
+        if states:
+            if any(s == "failed" for s in states):
+                return "failed"
+            if all(s == "finished" for s in states):
+                return "finished"
+            if all(s == "cancelled" for s in states):
+                return "cancelled"
+            return "running"
 
     return "running"
 

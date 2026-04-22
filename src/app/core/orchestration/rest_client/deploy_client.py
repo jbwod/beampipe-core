@@ -80,7 +80,7 @@ class DaliugeDeployClient:
         poll_interval: float = 3.0,
         timeout: float = 10.0,
     ) -> int:
-        """Poll session status until FINISHED or ERROR."""
+        """Poll session status until FINISHED, FAILED, or CANCELLED."""
         sid = quote(session_id)
         while True:
             try:
@@ -120,7 +120,7 @@ class DaliugeDeployClient:
                     logger.warning("event=dim_graph_status_error session_id=%s error=%s", session_id, e)
                 return 0
 
-            if state == "error":
+            if state in ("failed", "cancelled"):
                 logger.error(
                     "event=dim_session_error session_id=%s status=%s",
                     session_id,
