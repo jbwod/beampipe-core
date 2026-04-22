@@ -37,6 +37,11 @@ from .translate import (
 
 logger = logging.getLogger(__name__)
 
+# https://github.com/ICRAR/daliuge/blob/master/daliuge-engine/dlg/deploy/slurm_client.py
+_JOBSUB_CREATED_RE = re.compile(
+    r"Created job submission script\s+(?P<path>\S+/jobsub\.sh)"
+)
+
 __all__ = [
     "poll_session",
     "slurm_session_debug_paths",
@@ -129,6 +134,18 @@ def _render_generated_ini(
     out = StringIO()
     cfg.write(out)
     return out.getvalue()
+
+
+def _parse_jobsub_path(stdout: str, *, stderr: str = "") -> str:
+    match = _JOBSUB_CREATED_RE.search(stdout or "")
+    if not match:
+        stderr_clean = (stderr or "").strip()
+        stderr_suffix = f" stderr={stderr_clean!r}" if stderr_clean else ""
+        raise SlurmClientError(
+            "create_dlg_job did not print a 'Created job submission script ...' "
+            f"line; stdout was: {stdout!r}{stderr_suffix}"
+        )
+    return match.group("path")
 
 
 async def submit_session_payload(

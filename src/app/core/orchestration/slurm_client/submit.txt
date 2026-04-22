@@ -1,0 +1,45 @@
+[1] load profile src/app/core/orchestration/slurm_client/exampleprofile.json
+generated INI
+[DEPLOYMENT]
+remote = False
+submit = False
+
+[ENGINE]
+NUM_NODES = 1
+NUM_ISLANDS = 1
+ALL_NICS = 
+CHECK_WITH_SESSION = 
+MAX_THREADS = 0
+VERBOSE_LEVEL = 1
+ZERORUN = 
+SLEEPNCOPY = 
+
+[GRAPH]
+PHYSICAL_GRAPH = /scratch/pawsey0411/jblackwood/dlg/staging/BeampipeExecution_7747db90-4eeb-4f70-8f19-b717661d1277.pgt.graph
+
+[FACILITY]
+USER = jblackwood
+ACCOUNT = pawsey0411
+LOGIN_NODE = setonix.pawsey.org.au
+HOME_DIR = /scratch/pawsey0411
+DLG_ROOT = /scratch/pawsey0411/jblackwood/dlg
+LOG_DIR = /scratch/pawsey0411/jblackwood/dlg/log
+MODULES = module load py-numpy/1.26.4
+VENV = source /software/projects/pawsey0411/jblackwood/venv/bin/activate
+EXEC_PREFIX = srun -l
+end INI
+[2] SSH connect 'setonix.pawsey.org.au' user='jblackwood' port=22
+[3] mkdir -p /scratch/pawsey0411/jblackwood/dlg/staging
+[4] upload PGT /scratch/pawsey0411/jblackwood/dlg/staging/BeampipeExecution_7747db90-4eeb-4f70-8f19-b717661d1277.pgt.graph
+[5] upload INI /scratch/pawsey0411/jblackwood/dlg/staging/BeampipeExecution_7747db90-4eeb-4f70-8f19-b717661d1277.ini
+[6] create_dlg_job
+bash -lc 'set -euo pipefail
+set +u
+module load py-numpy/1.26.4
+set -u
+set +u
+source /software/projects/pawsey0411/jblackwood/venv/bin/activate
+set -u
+export DLG_ROOT='"'"'/scratch/pawsey0411/jblackwood/dlg'"'"'
+python3 -m dlg.deploy.create_dlg_job --action submit -f setonix -P /scratch/pawsey0411/jblackwood/dlg/staging/BeampipeExecution_7747db90-4eeb-4f70-8f19-b717661d1277.pgt.graph --config_file /scratch/pawsey0411/jblackwood/dlg/staging/BeampipeExecution_7747db90-4eeb-4f70-8f19-b717661d1277.ini'
+[done] jobsub /scratch/pawsey0411/jblackwood/dlg/workspace/HelloUniverse_2026-04-22T15-38-56/jobsub.sh

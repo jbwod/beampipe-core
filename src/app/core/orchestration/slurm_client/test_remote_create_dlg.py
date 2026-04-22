@@ -72,8 +72,23 @@ def _env_prelude(deployment_config: dict[str, Any]) -> str:
     return "\n".join(parts)
     # return None
 
+import re
+# match the output of create_dlg_job
+_JOBSUB_CREATED_RE = re.compile(
+    r"Created job submission script\s+(?P<path>\S+/jobsub\.sh)"
+)
+
 def _parse_jobsub_path(stdout: str, *, stderr: str = "") -> str:
-    return None
+    match = _JOBSUB_CREATED_RE.search(stdout or "")
+    if not match:
+        stderr_clean = (stderr or "").strip()
+        stderr_suffix = f" stderr={stderr_clean!r}" if stderr_clean else ""
+        raise SystemExit(f"create_dlg_job did not print a 'Created job submission script ...' line; stdout was: {stdout!r}{stderr_suffix}")
+        # raise SlurmClientError(
+        #     "create_dlg_job did not print a 'Created job submission script ...' "
+        #     f"line; stdout was: {stdout!r}{stderr_suffix}"
+        # )
+    return match.group("path")
 
 def _load_deployment(data: dict[str, Any]) -> dict[str, Any]:
     return dict(data.get("deployment") or data)
