@@ -123,7 +123,6 @@ class SlurmRemoteDeploymentConfig(BaseModel):
         description="TLS verification used by TM translation HTTP calls.",
     )
 
-    # # Optional inline override of the SLURM template
     # slurm_template: str | None = Field(
     #     default=None,
     #     description=(

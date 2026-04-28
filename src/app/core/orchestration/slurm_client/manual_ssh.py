@@ -1,6 +1,5 @@
 """
-PYTHONPATH=src uv run python -m app.core.orchestration.slurm_client.manual_ssh --host setonix.pawsey.org.au 
---username jblackwood --ssh-key ~/.ssh/pawsey_ed25519_key --known-hosts ~/.ssh/known_hosts --command "hostname && whoami" --passphrase
+PYTHONPATH=src uv run python -m app.core.orchestration.slurm_client.manual_ssh --host setonix.pawsey.org.au --username jblackwood --ssh-key ~/.ssh/pawsey_ed25519_key --known-hosts ~/.ssh/known_hosts --command "hostname && whoami" --passphrase
 """
 import argparse
 import asyncio

@@ -27,12 +27,15 @@ from restate.exceptions import TerminalError
 from ..core.config import settings
 from ..core.db.database import local_session
 from ..core.exceptions.workflow_exceptions import WorkflowErrorCode, WorkflowFailure
+from ..crud.crud_execution_record import crud_batch_execution_records
+from ..core.ledger.run_record import merge_restate_slurm_completion_timeout_into_manifest
 from ..core.ledger.service import execution_ledger_service
 from ..core.log_context import bind_execution_log_context
 from ..core.orchestration import service as orchestration_service
 from ..core.positive_policy import positive_int
 from ..core.projects import resolve_workflow_execute_step_overrides
 from ..models.ledger import ExecutionStatus
+from ..schemas.ledger import BatchExecutionRecordRead
 from .options import _run_opts_database, _run_opts_poll
 from .runtime import _ingress_terminal, _run_step
 
@@ -84,12 +87,20 @@ async def _completion_mark_failed_if_non_terminal(
             ExecutionStatus.CANCELLED.value,
         }:
             return
+        row = await crud_batch_execution_records.get(
+            db=db,
+            uuid=UUID(execution_id),
+            schema_to_select=BatchExecutionRecordRead,
+        )
+        wm = row.get("workflow_manifest") if isinstance(row, dict) else None
+        merged_manifest = merge_restate_slurm_completion_timeout_into_manifest(wm, error=error)
         await execution_ledger_service.update_execution_status(
             db=db,
             execution_id=UUID(execution_id),
             status=ExecutionStatus.FAILED,
             error=error,
             execution_phase=None,
+            workflow_manifest=merged_manifest,
         )
 
 

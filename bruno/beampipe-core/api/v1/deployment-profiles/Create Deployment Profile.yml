@@ -12,22 +12,38 @@ http:
     type: json
     data: |-
       {
-        "name": "test-staging-e2e-rest-dim",
-        "description": "rest_remote",
+        "name": "setonix-slurm-ini",
+        "description": "slurm_remote",
         "project_module": "wallaby_hires",
-        "is_default": true,
+        "is_default": false,
         "translation": {
           "algo": "metis",
           "num_par": 1,
-          "num_islands": 0,
+          "num_islands": 1,
           "tm_url": "http://dlg-tm.desk"
         },
         "deployment": {
-          "kind": "rest_remote",
-          "dim_host_for_tm": "dlg-dim",
-          "dim_port_for_tm": 8001,
-          "deploy_host": "dlg-dim.desk",
-          "deploy_port": 80,
+          "kind": "slurm_remote",
+          "login_node": "setonix.pawsey.org.au",
+          "ssh_port": 22,
+          "remote_user": "jblackwood",
+          "facility": "setonix",
+          "account": "pawsey0411",
+          "home_dir": "/scratch/pawsey0411",
+          "dlg_root": "/scratch/pawsey0411/jblackwood/dlg",
+          "log_dir": "/scratch/pawsey0411/jblackwood/dlg/log",
+          "modules": "module load py-numpy/1.26.4",
+          "venv": "source /software/projects/pawsey0411/jblackwood/venv/bin/activate",
+          "exec_prefix": "srun -l",
+          "job_duration_minutes": 30,
+          "num_nodes": 1,
+          "num_islands": 1,
+          "max_threads": 0,
+          "verbose_level": 1,
+          "all_nics": false,
+          "zerorun": false,
+          "sleepncopy": false,
+          "check_with_session": false,
           "verify_ssl": false
         }
       }

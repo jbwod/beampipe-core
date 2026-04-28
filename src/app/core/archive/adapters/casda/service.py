@@ -122,7 +122,6 @@ def stage_data_pawsey(
 
 
 def metadata_records_to_staging_table(records: list[dict]) -> Table:
-    """Need to turn this back to an Astropy Table."""
     rows = [
         {
             "access_url": ds["access_url"],

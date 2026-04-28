@@ -9,6 +9,7 @@ import json
 import os
 import shlex
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -115,6 +116,8 @@ async def _run(args: argparse.Namespace) -> None:
     port = args.port if args.port is not None else _ssh_port_from_deployment(deployment_config)
 
     ex_id = args.execution_id
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
+    session_id = f"BeampipeExecution-{ex_id}-{stamp}"
     staging_dir = f"{dlg_root}/staging"
     pgt_path = f"{staging_dir}/BeampipeExecution_{ex_id}.pgt.graph"
     ini_path = f"{staging_dir}/BeampipeExecution_{ex_id}.ini"
@@ -125,11 +128,14 @@ async def _run(args: argparse.Namespace) -> None:
         else None
     )
 
-    pgt_body = (
-        Path(args.pgt_json).read_text()
+    pgt_obj = (
+        json.loads(Path(args.pgt_json).read_text())
         if args.pgt_json
-        else json.dumps({"_smoke": True, "execution_id": str(ex_id)})
+        else [f"{session_id}.pgt.graph", []]
     )
+    if isinstance(pgt_obj, list) and len(pgt_obj) >= 1:
+        pgt_obj[0] = f"{session_id}.pgt.graph"
+    pgt_body = json.dumps(pgt_obj)
     ini_body = _render_generated_ini(
         deployment_config=deployment_config,
         username=username,
@@ -177,6 +183,21 @@ async def _run(args: argparse.Namespace) -> None:
         print(create_cmd)
         out, err, _ = await client.run_command(create_cmd, check=True)
         jobsub = _parse_jobsub_path(out, stderr=err)
+        session_dir = jobsub.rsplit("/", 1)[0]
+        print("[8] upload manifest.json", f"{session_dir}/manifest.json")
+        await client.put_text(
+            f"{session_dir}/manifest.json",
+            json.dumps(
+                {
+                    "execution_id": str(ex_id),
+                    "session_id": session_id,
+                    "created_at": datetime.now(UTC).isoformat(),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+        )
         print("[done] jobsub", jobsub)
 
 

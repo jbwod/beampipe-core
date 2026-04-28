@@ -120,6 +120,7 @@ async def _execution_build_manifest(execution_id: str, stage_out: dict[str, Any]
             eval_urls_by_sbid=stage_out.get("eval_urls_by_sbid") or {},
             checksum_urls_by_scan_id=stage_out.get("checksum_urls_by_scan_id") or {},
             eval_checksum_urls_by_sbid=stage_out.get("eval_checksum_urls_by_sbid") or {},
+            exclude_sbids=stage_out.get("staging_failed_sbids") or [],
         )
 
 

@@ -14,6 +14,7 @@ from ...core.ledger.service import execution_ledger_service
 from ...core.orchestration.service import (
     enrich_execution_dim_rest_urls,
     prepare_execution as orchestration_prepare_execution,
+    read_execution_ledger_snapshot,
 )
 from ...core.utils import queue
 from ...crud.crud_daliuge_deployment_profile import crud_daliuge_deployment_profile
@@ -132,6 +133,15 @@ async def get_execution(
     row = dict(execution)
     row.update(await enrich_execution_dim_rest_urls(db, row))
     return row
+
+
+@router.get("/{execution_id}/ledger-snapshot")
+async def get_execution_ledger_snapshot(
+    request: Request,
+    execution_id: UUID,
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, Any]:
+    return await read_execution_ledger_snapshot(db=db, execution_id=execution_id)
 
 
 @router.patch("/{execution_id}", response_model=BatchExecutionRecordRead)

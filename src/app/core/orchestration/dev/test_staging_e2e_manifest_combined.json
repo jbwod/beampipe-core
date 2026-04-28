@@ -1,0 +1,59 @@
+{
+  "inputs": {},
+  "sources": [
+    {
+      "source_identifier": "HIPASSJ1318-21",
+      "ra_string": "13h18m58.9s",
+      "dec_string": "-21.2.1.0",
+      "vsys": 668.5,
+      "sbids": [
+        {
+          "sbid": "34166",
+          "evaluation_file": "calibration-metadata-processing-logs-SB34166_2021-12-31-011733.tar",
+          "evaluation_file_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34166/other/calibration-metadata-processing-logs-SB34166_2021-12-31-011733.tar?response-content-disposition=attachment%3B%20filename%20%3D%22calibration-metadata-processing-logs-SB34166_2021-12-31-011733.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260427T224331Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604779&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260427%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=7b0d8f44ba6a76841113b95615374fa1d355f64b1a90bdd8432a2aab4de201d3",
+          "evaluation_file_checksum_url": "https://casda.csiro.au/download/web/48b7b7e8-82ab-4ed5-b03c-746232bcab39/calibration-metadata-processing-logs-SB34166_2021-12-31-011733.tar.checksum",
+          "datasets": [
+            {
+              "name": "HIPASSJ1318-21_A_beam25_10arc_split.ms.tar",
+              "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34166/visibilities/HIPASSJ1318-21_A_beam25_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam25_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260427T224310Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604779&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260427%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=756bd65caebdc5254ea0e27da55228d77efe8ad561e1b0365d83112902b6b199",
+              "checksum_url": "https://casda.csiro.au/download/web/0f023e6a-e592-4865-912c-539e697c24ea/HIPASSJ1318-21_A_beam25_10arc_split.ms.tar.checksum"
+            },
+            {
+              "name": "HIPASSJ1318-21_A_beam26_10arc_split.ms.tar",
+              "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34166/visibilities/HIPASSJ1318-21_A_beam26_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam26_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260427T224310Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604779&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260427%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=258b210ac6b3a86882aa4517885172ec7a72ae5e0a81170850357fa57788bb41",
+              "checksum_url": "https://casda.csiro.au/download/web/0f023e6a-e592-4865-912c-539e697c24ea/HIPASSJ1318-21_A_beam26_10arc_split.ms.tar.checksum"
+            },
+            {
+              "name": "HIPASSJ1318-21_A_beam27_10arc_split.ms.tar",
+              "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34166/visibilities/HIPASSJ1318-21_A_beam27_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam27_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260427T224310Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604779&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260427%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=ea97df6e7e2e5c753ef7c837a8c11a90d2e4f66398e380e6558c00f697f79110",
+              "checksum_url": "https://casda.csiro.au/download/web/0f023e6a-e592-4865-912c-539e697c24ea/HIPASSJ1318-21_A_beam27_10arc_split.ms.tar.checksum"
+            }
+          ]
+        },
+        {
+          "sbid": "34275",
+          "evaluation_file": "calibration-metadata-processing-logs-SB34275_2022-01-06-132301.tar",
+          "evaluation_file_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34275/other/calibration-metadata-processing-logs-SB34275_2022-01-06-132301.tar?response-content-disposition=attachment%3B%20filename%20%3D%22calibration-metadata-processing-logs-SB34275_2022-01-06-132301.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260427T224331Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604779&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260427%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=65f256867cda05d0ae2f862a6940cc9ae938409fac5f3e87db591a03c98957c2",
+          "evaluation_file_checksum_url": "https://casda.csiro.au/download/web/48b7b7e8-82ab-4ed5-b03c-746232bcab39/calibration-metadata-processing-logs-SB34275_2022-01-06-132301.tar.checksum",
+          "datasets": [
+            {
+              "name": "HIPASSJ1318-21_A_beam10_10arc_split.ms.tar",
+              "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34275/visibilities/HIPASSJ1318-21_A_beam10_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam10_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260427T224310Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604779&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260427%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=3acae097d6ed40a0411b5fccd0121928000d20b7ee6584184d2e426838108af9",
+              "checksum_url": "https://casda.csiro.au/download/web/0f023e6a-e592-4865-912c-539e697c24ea/HIPASSJ1318-21_A_beam10_10arc_split.ms.tar.checksum"
+            },
+            {
+              "name": "HIPASSJ1318-21_A_beam26_10arc_split.ms.tar",
+              "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34275/visibilities/HIPASSJ1318-21_A_beam26_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam26_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260427T224310Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604779&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260427%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=83179409d5e5dad83be39bc4cce1684aaa9db9f2ddf32d00c541b9710320c1c4",
+              "checksum_url": "https://casda.csiro.au/download/web/0f023e6a-e592-4865-912c-539e697c24ea/HIPASSJ1318-21_A_beam26_10arc_split.ms.tar.checksum"
+            },
+            {
+              "name": "HIPASSJ1318-21_A_beam27_10arc_split.ms.tar",
+              "staged_url": "https://ingest.pawsey.org.au/casda-prd-as102-01/sb34275/visibilities/HIPASSJ1318-21_A_beam27_10arc_split.ms.tar?response-content-disposition=attachment%3B%20filename%20%3D%22HIPASSJ1318-21_A_beam27_10arc_split.ms.tar%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260427T224310Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604779&X-Amz-Credential=b70b5ef79c494272afd8810ed1b6f2bb%2F20260427%2Fpawsey%2Fs3%2Faws4_request&X-Amz-Signature=4896f6ecdd38ab63294003ce30aad39de27afb930049799c2bad80b70ef88ba0",
+              "checksum_url": "https://casda.csiro.au/download/web/0f023e6a-e592-4865-912c-539e697c24ea/HIPASSJ1318-21_A_beam27_10arc_split.ms.tar.checksum"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

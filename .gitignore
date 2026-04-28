@@ -156,6 +156,10 @@ src/app/core/archive/adapters/test.py
 
 
 wallaby-hires-beampipe/*
+
+.podman-bridge.pid
+
+deploy/ssh/known_hosts
 scripts/calibration_files/*
 src/app/core/orchestration/dlg-engine_deploy
 src/app/core/orchestration/dlg-engine_deploy-test

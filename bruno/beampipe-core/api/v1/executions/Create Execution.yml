@@ -15,17 +15,11 @@ http:
         "project_module": "wallaby_hires",
         "sources": [
           {
-            "source_identifier": "HIPASSJ0349-18",
-            "sbids": ["69412"]
-          },
-          {
-            "source_identifier": "HIPASSJ0359-42",
-            "sbids": ["50098","50193"]
+            "source_identifier": "HIPASSJ0337-24"
           }
         ],
         "archive_name": "casda",
-        "deployment_profile_name": "test-staging-e2e-rest-dim",
-        "created_by_id": "0"
+        "deployment_profile_name": "test-staging-e2e-rest-remote"
       }
   auth:
     type: bearer
