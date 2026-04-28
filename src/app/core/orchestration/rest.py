@@ -15,6 +15,7 @@ from ..exceptions.workflow_exceptions import (
     WorkflowFailure,
     wf_execution_not_found,
 )
+from ..ledger.run_record import merge_dim_deploy_into_manifest, merge_dim_poll_into_manifest
 from ..ledger.service import execution_ledger_service
 from ..ledger.source_readiness import source_identifiers_from_specs
 from ..registry.service import source_registry_service
@@ -30,6 +31,15 @@ from .translate import fail_execution_after_translate_error
 logger = logging.getLogger(__name__)
 
 
+def dim_operator_urls_from_base(dim_base: str, session_id: str) -> dict[str, str]:
+    sid = quote(str(session_id))
+    base = dim_base.rstrip("/")
+    return {
+        "dim_session_status_url": f"{base}/api/sessions/{sid}/status",
+        "dim_graph_status_url": f"{base}/api/sessions/{sid}/graph/status",
+    }
+
+
 def session_debug_urls(profile: dict[str, Any], session_id: str) -> dict[str, str]:
     """Return operator-facing DIM REST URLs for a session (status + graph)."""
     if profile.get("deployment_backend") != "rest_remote":
@@ -39,12 +49,7 @@ def session_debug_urls(profile: dict[str, Any], session_id: str) -> dict[str, st
     if deploy_host is None or deploy_port is None:
         return {}
     dim_base = dim_rest_http_base(str(deploy_host), int(deploy_port))
-    sid = quote(str(session_id))
-    base = dim_base.rstrip("/")
-    return {
-        "dim_session_status_url": f"{base}/api/sessions/{sid}/status",
-        "dim_graph_status_url": f"{base}/api/sessions/{sid}/graph/status",
-    }
+    return dim_operator_urls_from_base(dim_base, session_id)
 
 
 async def translate(
@@ -184,12 +189,21 @@ async def deploy_session_payload(
     finally:
         deploy.close()
 
+    urls = dim_operator_urls_from_base(dim_base, session_id)
+    merged_manifest = merge_dim_deploy_into_manifest(
+        execution.get("workflow_manifest"),
+        session_id=str(session_id),
+        dim_rest_base=dim_base.rstrip("/"),
+        verify_ssl=verify_ssl,
+        operator_urls=urls,
+    )
     await execution_ledger_service.update_execution_status(
         db=db,
         execution_id=execution_id,
         scheduler_name="daliuge",
         scheduler_job_id=session_id,
         execution_phase=ExecutionPhase.SUBMIT,
+        workflow_manifest=merged_manifest,
     )
 
 
@@ -243,6 +257,7 @@ async def poll_session(
     dim_base = dim_rest_http_base(str(deploy_host), int(deploy_port))
 
     sid = quote(str(session_id))
+    http_status: int | None = None
     async with httpx.AsyncClient(
         base_url=dim_base.rstrip("/"),
         verify=profile["verify_ssl"],
@@ -250,6 +265,7 @@ async def poll_session(
     ) as client:
         r = await client.get(f"/api/sessions/{sid}/status")
         r.raise_for_status()
+        http_status = int(r.status_code)
         status_payload = r.json()
 
         session_state = _parse_dim_session_status(status_payload)
@@ -275,6 +291,15 @@ async def poll_session(
             execution_id,
             session_id,
         )
+        merged = merge_dim_poll_into_manifest(
+            execution.get("workflow_manifest"),
+            session_id=str(session_id),
+            session_state=str(session_state),
+            http_status=http_status,
+            record_terminal=True,
+            terminal_ledger_status="completed",
+            graph={"status": "ok"},
+        )
         await execution_ledger_service.update_execution_status(
             db=db,
             execution_id=execution_id,
@@ -282,6 +307,15 @@ async def poll_session(
             scheduler_name="daliuge",
             scheduler_job_id=str(session_id),
             execution_phase=None,
+            workflow_manifest=merged,
+        )
+        logger.info(
+            "event=ledger_dim_terminal_persisted execution_id=%s session_id=%s "
+            "session_state=%s http_status=%s ledger_status=completed",
+            execution_id,
+            session_id,
+            session_state,
+            http_status,
         )
         return {"terminal": True, "status": "completed"}
 
@@ -291,6 +325,14 @@ async def poll_session(
             execution_id,
             session_id,
         )
+        merged = merge_dim_poll_into_manifest(
+            execution.get("workflow_manifest"),
+            session_id=str(session_id),
+            session_state=str(session_state),
+            http_status=http_status,
+            record_terminal=True,
+            terminal_ledger_status="cancelled",
+        )
         await execution_ledger_service.update_execution_status(
             db=db,
             execution_id=execution_id,
@@ -298,6 +340,15 @@ async def poll_session(
             scheduler_name="daliuge",
             scheduler_job_id=str(session_id),
             execution_phase=ExecutionPhase.SUBMIT,
+            workflow_manifest=merged,
+        )
+        logger.info(
+            "event=ledger_dim_terminal_persisted execution_id=%s session_id=%s "
+            "session_state=%s http_status=%s ledger_status=cancelled",
+            execution_id,
+            session_id,
+            session_state,
+            http_status,
         )
         return {"terminal": True, "status": "cancelled"}
 
@@ -316,6 +367,24 @@ async def poll_session(
         session_id,
         error_msg,
     )
+    drops_count = len(error_drops) if isinstance(error_drops, list) else None
+    graph_payload: dict[str, Any] | None = None
+    if isinstance(error_drops, list) and error_drops:
+        graph_payload = {
+            "error_drop_count": drops_count or len(error_drops),
+            "error_drop_uids": [str(x) for x in error_drops],
+        }
+    merged = merge_dim_poll_into_manifest(
+        execution.get("workflow_manifest"),
+        session_id=str(session_id),
+        session_state=str(session_state),
+        http_status=http_status,
+        record_terminal=True,
+        terminal_ledger_status="failed",
+        error=error_msg,
+        error_drops_count=drops_count,
+        graph=graph_payload,
+    )
     await execution_ledger_service.update_execution_status(
         db=db,
         execution_id=execution_id,
@@ -324,6 +393,15 @@ async def poll_session(
         scheduler_name="daliuge",
         scheduler_job_id=str(session_id),
         execution_phase=ExecutionPhase.SUBMIT,
+        workflow_manifest=merged,
+    )
+    logger.info(
+        "event=ledger_dim_terminal_persisted execution_id=%s session_id=%s "
+        "session_state=%s http_status=%s ledger_status=failed",
+        execution_id,
+        session_id,
+        session_state,
+        http_status,
     )
     return {
         "terminal": True,
@@ -335,6 +413,7 @@ async def poll_session(
 
 __all__ = [
     "deploy_session_payload",
+    "dim_operator_urls_from_base",
     "poll_session",
     "session_debug_urls",
     "translate",
