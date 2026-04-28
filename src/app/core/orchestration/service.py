@@ -24,6 +24,7 @@ from ..exceptions.workflow_exceptions import (
     wf_staging_requires_casda,
     wf_unexpected,
 )
+from ..ledger.run_record import extract_beampipe_run_record, has_beampipe_run_record
 from ..ledger.service import execution_ledger_service
 from ..ledger.source_readiness import (
     filter_archive_rows_by_sbids,
@@ -31,11 +32,12 @@ from ..ledger.source_readiness import (
     parsed_source_readiness_error,
     source_identifiers_from_specs,
 )
+from ..projects import load_project_module
 from ..projects.service import get_graph_path, resolve_graph_content
 from ..registry.service import source_registry_service
 from ..restate_invoke import invoke_restate_workflow
 from . import rest, slurm
-from .manifest import inject_manifest_config_into_graph
+from .manifest import apply_manifest_graph_overrides, inject_manifest_config_into_graph
 from .manifest_builder import build_manifest
 from .staging import stage_sources_for_manifest
 
@@ -108,6 +110,15 @@ async def read_execution_ledger_snapshot(
 
     phase = execution.get("execution_phase")
     st = execution.get("status")
+    wm = execution.get("workflow_manifest")
+
+    def _iso(dt: Any) -> str | None:
+        if dt is None:
+            return None
+        if hasattr(dt, "isoformat"):
+            return cast(Any, dt).isoformat()
+        return str(dt)
+
     out: dict[str, Any] = {
         "execution_id": str(execution_id),
         "project_module": execution.get("project_module"),
@@ -115,10 +126,22 @@ async def read_execution_ledger_snapshot(
         "execution_phase": str(phase) if phase is not None else None,
         "scheduler_job_id": execution.get("scheduler_job_id"),
         "scheduler_name": execution.get("scheduler_name"),
-        "has_manifest": bool(execution.get("workflow_manifest")),
+        "has_manifest": bool(wm),
+        "has_beampipe_run_record": has_beampipe_run_record(wm if isinstance(wm, dict) else None),
         "last_error": execution.get("last_error"),
+        "retry_count": execution.get("retry_count") or 0,
+        "deployment_profile_id": str(execution["deployment_profile_id"])
+        if execution.get("deployment_profile_id")
+        else None,
+        "created_at": _iso(execution.get("created_at")),
+        "updated_at": _iso(execution.get("updated_at")),
+        "started_at": _iso(execution.get("started_at")),
+        "completed_at": _iso(execution.get("completed_at")),
     }
     out.update(await enrich_execution_dim_rest_urls(db, execution))
+    rr = extract_beampipe_run_record(wm if isinstance(wm, dict) else None)
+    if rr:
+        out["beampipe_run_record"] = rr
     return out
 
 
@@ -338,7 +361,8 @@ async def stage_sources_for_execution(
     *,
     casda_username: str | None = None,
     do_stage: bool = True,
-) -> dict[str, dict[str, str]]:
+    stage_by_sbid: bool | None = None,
+) -> dict[str, Any]:
     from ...crud.crud_execution_record import crud_batch_execution_records
     from ...schemas.ledger import BatchExecutionRecordRead
 
@@ -360,6 +384,7 @@ async def stage_sources_for_execution(
             "eval_urls_by_sbid": {},
             "checksum_urls_by_scan_id": {},
             "eval_checksum_urls_by_sbid": {},
+            "staging_failed_sbids": [],
         }
     if execution_phase == ExecutionPhase.SUBMIT and existing_manifest:
         return {
@@ -367,6 +392,7 @@ async def stage_sources_for_execution(
             "eval_urls_by_sbid": {},
             "checksum_urls_by_scan_id": {},
             "eval_checksum_urls_by_sbid": {},
+            "staging_failed_sbids": [],
         }
 
     project_module = execution["project_module"]
@@ -389,14 +415,16 @@ async def stage_sources_for_execution(
             "eval_urls_by_sbid": {},
             "checksum_urls_by_scan_id": {},
             "eval_checksum_urls_by_sbid": {},
+            "staging_failed_sbids": [],
         }
 
-    staged_urls, eval_urls, checksum_urls, eval_checksum_urls = (
+    staged_urls, eval_urls, checksum_urls, eval_checksum_urls, staging_failed_sbids = (
         await stage_sources_for_manifest(
             db=db,
             project_module=project_module,
             sources=sources,
             casda_username=str(casda_user),
+            stage_by_sbid=stage_by_sbid,
         )
     )
     return {
@@ -404,6 +432,7 @@ async def stage_sources_for_execution(
         "eval_urls_by_sbid": eval_urls,
         "checksum_urls_by_scan_id": checksum_urls,
         "eval_checksum_urls_by_sbid": eval_checksum_urls,
+        "staging_failed_sbids": sorted(staging_failed_sbids),
     }
 
 
@@ -415,6 +444,7 @@ async def build_manifest_for_execution(
     eval_urls_by_sbid: dict[str, str] | None = None,
     checksum_urls_by_scan_id: dict[str, str] | None = None,
     eval_checksum_urls_by_sbid: dict[str, str] | None = None,
+    exclude_sbids: list[str] | None = None,
 ) -> dict:
     """Build the daliuge manifest for an execution (replay-safe)."""
     from ...crud.crud_execution_record import crud_batch_execution_records
@@ -445,6 +475,7 @@ async def build_manifest_for_execution(
         eval_urls_by_sbid=eval_urls_by_sbid or {},
         checksum_urls_by_scan_id=checksum_urls_by_scan_id or {},
         eval_checksum_urls_by_sbid=eval_checksum_urls_by_sbid or {},
+        exclude_sbids=exclude_sbids or [],
     )
     sid = beampipe_session_id(
         execution_id=execution_id,
@@ -553,6 +584,15 @@ async def translate_dim_session_for_execution(
 
     graph_json = json.loads(graph_content)
     inject_manifest_config_into_graph(graph_json, manifest)
+    apply_manifest_graph_overrides(graph_json, manifest)
+    try:
+        pm = load_project_module(project_module)
+    except ValueError:
+        pm = None
+    if pm is not None:
+        hook = getattr(pm, "apply_graph_translate_overrides", None)
+        if callable(hook):
+            hook(graph_json, manifest)
 
     graph_path = get_graph_path(project_module)
     lg_name = f"{project_module}.graph"
@@ -813,6 +853,7 @@ async def execute_execution(
                 eval_urls_by_sbid=stage_out["eval_urls_by_sbid"],
                 checksum_urls_by_scan_id=stage_out["checksum_urls_by_scan_id"],
                 eval_checksum_urls_by_sbid=stage_out["eval_checksum_urls_by_sbid"],
+                exclude_sbids=stage_out.get("staging_failed_sbids") or [],
             )
 
         if do_submit:

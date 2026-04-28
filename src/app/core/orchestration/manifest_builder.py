@@ -28,6 +28,7 @@ async def build_manifest(
     eval_urls_by_sbid: dict[str, str] | None = None,
     checksum_urls_by_scan_id: dict[str, str] | None = None,
     eval_checksum_urls_by_sbid: dict[str, str] | None = None,
+    exclude_sbids: list[str] | None = None,
 ) -> dict[str, Any]:
     """
     1. Loads project module and fetches metadata from archive_metadata.
@@ -36,6 +37,8 @@ async def build_manifest(
     """
     module = load_project_module(project_module)
     metadata_by_source: dict[str, list[dict[str, Any]]] = {}
+
+    excluded = {str(x) for x in (exclude_sbids or [])}
 
     for spec in sources:
         sid = spec.get("source_identifier") if isinstance(spec, dict) else getattr(spec, "source_identifier", None)
@@ -49,7 +52,9 @@ async def build_manifest(
             sbids=sbids,
         )
         if records:
-            metadata_by_source[sid] = records
+            filtered = [r for r in records if str(r.get("sbid")) not in excluded]
+            if filtered:
+                metadata_by_source[sid] = filtered
 
     build_fn = getattr(module, "manifest", None)
     if not callable(build_fn):
@@ -69,6 +74,13 @@ async def build_manifest(
         "inputs": {},
         "sources": sources,
     }
+    merge_fn = getattr(module, "graph_overrides_from_sources", None)
+    if callable(merge_fn):
+        extra = merge_fn(sources)
+        if isinstance(extra, dict):
+            go = extra.get("graph_overrides")
+            if go is not None:
+                manifest["graph_overrides"] = go
     # if credentials_ini_url:
     #     manifest["inputs"]["credentials_ini_url"] = credentials_ini_url
 

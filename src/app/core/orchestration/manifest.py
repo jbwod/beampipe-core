@@ -1,8 +1,11 @@
 import json
+import logging
 import tempfile
 import time
 import uuid
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 ManifestDict = dict[str, Any]
 
@@ -39,6 +42,80 @@ def resolve_beampipe_ingest_uuids(lg_dict: ManifestDict) -> tuple[str, str] | No
                     return (str(node_id), str(field_id))
         return None
     return None
+
+
+def _node_name_matches(node: dict[str, Any], match: dict[str, Any]) -> bool:
+    if not isinstance(match, dict):
+        return False
+    kind = match.get("kind") or "node_name"
+    if kind != "node_name":
+        return False
+    name = node.get("name")
+    if not isinstance(name, str):
+        return False
+    if "equals" in match:
+        return name == match["equals"]
+    return False
+
+
+def _set_field_value(field: dict[str, Any], value: Any) -> None:
+    field["value"] = value
+    if field.get("type") == "Integer":
+        field["defaultValue"] = str(value)
+
+
+def apply_manifest_graph_overrides(lg_dict: ManifestDict, manifest_dict: ManifestDict | None) -> None:
+    if not manifest_dict:
+        return
+    spec = manifest_dict.get("graph_overrides")
+    if not isinstance(spec, dict):
+        return
+    patches = spec.get("patches")
+    if not isinstance(patches, list) or len(patches) == 0:
+        return
+
+    nodes = lg_dict.get(GRAPH_NODES)
+    if not isinstance(nodes, list):
+        logger.warning("event=graph_overrides_skip reason=no_nodeDataArray")
+        return
+
+    for patch in patches:
+        if not isinstance(patch, dict):
+            continue
+        match_spec = patch.get("match") or {}
+        fields_spec = patch.get("fields")
+        if not isinstance(fields_spec, list):
+            continue
+
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            if not _node_name_matches(node, match_spec):
+                continue
+            node_name = node.get("name")
+            node_fields = node.get(GRAPH_FIELDS)
+            if not isinstance(node_fields, list):
+                continue
+            for fd in fields_spec:
+                if not isinstance(fd, dict):
+                    continue
+                fname = fd.get("name")
+                if not fname:
+                    continue
+                val = fd.get("value")
+                for nf in node_fields:
+                    if not isinstance(nf, dict):
+                        continue
+                    if nf.get("name") != fname:
+                        continue
+                    _set_field_value(nf, val)
+                    logger.info(
+                        "event=graph_override_applied node_name=%s field=%s value=%s",
+                        node_name,
+                        fname,
+                        val,
+                    )
+                    break
 
 
 def inject_manifest_config_into_graph(
@@ -130,5 +207,6 @@ def resolve_lg_with_manifest(
             manifest_dict = json.load(mf)
     if manifest_dict is not None:
         inject_manifest_config_into_graph(lg_dict, manifest_dict)
+        apply_manifest_graph_overrides(lg_dict, manifest_dict)
         return write_filled_lg_to_temp(lg_dict)
     return lg_path
