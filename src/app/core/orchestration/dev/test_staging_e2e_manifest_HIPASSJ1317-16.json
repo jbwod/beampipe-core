@@ -1,0 +1,53 @@
+{
+  "inputs": {},
+  "sources": [
+    {
+      "source_identifier": "HIPASSJ1317-16",
+      "ra_string": "13h17m16.5s",
+      "dec_string": "-16.37.54.0",
+      "vsys": 1750.0,
+      "sbids": [
+        {
+          "sbid": "72962",
+          "evaluation_file": "calibration-metadata-processing-logs-SB72962_2025-04-21-063210.tar",
+          "evaluation_file_url": "https://data.csiro.au/casda_vo_proxy/vo/datalink/links?ID=evaluation-90293",
+          "evaluation_file_checksum_url": "",
+          "datasets": [
+            {
+              "name": "HIPASSJ1317-16_SB72962_F00_B00.ms.tar",
+              "staged_url": "",
+              "checksum_url": ""
+            },
+            {
+              "name": "HIPASSJ1317-16_SB72962_F00_B02.ms.tar",
+              "staged_url": "",
+              "checksum_url": ""
+            },
+            {
+              "name": "HIPASSJ1317-16_SB72962_F00_B14.ms.tar",
+              "staged_url": "",
+              "checksum_url": ""
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "graph_overrides": {
+    "version": 1,
+    "patches": [
+      {
+        "match": {
+          "kind": "node_name",
+          "equals": "Scatter/GenericScatterApp/Beam"
+        },
+        "fields": [
+          {
+            "name": "num_of_copies",
+            "value": 3
+          }
+        ]
+      }
+    ]
+  }
+}

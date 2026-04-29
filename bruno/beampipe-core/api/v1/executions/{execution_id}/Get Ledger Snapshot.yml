@@ -1,0 +1,47 @@
+info:
+  name: Get Ledger Snapshot
+  type: http
+  seq: 2
+  tags:
+    - executions
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/executions/:execution_id/ledger-snapshot"
+  params:
+    - name: execution_id
+      value: ""
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Ledger view for Restate parity (timestamps, beampipe_run_record when present)
+    request:
+      url: "{{baseUrl}}/api/v1/executions/:execution_id/ledger-snapshot"
+      method: GET
+      params:
+        - name: execution_id
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "execution_id": "",
+            "status": "",
+            "has_manifest": false,
+            "has_beampipe_run_record": false
+          }

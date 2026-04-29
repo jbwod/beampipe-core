@@ -16,11 +16,27 @@ from ..archive.adapters.casda import (
 )
 from ..archive.adapters.casda.credentials import init_casda_client
 from ..archive.service import archive_metadata_service
+from ..config import settings
 from ..projects import load_project_module
 from ..worker.tasks.discovery_batch import resolve_module_adapters
 from .manifest_builder import _get_sbids_for_source  # noqa: F401 — shared helper
 
 logger = logging.getLogger(__name__)
+
+
+def _effective_stage_by_sbid(stage_by_sbid: bool | None) -> bool:
+    if stage_by_sbid is not None:
+        return stage_by_sbid
+    return settings.CASDA_STAGE_BY_SBID
+
+
+def _sort_sbids(sbids: set[str]) -> list[str]:
+    def key(s: str) -> tuple[int, str]:
+        if s.isdigit():
+            return (0, int(s))
+        return (1, s)
+
+    return sorted(sbids, key=key)
 
 
 async def stage_sources_for_manifest(
@@ -31,7 +47,9 @@ async def stage_sources_for_manifest(
     *,
     adapters: dict[str, Any] | None = None,
     service_name: str = "async_service",
-) -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:
+    stage_by_sbid: bool | None = None,
+) -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str], set[str]]:
+# returns all staged urls, eval urls, checksum urls, eval checksum urls, and failed sbids
     module = load_project_module(project_module)
     if adapters is None:
         adapters = resolve_module_adapters(module) or {}
@@ -52,58 +70,85 @@ async def stage_sources_for_manifest(
         )
         all_records.extend(records)
         table = metadata_records_to_staging_table(records)
-        # if len(table) == 0:
-            # logger.debug(
-            #     "event=stage_sources_no_metadata project_module=%s source=%s falling_back_to_discover",
-            #     project_module,
-            #     source_identifier,
-            # )
-            # discover_fn = getattr(module, "discover")
-            # bundle = discover_fn(source_identifier, adapters=adapters or None)
-            # if not isinstance(bundle, dict):
-            #     logger.warning(
-            #         "event=stage_sources_discover_invalid project_module=%s source=%s",
-            #         project_module,
-            #         source_identifier,
-            #     )
-            #     continue
-            # query_results = bundle.get("query_results")
-            # if query_results is None or (
-            #     hasattr(query_results, "__len__") and len(query_results) == 0
-            # ):
-            #     logger.debug(
-            #         "event=stage_sources_no_results project_module=%s source=%s",
-            #         project_module,
-            #         source_identifier,
-            #     )
-            #     continue
-            # table = query_results
         tables_to_stage.append(table)
 
-    if not tables_to_stage:
+    if not all_records:
         logger.debug("event=stage_sources_no_datasets project_module=%s", project_module)
-        return {}, {}, {}, {}
+        return {}, {}, {}, {}, set()
 
-    # https://docs.astropy.org/en/latest/api/astropy.table.vstack.html
-    combined_table = vstack(tables_to_stage)
+    split_visibility = _effective_stage_by_sbid(stage_by_sbid)
     casda = init_casda_client(casda_username)
-
-    # Stage visibilities (access_url from metadata)
+    # https://docs.astropy.org/en/latest/api/astropy.table.vstack.html
     all_staged: dict[str, str] = {}
     all_checksums: dict[str, str] = {}
     all_eval: dict[str, str] = {}
     all_eval_checksums: dict[str, str] = {}
+    staging_failed_sbids: set[str] = set()
+
     try:
-        data_urls, checksum_urls = casda_stage_data(
-            casda,
-            combined_table,
-            verbose=True,
-            service_name=service_name,
-        )
-        for scan_id, url in data_urls.items():
-            all_staged[scan_id] = url
-        for scan_id, url in checksum_urls.items():
-            all_checksums[scan_id] = url
+        if split_visibility:
+            sbid_set = {str(r["sbid"]) for r in all_records if r.get("sbid") is not None}
+            for sb in _sort_sbids(sbid_set):
+                sub_records = [r for r in all_records if str(r.get("sbid")) == sb]
+                vis_table = metadata_records_to_staging_table(sub_records)
+                if len(vis_table) == 0:
+                    continue
+                logger.info(
+                    "event=casda_stage_visibility_by_sbid project_module=%s sbid=%s rows=%s",
+                    project_module,
+                    sb,
+                    len(vis_table),
+                )
+                try:
+                    data_urls, checksum_urls = casda_stage_data(
+                        casda,
+                        vis_table,
+                        verbose=True,
+                        service_name=service_name,
+                    )
+                except ValueError as e:
+                    if "do not have access to any of the requested data files" in str(e).lower():
+                        logger.warning(
+                            "event=casda_stage_visibility_access_denied project_module=%s sbid=%s error=%s",
+                            project_module,
+                            sb,
+                            e,
+                        )
+                        staging_failed_sbids.add(str(sb))
+                        continue
+                    raise
+                all_staged.update(data_urls)
+                all_checksums.update(checksum_urls)
+
+            orphans = [r for r in all_records if r.get("sbid") is None]
+            if orphans:
+                logger.warning(
+                    "event=casda_stage_visibility_missing_sbid project_module=%s orphan_records=%s",
+                    project_module,
+                    len(orphans),
+                )
+                vis_table = metadata_records_to_staging_table(orphans)
+                if len(vis_table) > 0:
+                    data_urls, checksum_urls = casda_stage_data(
+                        casda,
+                        vis_table,
+                        verbose=True,
+                        service_name=service_name,
+                    )
+                    all_staged.update(data_urls)
+                    all_checksums.update(checksum_urls)
+        else:
+            combined_table = vstack(tables_to_stage)
+            data_urls, checksum_urls = casda_stage_data(
+                casda,
+                combined_table,
+                verbose=True,
+                service_name=service_name,
+            )
+            for scan_id, url in data_urls.items():
+                all_staged[scan_id] = url
+            for scan_id, url in checksum_urls.items():
+                all_checksums[scan_id] = url
     except Exception as e:
         logger.error(
             "event=stage_sources_error project_module=%s error=%s",
@@ -114,6 +159,7 @@ async def stage_sources_for_manifest(
         raise
 
     # Stage evaluation files
+
     eval_table = metadata_records_to_eval_staging_table(all_records)
     if len(eval_table) > 0:
         try:
@@ -131,4 +177,8 @@ async def stage_sources_for_manifest(
                 e,
             )
 
-    return all_staged, all_eval, all_checksums, all_eval_checksums
+    for sb in staging_failed_sbids:
+        all_eval.pop(sb, None)
+        all_eval_checksums.pop(sb, None)
+
+    return all_staged, all_eval, all_checksums, all_eval_checksums, staging_failed_sbids
