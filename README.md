@@ -1,3 +1,37 @@
+<div align="center">
+
+<table width="100%">
+  <tr>
+    <td align="center" style="background-color: #422006; border: 2px solid #fbbf24; border-radius: 10px; padding: 0;">
+
+<table width="100%">
+  <tr>
+    <td align="center" style="background-color: #fbbf24; padding: 10px 24px;">
+      <p style="font-size: 13px; font-weight: 800; letter-spacing: 0.18em; color: #422006; margin: 0;">
+        ⚠&nbsp; DEPRECATED &nbsp;⚠
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" style="padding: 18px 28px 20px;">
+      <p style="font-size: 15px; color: #fef3c7; margin: 0 0 14px 0; line-height: 1.6;">
+        This repository is no longer maintained.<br/>
+        Active development continues at
+        <strong style="color: #fde68a;">beampipe-core-v2</strong>.
+      </p>
+      <a href="https://github.com/jbwod/beampipe-core-v2">
+        <img src="https://img.shields.io/badge/Continue_at-beampipe--core--v2-422006?style=for-the-badge&labelColor=fbbf24&logo=github&logoColor=422006" alt="Continue at beampipe-core-v2" />
+      </a>
+    </td>
+  </tr>
+</table>
+  </tr>
+</table>
+
+</div>
+
+<br/>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/4414e79f-7431-4999-b2ef-28cf9f0b254e">
   <source media="(prefers-color-scheme: light)" srcset="https://github.com/user-attachments/assets/648d6a14-e1ee-4297-aa36-ff58f130e5d8">
